@@ -3,7 +3,6 @@ from collections import namedtuple
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,7 +11,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 
-import config
+import src.config as config
 
 CoordsTuple = namedtuple("Coords", "latitude longitude")
 center_of_paris = CoordsTuple(latitude=48.8580073, longitude=2.3342828)
@@ -58,7 +57,7 @@ def traffic_screenshots_folder(screenshot_period):
 
 
 if __name__ == "__main__":
-    screenshot_period = 15  # in minutes
+    screenshot_period = 30  # in minutes
     selenium_test_dir = traffic_screenshots_folder(screenshot_period)
 
     # ---------- ----------- ----------- ----------- #

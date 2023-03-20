@@ -7,8 +7,8 @@ from imageio.v2 import imread
 from scipy import sparse
 from tqdm import tqdm
 
-import config
-from lib.DataProcessing.SeleniumScreenshots import get_info_from_name, traffic_screenshots_folder
+import src.config as config
+from src.lib.DataProcessing.SeleniumScreenshots import get_info_from_name, traffic_screenshots_folder
 from src.performance_utils import get_map_function, timeit
 
 TRAFFIC_TS_LAG = -1  # 1 hour less because GMT+1 vs GMT+0
