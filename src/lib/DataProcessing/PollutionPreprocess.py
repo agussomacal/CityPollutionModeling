@@ -45,7 +45,13 @@ def get_stations_lat_long():
     return stations_latlong
 
 
-def filter_pollution_dates(pollution, traffic_by_pixel, station_coordinates, minimal_proportion_of_available_data=0.2):
+def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, traffic_pixels_coords, minimal_proportion_of_available_data=0.2):
+    # filter the stations inside the map
+    max_coords = traffic_pixels_coords.max(axis=1)
+    min_coords = traffic_pixels_coords.min(axis=1)
+    pollution = pollution.loc[:, ((station_coordinates <= max_coords) & (station_coordinates >= min_coords)).all(axis=1)]
+    pollution.sort_index(inplace=True)
+
     # ----- filter pollution data by traffic dates ------ #
     pollution = pollution.loc[pollution.index.intersection(traffic_by_pixel.index)]  # filter the useful rows
     known_stations = pollution.columns.intersection(station_coordinates.index)
@@ -55,4 +61,6 @@ def filter_pollution_dates(pollution, traffic_by_pixel, station_coordinates, min
     station_coordinates = station_coordinates.loc[known_stations, :]
     station_coordinates = station_coordinates.loc[stations_nan_mask, :]
     pollution = pollution.loc[:, stations_nan_mask]
+    print(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
+          f"{pollution.columns}")
     return pollution, station_coordinates

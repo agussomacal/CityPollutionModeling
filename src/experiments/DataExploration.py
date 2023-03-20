@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 
 import config
 from lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
-from lib.DataProcessing.SeleniumScreenshots import traffic_screenshots_folder
 from lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
 from src.viz_utils import save_fig
@@ -39,7 +38,8 @@ if __name__ == "__main__":
     pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
     station_coordinates = get_stations_lat_long()
     latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)
-    pollution, station_coordinates = filter_pollution_dates(pollution, traffic_by_pixel, station_coordinates)
+    pollution, station_coordinates = filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel,
+                                                            traffic_pixels_coords)
 
     with save_fig(plots_dir, "AvailableStations_InPeriod.png"):
         plot_stations_in_map(load_background(screenshot_period), station_coordinates, latitudes, longitudes)
