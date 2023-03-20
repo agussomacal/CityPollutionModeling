@@ -2,3 +2,9 @@ pandas
 numpy
 matplotlib
 seaborn
+webdriver-manager
+selenium
+scipy
+imageio
+tqdm
+pathos
