@@ -46,7 +46,7 @@ def get_info_from_name(fname):
     minute = minute.split(".")[0]
     year, month, day, hour, minute = list(map(int, [year, month, day, hour, minute]))
     return name, CoordsTuple(latitude=lat, longitude=long), \
-        int(zoom), datetime.datetime(*list(map(int, [year, month, day, hour, minute])))
+        int(zoom), datetime(*list(map(int, [year, month, day, hour, minute])))
 
 
 def traffic_screenshots_folder(screenshot_period):

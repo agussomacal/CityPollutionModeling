@@ -1,4 +1,5 @@
 pandas
+geopandas
 numpy
 matplotlib
 seaborn
@@ -8,3 +9,6 @@ scipy
 imageio
 tqdm
 pathos
+makefun
+joblib
+python-benedict

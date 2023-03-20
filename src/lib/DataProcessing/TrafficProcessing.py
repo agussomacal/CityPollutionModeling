@@ -35,6 +35,14 @@ def load_image(filepath, shape=(800, 1000)):
     return image[(sx // 2 - shape[0] // 2):(sx // 2 + 400), (sy // 2 - 500):(sy // 2 + 500), :-1]
 
 
+def load_background(screenshot_period):
+    # Load background image
+    return load_image(glob.glob(f"{traffic_screenshots_folder(screenshot_period)}/Background_*.png")[0])
+
+
+# =============== =============== =============== #
+#              Process traffic images
+# =============== =============== =============== #
 def filter_image_by_colors(img, colors_dict, color_width=2):
     filtered_image = np.zeros(np.shape(img)[:-1])
     for name, value in colors_dict.items():
@@ -89,3 +97,80 @@ def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nro
         traffic_by_pixel.index = pd.to_datetime(traffic_by_pixel.index)
         traffic_by_pixel.columns = traffic_by_pixel.columns.map(str2tuple)
     return traffic_by_pixel
+
+
+# =============== =============== =============== #
+#                Pixels to lat-long
+# =============== =============== =============== #
+def project(lat, long, tile_size):
+    """Mercator projection: Takes lat, long and returns world coordinates
+    """
+    siny = np.sin(lat * np.pi / 180)
+    siny = min(max(siny, -0.9999), 0.9999)
+    return tile_size * (0.5 + long / 360), tile_size * (0.5 - np.log((1 + siny) / (1 - siny)) / (4 * np.pi))
+
+
+# User settings for screenshot
+IMG_SETTINGS = {'lat': 48.864716,
+                'long': 2.349014,
+                'zoom_level': 15,
+                'tile_size': 256,
+                'scale': 2 ** 15,
+                'shape': (5000, 10000)
+                }
+
+
+def inv_project(wcx, wcy, tile_size):
+    """Inverse of project: Takes world coordinates and returns lat-long
+    """
+    long = 360 * (wcx / tile_size - 0.5)
+    b = np.exp(4 * np.pi * (0.5 - wcy / tile_size))
+    siny = (b - 1) / (b + 1)
+    return np.arcsin(siny) * 180 / np.pi, long
+
+
+def img_to_latlong(img=IMG_SETTINGS):
+    """Maps each pixel to its corresponding lat-long
+    """
+    nx, ny = img['shape'][0], img['shape'][1]
+
+    # Google Maps World Coordinates
+    wcx, wcy = project(img['lat'], img['long'], img['tile_size'])
+
+    # Google Maps Pixel Coordinates
+    px, py = int(np.floor(wcx * img['scale'])), int(np.floor(wcy * img['scale']))
+
+    # Matrix of Pixel Coordinates
+    I, J = np.indices(img['shape'])
+    PX = (px - ny // 2) * np.ones(img['shape']) + J
+    PY = (py - nx // 2) * np.ones(img['shape']) + I
+
+    # Matrix of World Coordinates
+    WCX = PX / img['scale']
+    WCY = PY / img['scale']
+
+    # Matrix of Lat-Long
+    LAT, LONG = inv_project(WCX, WCY, img['tile_size'])
+
+    return LAT, LONG
+
+
+def get_traffic_pixel_coords(screenshot_period, traffic_by_pixel):
+    background = load_background(screenshot_period)
+    px_x, px_y, _ = np.shape(background)
+    _, center, zoom, _ = get_info_from_name(
+        glob.glob(f"{traffic_screenshots_folder(screenshot_period)}/Screenshot*.png")[0])
+    latitudes, longitudes = img_to_latlong(img={
+        'lat': center.latitude,
+        'long': center.longitude,
+        'zoom_level': zoom,
+        'tile_size': 256,
+        'scale': 2 ** zoom,
+        'shape': (px_x, px_y)
+    })
+
+    traffic_pixels_coords = pd.DataFrame(
+        [latitudes[tuple(zip(*traffic_by_pixel.columns))], longitudes[tuple(zip(*traffic_by_pixel.columns))]],
+        index=["lat", "long"],
+        columns=traffic_by_pixel.columns)
+    return latitudes, longitudes, traffic_pixels_coords
