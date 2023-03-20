@@ -23,9 +23,9 @@ def plot_stations_in_map(background, station_coordinates, lat, long):
 
 
 if __name__ == "__main__":
-    recalculate_traffic_by_pixel = False
+    recalculate_traffic_by_pixel = True
     proportion_of_past_times = 0.7
-    nrows2load_traffic_data = 10  # None 1000
+    nrows2load_traffic_data = None  # None 1000
     screenshot_period = 15
 
     plots_dir = Path.joinpath(config.results_dir, "ScreenshotsAnalysis")
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     traffic_by_pixel = save_load_traffic_by_pixel_data(screenshot_period=screenshot_period,
                                                        recalculate=recalculate_traffic_by_pixel,
                                                        nrows2load_traffic_data=nrows2load_traffic_data,
-                                                       filename="Traffic_by_PixelDate")
+                                                       workers=50)
     pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
     station_coordinates = get_stations_lat_long()
     latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)

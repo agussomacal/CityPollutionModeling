@@ -1,4 +1,5 @@
 import glob
+import os.path
 from pathlib import Path
 
 import numpy as np
@@ -52,11 +53,11 @@ def filter_image_by_colors(img, colors_dict, color_width=2):
     return filtered_image
 
 
-def process_traffic_images(screenshot_period=15):
+def process_traffic_images(screenshot_period=15, workers=1):
     stations_traffic_dir = traffic_screenshots_folder(screenshot_period)
     images = []
     dates = []
-    for date, image in tqdm(get_map_function(workers=1)(
+    for date, image in tqdm(get_map_function(workers=workers)(
             lambda im_path: (get_info_from_name(im_path)[-1], load_image(im_path)),
             glob.glob(f"{stations_traffic_dir}/Screenshot*.png")), desc="Loading images"):
         images.append(sparse.csr_matrix(filter_image_by_colors(image, TRAFFIC_VALUES, color_width=1)))
@@ -75,15 +76,15 @@ def process_traffic_images(screenshot_period=15):
     return traffic
 
 
-def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None,
-                                    filename="Traffic_by_PixelDate"):
-    if recalculate:
+def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None, workers=1):
+    processed_filename = f"{config.traffic_dir}/Traffic_by_PixelDate.zip"
+    if recalculate or not os.path.exists(processed_filename):
         with timeit("Extracting traffic pixels from images: "):
-            traffic_by_pixel = process_traffic_images(screenshot_period=screenshot_period)
+            traffic_by_pixel = process_traffic_images(screenshot_period=screenshot_period, workers=workers)
             # 2Gb and slower to save than to load images and calculate.
         print("Saving traffic_by_pixel pixel summary DataFrame.")
         with timeit("Saving extracted traffic pixels: "):
-            traffic_by_pixel.to_csv(f"{config.traffic_dir}/{filename}.zip", compression="zip")
+            traffic_by_pixel.to_csv(processed_filename, compression="zip")
         # np.unique(traffic_by_pixel.values.ravel())   # array([0., 1., 2., 3., 4.]) There is exactly 4 colors.
     else:
         def str2tuple(s):
@@ -91,7 +92,7 @@ def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nro
             return int(x[1:]), int(y[1:-1])
 
         with timeit("Loading traffic pixels data: "):
-            traffic_by_pixel = pd.read_csv(f"{config.traffic_dir}/{filename}.zip",
+            traffic_by_pixel = pd.read_csv(processed_filename,
                                            compression="zip", nrows=nrows2load_traffic_data,
                                            low_memory=True, index_col=0)
         traffic_by_pixel.index = pd.to_datetime(traffic_by_pixel.index)
