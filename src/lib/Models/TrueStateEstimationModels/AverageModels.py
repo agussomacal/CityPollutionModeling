@@ -25,8 +25,8 @@ class GlobalMeanModel(BaseModel):
         self.set_params(global_mean=global_mean)
 
     def calibrate(self, observed_pollution, traffic, target_positions, **kwargs):
-        self.set_params(global_mean=np.mean(observed_pollution))
+        self.set_params(global_mean=np.mean(observed_pollution.values))
         return self
 
     def state_estimation(self, observed_pollution, traffic, target_positions, **kwargs) -> np.ndarray:
-        return np.ones(np.shape(target_positions)[:2]) * self.params["global_mean"]
+        return np.ones((len(observed_pollution), np.shape(target_positions)[1])) * self.params["global_mean"]
