@@ -42,25 +42,25 @@ def get_stations_lat_long():
     gdfstations = gdfstations.to_crs(epsg=3857)  # Change to webmercator projection
     stations_latlong = pd.DataFrame([s.coords[0] for s in gdfstations.to_crs('epsg:4326').geometry],
                                     index=stations.index, columns=["long", "lat"])
-    return stations_latlong
+    return stations_latlong.T
 
 
 def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, traffic_pixels_coords, minimal_proportion_of_available_data=0.2):
     # ----- filter pollution data by traffic dates ------ #
     pollution = pollution.loc[pollution.index.intersection(traffic_by_pixel.index)]  # filter the useful rows
-    known_stations = pollution.columns.intersection(station_coordinates.index)
+    known_stations = pollution.columns.intersection(station_coordinates.columns)
     pollution = pollution[known_stations]  # filter the known stations
     # filter station with no data more than 20% of the relevant period
     stations_nan_mask = ~(pollution.isna().mean() > minimal_proportion_of_available_data)
-    station_coordinates = station_coordinates.loc[known_stations, :]
-    station_coordinates = station_coordinates.loc[stations_nan_mask, :]
+    station_coordinates = station_coordinates[known_stations]
+    station_coordinates = station_coordinates.loc[:, stations_nan_mask]
     pollution = pollution.loc[:, stations_nan_mask]
     # filter the stations inside the map
     max_coords = traffic_pixels_coords.max(axis=1)
     min_coords = traffic_pixels_coords.min(axis=1)
-    pollution = pollution.loc[:, ((station_coordinates <= max_coords) & (station_coordinates >= min_coords)).all(axis=1)]
+    pollution = pollution.loc[:, ((station_coordinates.T <= max_coords) & (station_coordinates.T >= min_coords)).all(axis=1)]
     pollution.sort_index(inplace=True)
-    station_coordinates = station_coordinates.loc[pollution.columns, :]
+    station_coordinates = station_coordinates[pollution.columns]
     print(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
           f"{pollution.columns}")
     return pollution, station_coordinates

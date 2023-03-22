@@ -12,3 +12,5 @@ pathos
 makefun
 joblib
 python-benedict
+scikit-learn
+cma

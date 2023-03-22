@@ -77,23 +77,21 @@ def process_traffic_images(screenshot_period=15, workers=1):
 
 
 def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None, workers=1):
-    processed_filename = f"{config.traffic_dir}/Traffic_by_PixelDate.zip"
+    processed_filename = f"{config.traffic_dir}/Traffic_by_PixelDate.csv"
     if recalculate or not os.path.exists(processed_filename):
         with timeit("Extracting traffic pixels from images: "):
             traffic_by_pixel = process_traffic_images(screenshot_period=screenshot_period, workers=workers)
             # 2Gb and slower to save than to load images and calculate.
         print("Saving traffic_by_pixel pixel summary DataFrame.")
         with timeit("Saving extracted traffic pixels: "):
-            traffic_by_pixel.to_csv(processed_filename, compression="zip")
-        # np.unique(traffic_by_pixel.values.ravel())   # array([0., 1., 2., 3., 4.]) There is exactly 4 colors.
+            traffic_by_pixel.to_csv(processed_filename)
     else:
         def str2tuple(s):
             x, y = s.split(",")
             return int(x[1:]), int(y[1:-1])
 
-        with timeit("Loading traffic pixels data: "):
-            traffic_by_pixel = pd.read_csv(processed_filename,
-                                           compression="zip", nrows=nrows2load_traffic_data,
+        with timeit(f"Loading traffic pixels data: {processed_filename}"):
+            traffic_by_pixel = pd.read_csv(processed_filename, nrows=nrows2load_traffic_data,
                                            low_memory=True, index_col=0)
         traffic_by_pixel.index = pd.to_datetime(traffic_by_pixel.index)
         traffic_by_pixel.columns = traffic_by_pixel.columns.map(str2tuple)
