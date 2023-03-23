@@ -1,7 +1,9 @@
+import time
 from functools import partial
 from pathlib import Path
 
 import numpy as np
+import psutil
 from matplotlib import pyplot as plt
 import seaborn as sns
 from spiderplot import spiderplot
@@ -16,6 +18,8 @@ from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_
 from src.lib.Models.BaseModel import BaseModel, split_by_station
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.viz_utils import save_fig, generic_plot
+
+from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel
 
 
 def plot_stations_in_map(background, station_coordinates, lat, long):
@@ -45,13 +49,22 @@ def split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times, av
 
 
 if __name__ == "__main__":
-    recalculate_traffic_by_pixel = False
-    proportion_of_past_times = 0.7
-    nrows2load_traffic_data = 20  # None 1000
-    screenshot_period = 15
-
     sns.set_theme()
 
+    # ----- parameters of experiment ----- #
+    recalculate_traffic_by_pixel = False
+    proportion_of_past_times = 0.8
+    screenshot_period = 15
+
+    RAM = psutil.virtual_memory().total / 1000000000
+    if RAM > 100:  # if run in server
+        nrows2load_traffic_data = None  # None 1000
+        num_cores = 25
+    else:
+        nrows2load_traffic_data = 200  # None 1000
+        num_cores = 10
+
+    # ----- Setting data for experiment ----- #
     plots_dir = Path.joinpath(config.results_dir, "ScreenshotsAnalysis")
     plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -72,19 +85,28 @@ if __name__ == "__main__":
         split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times)
 
 
+    # ----- Defining Experiment ----- #
     def train_test_model(model: BaseModel):
         def decorated_func(station):
             # in train time use the past
             data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                                         observed_pollution=pollution_past, traffic=traffic_past)
+            t0 = time.time()
             model.calibrate(**data_known)
+            t_to_fit = time.time() - t0
             # in test time use the future
             data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                                         observed_pollution=pollution_future, traffic=traffic_future)
 
+            t0 = time.time()
+            estimation = model.state_estimation(**data_known)
+            t_to_estimate = time.time() - t0
+
             return {
                 "model_params": model.params,
-                "estimation": model.state_estimation(**data_known)
+                "estimation": estimation,
+                "time_to_fit": t_to_fit,
+                "time_to_estimate": t_to_estimate,
             }
 
         decorated_func.__name__ = str(model)
@@ -96,16 +118,21 @@ if __name__ == "__main__":
         name="NewPipeline"
     )
     lab = LabPipeline()
-    models = [SnapshotMeanModel(), GlobalMeanModel()]
+    models = [SnapshotMeanModel(summary_statistic="mean"),
+              SnapshotMeanModel(summary_statistic="median"),
+              GlobalMeanModel(),
+              TrafficMeanModel(summary_statistic="mean")]
     lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
     lab.execute(
         data_manager,
-        num_cores=2,
+        num_cores=num_cores,
         forget=False,
         recalculate=False,
         save_on_iteration=None,
         station=station_coordinates.columns.to_list()
     )
+
+    # ----- Plotting results ----- #
     generic_plot(data_manager, x="station", y="se", label="model", plot_func=spiderplot,
                  se=lambda estimation, station:
                  ((estimation - split_by_station(
@@ -114,6 +141,7 @@ if __name__ == "__main__":
                                 np.newaxis]).ravel() ** 2).mean())
 
     generic_plot(data_manager, x="station", y="se", label="model", plot_func=sns.barplot,
+                 log="",
                  se=lambda estimation, station:
                  ((estimation - split_by_station(
                      unknown_station=station, observed_stations=station_coordinates,

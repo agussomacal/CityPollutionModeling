@@ -18,14 +18,14 @@ TRAFFIC_VALUES = {
     "green": 1,
     "yellow": 2,
     "red": 3,
-    "really_bad": 4
+    "dark_red": 4
 }
 
 TRAFFIC_COLORS = {
     "green": (99, 214, 104),
     "yellow": (255, 151, 77),
     "red": (242, 60, 50),
-    "really_bad": (129, 31, 31)
+    "dark_red": (129, 31, 31)
 }
 road_color = (255, 255, 255)
 
