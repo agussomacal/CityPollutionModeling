@@ -115,10 +115,13 @@ if __name__ == "__main__":
         name="NewPipeline"
     )
     lab = LabPipeline()
-    models = [SnapshotMeanModel(summary_statistic="mean"),
-              SnapshotMeanModel(summary_statistic="median"),
-              GlobalMeanModel(),
-              TrafficMeanModel(summary_statistic="mean")]
+    models = [
+        SnapshotMeanModel(summary_statistic="mean"),
+        SnapshotMeanModel(summary_statistic="median"),
+        GlobalMeanModel(),
+        TrafficMeanModel(summary_statistic="mean"),
+        TrafficMeanModel(summary_statistic="median")
+    ]
     lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
     lab.execute(
         data_manager,
@@ -130,17 +133,19 @@ if __name__ == "__main__":
     )
 
     # ----- Plotting results ----- #
-    generic_plot(data_manager, x="station", y="se", label="model", plot_func=spiderplot,
-                 se=lambda estimation, station:
-                 ((estimation - split_by_station(
+    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+                 mse=lambda estimation, station:
+                 np.sqrt(((estimation - split_by_station(
                      unknown_station=station, observed_stations=station_coordinates,
                      observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                np.newaxis]).ravel() ** 2).mean())
+                                        np.newaxis]).ravel() ** 2).mean()))
 
-    generic_plot(data_manager, x="station", y="se", label="model", plot_func=sns.barplot,
-                 log="",
-                 se=lambda estimation, station:
-                 ((estimation - split_by_station(
+    generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
+                 error=lambda estimation, station:
+                 np.abs((estimation - split_by_station(
                      unknown_station=station, observed_stations=station_coordinates,
                      observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                np.newaxis]).ravel() ** 2).mean())
+                                      np.newaxis]).ravel()))
+
+    generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
+    generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
