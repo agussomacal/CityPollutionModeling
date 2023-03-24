@@ -1,3 +1,4 @@
+import itertools
 from collections import namedtuple
 
 import pandas as pd
@@ -9,6 +10,8 @@ from scipy.optimize import minimize
 CMA_OPTIM_METHOD = "cma"
 BFGS_OPTIM_METHOD = "bfgs"
 BFGS_PAR_OPTIM_METHOD = "bfgs_parallel"
+RANDOM = "random"
+UNIFORM = "uniform"
 NONE_OPTIM_METHOD = None
 
 Bounds = namedtuple("Bounds", "lower upper")
@@ -23,7 +26,7 @@ def split_by_station(unknown_station, observed_stations, observed_pollution, tra
                 "observed_pollution": observed_pollution.loc[valid_times, known_stations],
                 "traffic": traffic.loc[valid_times, :],
                 "target_positions": observed_stations[[unknown_station]]}, \
-            observed_pollution.loc[valid_times, unknown_station]
+               observed_pollution.loc[valid_times, unknown_station]
 
 
 def loo(observed_stations, observed_pollution, traffic):
@@ -49,9 +52,10 @@ def mse(x, y):
 class BaseModel:
     TRUE_MODEL = True
 
-    def __init__(self, name="", loss=mse, optim_method=NONE_OPTIM_METHOD, verbose=False, **kwargs):
+    def __init__(self, name="", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False, **kwargs):
         self.name = name
         self.loss = loss
+        self.niter = niter
         self.optim_method = optim_method
         self.verbose = verbose
         self._params = dict()
@@ -72,12 +76,15 @@ class BaseModel:
     def __str__(self):
         return str(self.__class__.__name__) + self.name
 
-    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
+        """
+        target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
+        """
         raise Exception("Not implemented.")
 
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, target_positions,
-                                   **kwargs) -> np.ndarray:
+                                   target_pollution, **kwargs) -> np.ndarray:
         return self.state_estimation(
             observed_stations=observed_stations,
             observed_pollution=observed_pollution,
@@ -93,9 +100,10 @@ class BaseModel:
         def optim_func(params):
             if self.verbose:
                 print("Params for optimization: ", params)
-            self.set_params(**dict(zip(self.params.keys(), optim_params)))
+            self.set_params(**dict(zip(self.params.keys(), params)))
             target_pollution, predicted_pollution = \
-                list(zip(*[(target_pollution, self.state_estimation_for_optim(**known_data, **kwargs))
+                list(zip(*[(target_pollution,
+                            self.state_estimation_for_optim(**known_data, target_pollution=target_pollution, **kwargs))
                            for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
 
             loss = self.loss(np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0))
@@ -107,11 +115,19 @@ class BaseModel:
         if self.optim_method == CMA_OPTIM_METHOD:
             optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
                                         sigma0=1, eval_initial_x=True,
-                                        options={'popsize': 10, 'maxfevals': 1000})
+                                        options={'popsize': 10, 'maxfevals': self.niter})
         elif self.optim_method == BFGS_OPTIM_METHOD:
             optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds,
                                     method="L-BFGS-B" if all([b is None for b in self.bounds.values()]) else 'SLSQP',
-                                    options={'maxiter': 1000}).x
+                                    options={'maxiter': self.niter}).x
+        elif self.optim_method in [RANDOM, UNIFORM]:
+            sampler = np.linspace if UNIFORM else np.random.uniform
+            samples = {k: sampler(*bounds, self.niter) for k, bounds in self.bounds.items() if bounds is not None}
+            losses = [optim_func(list({**self.params, **dict(zip(samples.keys(), x))}.values())) for x in
+                      zip(*sampler.values())]
+            best_ix = np.argmin(losses)
+            self.set_params(**{k: v[best_ix] for k, v in samples.items()})
+
         elif self.optim_method == NONE_OPTIM_METHOD:
             return None
         else:

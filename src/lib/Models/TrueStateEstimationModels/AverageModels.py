@@ -14,10 +14,10 @@ class SummaryModel(BaseModel):
 
 
 class SnapshotMeanModel(SummaryModel):
-    def calibrate(self, observed_pollution, traffic, target_positions, **kwargs):
+    def calibrate(self, observed_stations, observed_pollution, traffic, **kwargs):
         return self
 
-    def state_estimation(self, observed_pollution, traffic, target_positions, **kwargs) -> np.ndarray:
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions, **kwargs) -> np.ndarray:
         summary_function = getattr(np, 'nan'+self.summary_statistic)
         return summary_function(observed_pollution.values, axis=1)[:, np.newaxis] * \
                np.ones((1, np.shape(target_positions)[1]))
@@ -28,10 +28,10 @@ class GlobalMeanModel(SummaryModel):
         super(GlobalMeanModel, self).__init__(summary_statistic=summary_statistic)
         self.set_params(global_mean=global_mean)
 
-    def calibrate(self, observed_pollution, traffic, target_positions, **kwargs):
+    def calibrate(self, observed_stations, observed_pollution, traffic, **kwargs):
         summary_function = getattr(np, 'nan'+self.summary_statistic)
         self.set_params(global_mean=summary_function(observed_pollution.values))
         return self
 
-    def state_estimation(self, observed_pollution, traffic, target_positions, **kwargs) -> np.ndarray:
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions, **kwargs) -> np.ndarray:
         return np.ones((len(observed_pollution), np.shape(target_positions)[1])) * self.params["global_mean"]
