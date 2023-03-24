@@ -1,3 +1,5 @@
+import os
+import urllib
 from datetime import datetime
 
 import geopandas
@@ -8,8 +10,22 @@ import pandas as pd
 import src.config as config
 
 
+def download_pollution_files(year, filename):
+    if year == 2023:
+        code = "977a0df593384000991de41669679303"
+    elif year == 2022:
+        code = "bfeac8949e5c4d75b281a26a36aee3f4"
+    else:
+        raise Exception("Only years 2022 and 2023 are available")
+
+    urllib.request.urlretrieve(f"https://www.arcgis.com/sharing/rest/content/items/{code}/data", filename)
+
+
 def load_pollution_file(year):
-    pollution = pd.read_csv(f"{config.observations_dir}/{year}_NO2.csv", index_col=0, header=2)[3:]
+    filename = f"{config.observations_dir}/{year}_NO2.csv"
+    if not os.path.exists(filename):
+        download_pollution_files(year, filename)
+    pollution = pd.read_csv(filename, index_col=0, header=2)[3:]
     pollution.index = pd.to_datetime(pollution.index).tz_localize(None)
     pollution = pollution.astype(float)
     return pollution
@@ -45,7 +61,8 @@ def get_stations_lat_long():
     return stations_latlong.T
 
 
-def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, traffic_pixels_coords, minimal_proportion_of_available_data=0.2):
+def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, traffic_pixels_coords,
+                           minimal_proportion_of_available_data=0.2):
     # ----- filter pollution data by traffic dates ------ #
     pollution = pollution.loc[pollution.index.intersection(traffic_by_pixel.index)]  # filter the useful rows
     known_stations = pollution.columns.intersection(station_coordinates.columns)
@@ -58,7 +75,8 @@ def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, tra
     # filter the stations inside the map
     max_coords = traffic_pixels_coords.max(axis=1)
     min_coords = traffic_pixels_coords.min(axis=1)
-    pollution = pollution.loc[:, ((station_coordinates.T <= max_coords) & (station_coordinates.T >= min_coords)).all(axis=1)]
+    pollution = pollution.loc[:,
+                ((station_coordinates.T <= max_coords) & (station_coordinates.T >= min_coords)).all(axis=1)]
     pollution.sort_index(inplace=True)
     station_coordinates = station_coordinates[pollution.columns]
     print(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "

@@ -76,7 +76,8 @@ def process_traffic_images(screenshot_period=15, workers=1):
     return traffic
 
 
-def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None, workers=1):
+def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None, workers=1,
+                                    chunksize=None):
     processed_filename = f"{config.traffic_dir}/Traffic_by_PixelDate.csv"
     if recalculate or not os.path.exists(processed_filename):
         with timeit("Extracting traffic pixels from images: "):
@@ -91,10 +92,25 @@ def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nro
             return int(x[1:]), int(y[1:-1])
 
         with timeit(f"Loading traffic pixels data: {processed_filename}"):
-            traffic_by_pixel = pd.read_csv(processed_filename, nrows=nrows2load_traffic_data,
-                                           low_memory=True, index_col=0)
-        traffic_by_pixel.index = pd.to_datetime(traffic_by_pixel.index)
-        traffic_by_pixel.columns = traffic_by_pixel.columns.map(str2tuple)
+            if chunksize is None:
+                traffic_by_pixel = pd.read_csv(processed_filename, nrows=nrows2load_traffic_data,
+                                               low_memory=True, index_col=0)
+                traffic_by_pixel.index = pd.to_datetime(traffic_by_pixel.index)
+                traffic_by_pixel.columns = traffic_by_pixel.columns.map(str2tuple)
+            else:
+                df_list = []  # list to hold the batch dataframe
+                for df_chunk in tqdm(get_map_function(workers)
+                                         (lambda x: x, pd.read_csv(processed_filename,
+                                                                   nrows=nrows2load_traffic_data,
+                                                                   chunksize=chunksize, low_memory=True,
+                                                                   index_col=0))):
+                    df_chunk.index = pd.to_datetime(df_chunk.index)
+                    df_chunk.columns = df_chunk.columns.map(str2tuple)
+                    # Alternatively, append the chunk to list and merge all
+                    df_list.append(df_chunk)
+                # Merge all dataframes into one dataframe
+                traffic_by_pixel = pd.concat(df_list)
+
     return traffic_by_pixel
 
 

@@ -1,11 +1,10 @@
 import time
-from functools import partial
 from pathlib import Path
 
 import numpy as np
 import psutil
-from matplotlib import pyplot as plt
 import seaborn as sns
+from matplotlib import pyplot as plt
 from spiderplot import spiderplot
 
 import src.config as config
@@ -17,9 +16,8 @@ from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_
     load_background
 from src.lib.Models.BaseModel import BaseModel, split_by_station
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
-from src.viz_utils import save_fig, generic_plot
-
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel
+from src.viz_utils import save_fig, generic_plot
 
 
 def plot_stations_in_map(background, station_coordinates, lat, long):
@@ -61,17 +59,16 @@ if __name__ == "__main__":
         nrows2load_traffic_data = None  # None 1000
         num_cores = 25
     else:
-        nrows2load_traffic_data = 200  # None 1000
+        nrows2load_traffic_data = 300  # None 1000
         num_cores = 10
 
     # ----- Setting data for experiment ----- #
     plots_dir = Path.joinpath(config.results_dir, "ScreenshotsAnalysis")
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    traffic_by_pixel = save_load_traffic_by_pixel_data(screenshot_period=screenshot_period,
-                                                       recalculate=recalculate_traffic_by_pixel,
-                                                       nrows2load_traffic_data=nrows2load_traffic_data,
-                                                       workers=1)
+    traffic_by_pixel = save_load_traffic_by_pixel_data(
+        screenshot_period=screenshot_period, recalculate=recalculate_traffic_by_pixel,
+        nrows2load_traffic_data=nrows2load_traffic_data, workers=1, chunksize=None)
     pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
     station_coordinates = get_stations_lat_long()
     latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)
