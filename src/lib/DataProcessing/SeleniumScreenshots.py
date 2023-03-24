@@ -12,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 
 import src.config as config
-from src.DataProcessing.PollutionPreprocess import get_stations_lat_long
+from src.lib.DataProcessing.PollutionPreprocess import get_stations_lat_long
 
 CoordsTuple = namedtuple("Coords", "latitude longitude")
 center_of_paris = CoordsTuple(latitude=48.8580073, longitude=2.3342828)
