@@ -12,6 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 
 import src.config as config
+from src.DataProcessing.PollutionPreprocess import get_stations_lat_long
 
 CoordsTuple = namedtuple("Coords", "latitude longitude")
 center_of_paris = CoordsTuple(latitude=48.8580073, longitude=2.3342828)
@@ -46,7 +47,7 @@ def get_info_from_name(fname):
     minute = minute.split(".")[0]
     year, month, day, hour, minute = list(map(int, [year, month, day, hour, minute]))
     return name, CoordsTuple(latitude=lat, longitude=long), \
-        int(zoom), datetime(*list(map(int, [year, month, day, hour, minute])))
+           int(zoom), datetime(*list(map(int, [year, month, day, hour, minute])))
 
 
 def traffic_screenshots_folder(screenshot_period):
@@ -90,17 +91,9 @@ if __name__ == "__main__":
     # ---------- ----------- ----------- ----------- #
     #                   Core of code
     # ---------- ----------- ----------- ----------- #
-    station_coordinates = pd.DataFrame([
-        ['ELYS', 'PA07', 'AUT', 'BONAP', 'OPERA', 'HAUS', 'PA04C', 'PA13',
-         'CELES', 'PA18', 'BASCH', 'PA15L', 'PA12', 'BP_EST', 'SOULT'],
-        [48.86867978171355, 48.85719963458387, 48.84951967972958, 48.85621636967545, 48.870360489330714,
-         48.87329987270092, 48.85943820267798, 48.828608029768915, 48.85261565506112, 48.8916687478872,
-         48.82770896097115, 48.830548878814895, 48.83720120744435, 48.83860845472763, 48.83802336734008],
-        [2.311806320972728, 2.293299113256733, 2.253411499806541, 2.3343433611339512, 2.3322591802886805,
-         2.330387763170951, 2.351109707540651, 2.360279635559221, 2.3601153218686632, 2.346671039638325,
-         2.3267480081515686, 2.2696778063113494, 2.393899257058465, 2.4127801276675642, 2.408116146897623]
-    ],
-        index=["Nom_Station", "lat", "long"]).T
+    station_coordinates = get_stations_lat_long().T
+    station_coordinates.index.name = "Nom_station"
+    station_coordinates.reset_index("Nom_station", inplace=True)
 
     stations_traffic_dir = Path.joinpath(config.data_dir, f"TrafficStationsScreenshots_{screenshot_period}")
     stations_traffic_dir.mkdir(parents=True, exist_ok=True)

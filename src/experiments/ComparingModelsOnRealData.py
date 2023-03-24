@@ -66,11 +66,11 @@ if __name__ == "__main__":
     plots_dir = Path.joinpath(config.results_dir, "ScreenshotsAnalysis")
     plots_dir.mkdir(parents=True, exist_ok=True)
 
+    station_coordinates = get_stations_lat_long()
     traffic_by_pixel = save_load_traffic_by_pixel_data(
         screenshot_period=screenshot_period, recalculate=recalculate_traffic_by_pixel,
         nrows2load_traffic_data=nrows2load_traffic_data, workers=1, chunksize=None)
     pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
-    station_coordinates = get_stations_lat_long()
     latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)
     pollution, station_coordinates = filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel,
                                                             traffic_pixels_coords)
