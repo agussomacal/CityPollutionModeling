@@ -74,7 +74,7 @@ def get_stations_lat_long():
         ],
             index=["lat", "long"],
             columns=['ELYS', 'PA07', 'AUT', 'BONAP', 'OPERA', 'HAUS', 'PA04C', 'PA13',
-             'CELES', 'PA18', 'BASCH', 'PA15L', 'PA12', 'BP_EST', 'SOULT']).T
+             'CELES', 'PA18', 'BASCH', 'PA15L', 'PA12', 'BP_EST', 'SOULT'])
     return stations_latlong
 
 

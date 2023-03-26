@@ -59,7 +59,7 @@ if __name__ == "__main__":
         nrows2load_traffic_data = None  # None 1000
         num_cores = 25
     else:
-        nrows2load_traffic_data = 300  # None 1000
+        nrows2load_traffic_data = 12  # None 1000
         num_cores = 10
 
     # ----- Setting data for experiment ----- #

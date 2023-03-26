@@ -1,14 +1,10 @@
-import datetime
-from typing import List, Dict, Union
-import pandas as pd
 import numpy as np
+import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-from src.lib.Models.BaseModel import BaseModel
-
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SummaryModel
-
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
+from src.lib.Models.BaseModel import BaseModel
+from src.lib.Models.TrueStateEstimationModels.AverageModels import SummaryModel
 from src.performance_utils import partial_filter, filter_dict
 
 
@@ -52,7 +48,7 @@ class TrafficConvolutionModel(BaseModel):
         #     f"parameters for {self} are {TRAFFIC_VALUES.keys()}, instead {kwargs.keys()} given"
         self.set_params(**kwargs)
 
-    def convolve(self, traffic, target_positions, traffic_coords) -> np.pd.DataFrame:
+    def convolve(self, traffic, target_positions, traffic_coords) -> pd.DataFrame:
         """
         traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
