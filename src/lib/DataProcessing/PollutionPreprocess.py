@@ -1,3 +1,4 @@
+import logging
 import os
 import urllib
 from datetime import datetime
@@ -74,7 +75,7 @@ def get_stations_lat_long():
         ],
             index=["lat", "long"],
             columns=['ELYS', 'PA07', 'AUT', 'BONAP', 'OPERA', 'HAUS', 'PA04C', 'PA13',
-             'CELES', 'PA18', 'BASCH', 'PA15L', 'PA12', 'BP_EST', 'SOULT'])
+                     'CELES', 'PA18', 'BASCH', 'PA15L', 'PA12', 'BP_EST', 'SOULT'])
     return stations_latlong
 
 
@@ -96,6 +97,6 @@ def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, tra
                 ((station_coordinates.T <= max_coords) & (station_coordinates.T >= min_coords)).all(axis=1)]
     pollution.sort_index(inplace=True)
     station_coordinates = station_coordinates[pollution.columns]
-    print(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
-          f"{pollution.columns}")
+    logging.info(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
+                 f"{pollution.columns}")
     return pollution, station_coordinates

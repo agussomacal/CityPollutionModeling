@@ -83,7 +83,6 @@ def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nro
         with timeit("Extracting traffic pixels from images: "):
             traffic_by_pixel = process_traffic_images(screenshot_period=screenshot_period, workers=workers)
             # 2Gb and slower to save than to load images and calculate.
-        print("Saving traffic_by_pixel pixel summary DataFrame.")
         with timeit("Saving extracted traffic pixels: "):
             traffic_by_pixel.to_csv(processed_filename)
     else:
