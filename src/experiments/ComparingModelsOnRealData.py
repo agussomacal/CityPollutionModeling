@@ -129,6 +129,14 @@ if __name__ == "__main__":
         split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times)
 
 
+    def llo4test(station):
+        _, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
+                                           observed_pollution=pollution_future, traffic=traffic_future)
+        return {
+            "future_pollution": data_unknown
+        }
+
+
     # ----- Defining Experiment ----- #
     def train_test_model(model: BaseModel):
         def decorated_func(station):
@@ -150,6 +158,7 @@ if __name__ == "__main__":
             return {
                 "model_params": model.params,
                 "estimation": estimation,
+                # "error": ((estimation - data_unknown.values.ravel()) ** 2).ravel(),
                 "time_to_fit": t_to_fit,
                 "time_to_estimate": t_to_estimate,
             }
@@ -158,40 +167,80 @@ if __name__ == "__main__":
         return decorated_func
 
 
+    models = [SnapshotMeanModel(summary_statistic="mean"),
+              SnapshotMeanModel(summary_statistic="median"),
+              GlobalMeanModel(),
+              TrafficMeanModel(summary_statistic="mean"),
+              TrafficMeanModel(summary_statistic="median")]
+
     lab = LabPipeline()
-    for models in [
-        [SnapshotMeanModel(summary_statistic="mean"),
-         SnapshotMeanModel(summary_statistic="median"),
-         GlobalMeanModel(),
-         TrafficMeanModel(summary_statistic="mean"),
-         TrafficMeanModel(summary_statistic="median")],
-        [TrafficConvolutionModel(conv_kernel=gaussker, normalize=False, sigma=Bounds(0, 2 * longer_distance),
-                                 loss=mse, optim_method=UNIFORM, niter=10, verbose=True)]
-    ]:
-        lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
-        lab.execute(
-            data_manager,
-            num_cores=num_cores,
-            forget=False,
-            recalculate=False,
-            save_on_iteration=None,
-            station=station_coordinates.columns.to_list()
-        )
+    lab.define_new_block_of_functions("true_values", llo4test)
+    lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
+    lab.execute(
+        data_manager,
+        num_cores=num_cores,
+        forget=False,
+        recalculate=False,
+        save_on_iteration=None,
+        station=station_coordinates.columns.to_list()
+    )
 
-        # ----- Plotting results ----- #
-        generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
-                     mse=lambda estimation, station:
-                     np.sqrt(((estimation - split_by_station(
-                         unknown_station=station, observed_stations=station_coordinates,
-                         observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                            np.newaxis]).ravel() ** 2).mean()))
+    # ----- Plotting results ----- #
 
-        generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
-                     error=lambda estimation, station:
-                     np.abs((estimation - split_by_station(
-                         unknown_station=station, observed_stations=station_coordinates,
-                         observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                          np.newaxis]).ravel()))
+    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+                 mse=lambda estimation, future_pollution:
+                 np.sqrt(((estimation - future_pollution.values.ravel()).ravel() ** 2).mean()))
 
-        generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
-        generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
+    generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
+                 error=lambda estimation, future_pollution:
+                 np.abs((estimation - future_pollution.values.ravel()).ravel()))
+    # generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+    #              mse=lambda estimation, station:
+    #              np.sqrt(((estimation - split_by_station(
+    #                  unknown_station=station, observed_stations=station_coordinates,
+    #                  observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
+    #                                     np.newaxis]).ravel() ** 2).mean()))
+    #
+    # generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
+    #              error=lambda estimation, station:
+    #              np.abs((estimation - split_by_station(
+    #                  unknown_station=station, observed_stations=station_coordinates,
+    #                  observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
+    #                                   np.newaxis]).ravel()))
+
+    generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
+    generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
+
+    # Conv
+    print(longer_distance)
+    models = [TrafficConvolutionModel(conv_kernel=gaussker, normalize=False, sigma=Bounds(0, 2 * longer_distance),
+                                      loss=mse, optim_method=UNIFORM, niter=10, verbose=True)]
+
+    lab = LabPipeline()
+    lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
+    lab.execute(
+        data_manager,
+        num_cores=num_cores,
+        forget=False,
+        recalculate=False,
+        save_on_iteration=None,
+        station=station_coordinates.columns.to_list()
+    )
+
+    # ----- Plotting results ----- #
+    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+                 mse=lambda estimation, station:
+                 np.sqrt(((estimation - split_by_station(
+                     unknown_station=station, observed_stations=station_coordinates,
+                     observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
+                                        np.newaxis]).ravel() ** 2).mean()))
+
+    generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
+                 error=lambda estimation, station:
+                 np.abs((estimation - split_by_station(
+                     unknown_station=station, observed_stations=station_coordinates,
+                     observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
+                                      np.newaxis]).ravel()))
+
+    generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
+    generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)

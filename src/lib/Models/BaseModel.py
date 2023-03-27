@@ -65,7 +65,8 @@ class BaseModel:
         for k, v in kwargs.items():
             if v is None or isinstance(v, Bounds):
                 self.bounds[k] = v
-                self.set_params(**{k: np.mean(v)})  # starting value the center
+                # self.set_params(**{k: np.mean(v)})  # starting value the center
+                self.set_params(**{k: v.lower})  # starting value the center
             else:
                 self.set_params(**{k: v})
         self.losses = dict()
