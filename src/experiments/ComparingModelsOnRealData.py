@@ -94,7 +94,7 @@ if __name__ == "__main__":
     RAM = psutil.virtual_memory().total / 1000000000
     if RAM > 100:  # if run in server
         nrows2load_traffic_data = None  # None 1000
-        num_cores = 25
+        num_cores = 1
     else:
         nrows2load_traffic_data = 500  # None 1000
         num_cores = 10
