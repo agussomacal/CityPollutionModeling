@@ -50,7 +50,7 @@ class SnapshotWeightedModel(BaseModel):
             list(range(len(pollution))), list(map(lambda x: x[0].tolist().index(x[1]), zip(pollution, target)))] = 0
         pollution[np.isnan(pollution)] = 0
 
-        lr = LinearRegression(fit_intercept=False).fit(pollution, target)
+        lr = LinearRegression(fit_intercept=False, positive=True).fit(pollution, target)
         self.set_params(**dict(zip(pollution_columns, lr.coef_)))
         return self
 

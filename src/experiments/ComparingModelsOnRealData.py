@@ -1,6 +1,8 @@
 import logging
+import os.path
 import time
 
+import joblib
 import numpy as np
 import pandas as pd
 import psutil
@@ -21,6 +23,7 @@ from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanM
     SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
+from src.performance_utils import timeit
 from src.viz_utils import save_fig, generic_plot
 
 
@@ -100,14 +103,29 @@ if __name__ == "__main__":
         num_cores = 10
 
     # ----- Setting data for experiment ----- #
-    station_coordinates = get_stations_lat_long()
-    traffic_by_pixel = save_load_traffic_by_pixel_data(
-        screenshot_period=screenshot_period, recalculate=recalculate_traffic_by_pixel,
-        nrows2load_traffic_data=nrows2load_traffic_data, workers=1, chunksize=None)
-    pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
-    latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)
-    pollution, station_coordinates = filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel,
-                                                            traffic_pixels_coords)
+    preprocessing_data_path = f"{data_manager.path}/preprocessing_data.compressed"
+    if os.path.exists(preprocessing_data_path):
+        with timeit("Time loading pre-processed data:"):
+            traffic_past, pollution_past, traffic_future, pollution_future, station_coordinates = joblib.load(
+                preprocessing_data_path)
+    else:
+        station_coordinates = get_stations_lat_long()
+        traffic_by_pixel = save_load_traffic_by_pixel_data(
+            screenshot_period=screenshot_period, recalculate=recalculate_traffic_by_pixel,
+            nrows2load_traffic_data=nrows2load_traffic_data, workers=1, chunksize=None)
+        pollution = get_pollution(date_start=traffic_by_pixel.index.min(), date_end=traffic_by_pixel.index.max())
+        latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_by_pixel)
+        pollution, station_coordinates = filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel,
+                                                                traffic_pixels_coords)
+
+        # ----- split data in time to train and test -----
+        traffic_past, pollution_past, traffic_future, pollution_future = \
+            split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times)
+        with timeit("Time saving pre-processed data"):
+            joblib.dump((traffic_past, pollution_past, traffic_future, pollution_future, station_coordinates),
+                        filename=preprocessing_data_path)
+
+    latitudes, longitudes, traffic_pixels_coords = get_traffic_pixel_coords(screenshot_period, traffic_future)
     lat_bounds = Bounds(np.min(latitudes), np.max(latitudes))
     long_bounds = Bounds(np.min(longitudes), np.max(longitudes))
     longer_distance = np.sqrt(np.diff(lat_bounds) ** 2 + np.diff(long_bounds) ** 2)
@@ -121,13 +139,9 @@ if __name__ == "__main__":
     with save_fig(data_manager.path, "StationsDistance.png"):
         plot_pairwise_info(distance_between_stations)
     with save_fig(data_manager.path, "StationsCorrelation.png"):
-        plot_pairwise_info(pollution.corr())
+        plot_pairwise_info(pollution_past.corr())
     with save_fig(data_manager.path, "StationsCorrelationVSDistance.png"):
-        plt.scatter(distance_between_stations.values.ravel(), pollution.corr().values.ravel())
-
-    # ----- split data in time to train and test -----
-    traffic_past, pollution_past, traffic_future, pollution_future = \
-        split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times)
+        plt.scatter(distance_between_stations.values.ravel(), pollution_past.corr().values.ravel())
 
 
     def llo4test(station):
@@ -184,7 +198,7 @@ if __name__ == "__main__":
         data_manager,
         num_cores=num_cores,
         forget=False,
-        recalculate=False,
+        recalculate=True,
         save_on_iteration=None,
         station=station_coordinates.columns.to_list()
     )
@@ -198,19 +212,6 @@ if __name__ == "__main__":
     generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
                  error=lambda estimation, future_pollution:
                  np.abs((estimation - future_pollution.values.ravel()).ravel()))
-    # generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
-    #              mse=lambda estimation, station:
-    #              np.sqrt(((estimation - split_by_station(
-    #                  unknown_station=station, observed_stations=station_coordinates,
-    #                  observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-    #                                     np.newaxis]).ravel() ** 2).mean()))
-    #
-    # generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
-    #              error=lambda estimation, station:
-    #              np.abs((estimation - split_by_station(
-    #                  unknown_station=station, observed_stations=station_coordinates,
-    #                  observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-    #                                   np.newaxis]).ravel()))
 
     generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
     generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
