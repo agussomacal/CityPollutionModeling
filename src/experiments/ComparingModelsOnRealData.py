@@ -17,7 +17,8 @@ from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_dat
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
 from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
+from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
+    SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
 from src.viz_utils import save_fig, generic_plot
@@ -95,7 +96,7 @@ if __name__ == "__main__":
         nrows2load_traffic_data = None  # None 1000
         num_cores = 25
     else:
-        nrows2load_traffic_data = 12  # None 1000
+        nrows2load_traffic_data = 500  # None 1000
         num_cores = 10
 
     # ----- Setting data for experiment ----- #
@@ -167,11 +168,14 @@ if __name__ == "__main__":
         return decorated_func
 
 
-    models = [SnapshotMeanModel(summary_statistic="mean"),
-              SnapshotMeanModel(summary_statistic="median"),
-              GlobalMeanModel(),
-              TrafficMeanModel(summary_statistic="mean"),
-              TrafficMeanModel(summary_statistic="median")]
+    models = [
+        SnapshotWeightedModel(summary_statistic="mean"),
+        SnapshotMeanModel(summary_statistic="mean"),
+        # SnapshotMeanModel(summary_statistic="median"),
+        GlobalMeanModel(),
+        TrafficMeanModel(summary_statistic="mean"),
+        # TrafficMeanModel(summary_statistic="median")
+    ]
 
     lab = LabPipeline()
     lab.define_new_block_of_functions("true_values", llo4test)
