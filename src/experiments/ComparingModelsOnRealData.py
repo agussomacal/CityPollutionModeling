@@ -37,10 +37,10 @@ def plot_stations_in_map(background, station_coordinates, lat, long):
 
 def plot_pairwise_info(pirewise_info):
     plt.figure(figsize=np.shape(pirewise_info))
-    mask = np.zeros_like(pirewise_info, dtype=np.bool)
-    mask[np.tril_indices_from(mask)] = True
+    # mask = np.zeros_like(pirewise_info, dtype=np.bool)
+    # mask[np.tril_indices_from(mask)] = True
     sns.heatmap(pirewise_info, annot=True, fmt=".2f", linewidth=.5, cmap="viridis",
-                square=True, mask=mask)
+                square=True)  # , mask=mask)
     plt.tight_layout()
 
 
