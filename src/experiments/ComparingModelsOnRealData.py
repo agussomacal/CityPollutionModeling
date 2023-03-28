@@ -18,7 +18,7 @@ from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_statio
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
-from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM
+from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM, ModelsSequenciator
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
@@ -188,7 +188,10 @@ if __name__ == "__main__":
         # SnapshotMeanModel(summary_statistic="median"),
         GlobalMeanModel(),
         TrafficMeanModel(summary_statistic="mean"),
-        # TrafficMeanModel(summary_statistic="median")
+        # TrafficMeanModel(summary_statistic="median"),
+        ModelsSequenciator(models=[SnapshotMeanModel(summary_statistic="mean"),
+                                   TrafficMeanModel(summary_statistic="mean")],
+                           name="SnapshotPollutionTraffic")
     ]
 
     lab = LabPipeline()
@@ -198,7 +201,7 @@ if __name__ == "__main__":
         data_manager,
         num_cores=num_cores,
         forget=False,
-        recalculate=True,
+        recalculate=False,
         save_on_iteration=None,
         station=station_coordinates.columns.to_list()
     )
@@ -216,6 +219,7 @@ if __name__ == "__main__":
     generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
     generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
 
+    dfvbyhe
     # Conv
     print(longer_distance)
     models = [TrafficConvolutionModel(conv_kernel=gaussker, normalize=False, sigma=Bounds(0, 2 * longer_distance),

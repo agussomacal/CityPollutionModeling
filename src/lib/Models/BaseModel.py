@@ -1,5 +1,6 @@
 import logging
 from collections import namedtuple
+from typing import List
 
 import cma
 import numpy as np
@@ -27,7 +28,7 @@ def split_by_station(unknown_station, observed_stations, observed_pollution, tra
                 "observed_pollution": observed_pollution.loc[valid_times, known_stations],
                 "traffic": traffic.loc[valid_times, :],
                 "target_positions": observed_stations[[unknown_station]]}, \
-               observed_pollution.loc[valid_times, unknown_station]
+            observed_pollution.loc[valid_times, unknown_station]
 
 
 def loo(observed_stations, observed_pollution, traffic):
@@ -147,4 +148,58 @@ class BaseModel:
         else:
             raise Exception("Not implemented.")
         logging.info("Optim params: ", self.params)
+        return self
+
+
+class ModelsSequenciator:
+    def __init__(self, models: List[BaseModel], name=None):
+        # assert all([isinstance(model, BaseModel) for model in models])
+        self.name = name
+        self.models = models
+        self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
+
+    @property
+    def params(self):
+        return {str(model): model.params for model in self.models}
+
+    def __str__(self):
+        return '_'.join([str(model) for model in self.models]) if self.name is None else self.name
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        predictions = np.zeros((len(observed_pollution), np.shape(target_positions)[1]))
+        observed_pollution_i = observed_pollution.copy()
+        for i, model in enumerate(self.models):
+            predictions += model.state_estimation(observed_stations, observed_pollution_i, traffic, target_positions,
+                                                  **kwargs)
+            # get the residuals on the observed values
+            # the following lines are necessary for models that relly on the names of the sensors and are not properly
+            # state stimation methods.
+            # only actualize if it is not the las model
+            if observed_pollution_i is not None and i < len(self.models) - 1:
+                observed_pollution_i -= pd.concat([pd.DataFrame(model.state_estimation(**known_data, **kwargs),
+                                                                index=known_data["observed_pollution"].index,
+                                                                columns=[target_pollution.name])
+                                                   for known_data, target_pollution in
+                                                   loo(observed_stations, observed_pollution_i, traffic)], axis=1)
+                # observed_pollution_i -= pd.DataFrame(
+                #     model.state_estimation(observed_stations, observed_pollution_i, traffic,
+                #                            observed_stations, **kwargs),
+                #     index=observed_pollution_i.index,
+                #     columns=observed_pollution_i.columns)
+
+        # predictions[predictions < 0] = 0  # non negative values; pollution is positive quantity.
+        return predictions
+
+    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+        observed_pollution_i = observed_pollution.copy()
+        for i, model in enumerate(self.models):
+            model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+
+            if i < len(self.models) - 1:  # only actualize if it is not the las model
+                observed_pollution_i -= pd.concat([pd.DataFrame(model.state_estimation(**known_data, **kwargs),
+                                                                index=known_data["observed_pollution"].index,
+                                                                columns=[target_pollution.name])
+                                                   for known_data, target_pollution in
+                                                   loo(observed_stations, observed_pollution_i, traffic)], axis=1)
         return self
