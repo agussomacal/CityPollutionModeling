@@ -1,13 +1,16 @@
 import logging
 from collections import namedtuple
-from typing import List
+from typing import List, Union, Dict
 
 import cma
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from sklearn.linear_model import LinearRegression, LassoCV
 from sklearn.model_selection import LeaveOneOut
 from tqdm import tqdm
+
+from src.performance_utils import if_true_str
 
 CMA_OPTIM_METHOD = "cma"
 BFGS_OPTIM_METHOD = "bfgs"
@@ -203,3 +206,78 @@ class ModelsSequenciator:
                                                    for known_data, target_pollution in
                                                    loo(observed_stations, observed_pollution_i, traffic)], axis=1)
         return self
+
+
+class ModelsAverager(BaseModel):
+    def __init__(self, models: List[BaseModel], positive=False, fit_intercept=False,
+                 weights: Union[Dict, List, np.ndarray] = None, name=None, n_alphas=None):
+        super().__init__()
+        self.name = name
+        self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
+
+        self.models = models
+        self.n_alphas = n_alphas
+        if n_alphas is None:
+            self.lr = LinearRegression(positive=positive, fit_intercept=fit_intercept)
+        else:
+            self.lr = LassoCV(positive=positive, fit_intercept=fit_intercept, n_alphas=n_alphas)
+        if weights is not None:
+            if isinstance(weights, Dict):
+                self.lr.coef_ = np.array([weights[str(model)] for model in self.models])
+                self.lr.intercept_ = weights["intercept"]
+            elif isinstance(weights, (List, np.ndarray)):
+                self.lr.coef_ = np.array(weights[:-1])
+                self.lr.intercept_ = weights[-1]
+
+    @property
+    def weights(self):
+        return np.ravel(np.append(self.lr.coef_, self.lr.intercept_))
+
+    @property
+    def model_importance(self):
+        return {model_name: weight for model_name, weight in
+                zip(list(map(str, self.models)) + ["intercept"], np.abs(self.weights) / np.abs(self.weights).sum())}
+
+    @property
+    def params(self):
+        return {**{str(model): model.params for model in self.models}, **{"weights": self.weights.tolist()}}
+
+    def __str__(self):
+        models_names = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in
+                                 self.models]) if self.name is None else self.name
+        return f"{if_true_str(self.lr.fit_intercept, 'c', '', '+')}{'LASSO' if self.n_alphas else 'LR'}{if_true_str(self.lr.positive, '+')}({models_names})"
+
+    def state_estimation_concatenated(self, observed_stations, observed_pollution, traffic,
+                                      target_positions: pd.DataFrame,
+                                      **kwargs) -> np.ndarray:
+        return np.concatenate([
+            model.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs).reshape(
+                (-1, 1))
+            for model in self.models], axis=1)
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        individual_predictions = self.state_estimation_concatenated(observed_stations, observed_pollution, traffic,
+                                                                    target_positions, **kwargs)
+        return (individual_predictions @ self.lr.coef_ + self.lr.intercept_).reshape((len(observed_pollution), -1))
+
+    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
+                                                                                                       np.ndarray]:
+        target_pollution, predicted_pollution = \
+            list(zip(*[(target_pollution,
+                        self.state_estimation_concatenated(**known_data, target_pollution=target_pollution, **kwargs))
+                       for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
+
+        return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
+
+    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+        if not hasattr(self.lr, "coefs_") or not hasattr(self.lr, "intercept_"):
+            # calibrate models
+            for model in self.models:
+                model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+            # find optimal weights for model averaging
+            individual_predictions, target = \
+                self.state_estimation_for_optim(observed_stations, observed_pollution, traffic, **kwargs)
+            not_nan = ~np.any(np.isnan(individual_predictions), axis=1) & ~np.isnan(target)
+            self.lr.fit(individual_predictions[not_nan], target[not_nan])
+        print(f"Models importance: {self.model_importance}")

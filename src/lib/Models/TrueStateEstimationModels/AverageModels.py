@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 from src.lib.Models.BaseModel import BaseModel, loo
-from src.performance_utils import filter_dict
+from src.performance_utils import filter_dict, if_true_str
 
 
 class SummaryModel(BaseModel):
@@ -28,10 +28,16 @@ class SnapshotMeanModel(SummaryModel):
 
 
 class SnapshotWeightedModel(BaseModel):
+    def __init__(self, positive=True, fit_intercept=False, **kwargs):
+        self.positive = positive
+        self.fit_intercept = fit_intercept
+        super().__init__(name=if_true_str(positive, "positive", "_") + if_true_str(fit_intercept, "fit_intercept", "_"),
+                         **kwargs)
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
                          **kwargs) -> np.ndarray:
-        return (observed_pollution @ pd.Series(filter_dict(observed_stations.columns, **self.params))).values
+        return (observed_pollution @ pd.Series(filter_dict(observed_stations.columns, **self.params))).values \
+            .reshape((-1, np.shape(target_positions)[1]))
 
     def calibrate(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray, np.ndarray]:
         """
@@ -50,7 +56,7 @@ class SnapshotWeightedModel(BaseModel):
             list(range(len(pollution))), list(map(lambda x: x[0].tolist().index(x[1]), zip(pollution, target)))] = 0
         pollution[np.isnan(pollution)] = 0
 
-        lr = LinearRegression(fit_intercept=False, positive=True).fit(pollution, target)
+        lr = LinearRegression(fit_intercept=self.fit_intercept, positive=self.positive).fit(pollution, target)
         self.set_params(**dict(zip(pollution_columns, lr.coef_)))
         return self
 

@@ -1,6 +1,7 @@
 import logging
 import os.path
 import time
+from functools import partial
 
 import joblib
 import numpy as np
@@ -18,12 +19,13 @@ from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_statio
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
-from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM, ModelsSequenciator
+from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM, ModelsSequenciator, \
+    ModelsAverager
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
-from src.performance_utils import timeit
+from src.performance_utils import timeit, NamedPartial
 from src.viz_utils import save_fig, generic_plot
 
 
@@ -173,7 +175,7 @@ if __name__ == "__main__":
             return {
                 "model_params": model.params,
                 "estimation": estimation,
-                # "error": ((estimation - data_unknown.values.ravel()) ** 2).ravel(),
+                "error": ((estimation - data_unknown.values.ravel()) ** 2).ravel(),
                 "time_to_fit": t_to_fit,
                 "time_to_estimate": t_to_estimate,
             }
@@ -182,74 +184,120 @@ if __name__ == "__main__":
         return decorated_func
 
 
-    models = [
-        SnapshotWeightedModel(summary_statistic="mean"),
+    models_first = [
+        SnapshotWeightedModel(positive=True, fit_intercept=True),
+        SnapshotWeightedModel(positive=False, fit_intercept=True),
+        ModelsSequenciator(models=[GlobalMeanModel(),
+                                   SnapshotWeightedModel(positive=True, fit_intercept=False)],
+                           name="Global_SnapW"),
+        # ModelsAverager(models=[GlobalMeanModel(),
+        #                        TrafficMeanModel(summary_statistic="mean"),
+        #                        TrafficMeanModel(summary_statistic="median"),
+        #                        SnapshotMeanModel(summary_statistic="mean"),
+        #                        SnapshotMeanModel(summary_statistic="median"),
+        #                        SnapshotWeightedModel(positive=True, fit_intercept=True)],
+        #                positive=False, fit_intercept=True),
+        # ModelsAverager(models=[GlobalMeanModel(),
+        #                        TrafficMeanModel(summary_statistic="mean"),
+        #                        TrafficMeanModel(summary_statistic="median"),
+        #                        SnapshotMeanModel(summary_statistic="mean"),
+        #                        SnapshotMeanModel(summary_statistic="median"),
+        #                        SnapshotWeightedModel(positive=True, fit_intercept=True),
+        #                        ],
+        #                positive=True, fit_intercept=True),
+        ModelsAverager(models=[GlobalMeanModel(),
+                               TrafficMeanModel(summary_statistic="mean"),
+                               TrafficMeanModel(summary_statistic="median"),
+                               SnapshotMeanModel(summary_statistic="mean"),
+                               SnapshotMeanModel(summary_statistic="median"),
+                               SnapshotWeightedModel(positive=True, fit_intercept=True),
+                               ],
+                       positive=True, fit_intercept=False),
+        # ModelsAverager(models=[GlobalMeanModel(),
+        #                        TrafficMeanModel(summary_statistic="mean"),
+        #                        TrafficMeanModel(summary_statistic="median"),
+        #                        SnapshotMeanModel(summary_statistic="mean"),
+        #                        SnapshotMeanModel(summary_statistic="median"),
+        #                        SnapshotWeightedModel(positive=True, fit_intercept=True)],
+        #                positive=False, fit_intercept=True, n_alphas=100),
+        # ModelsAverager(models=[GlobalMeanModel(),
+        #                        TrafficMeanModel(summary_statistic="mean"),
+        #                        TrafficMeanModel(summary_statistic="median"),
+        #                        SnapshotMeanModel(summary_statistic="mean"),
+        #                        SnapshotMeanModel(summary_statistic="median"),
+        #                        SnapshotWeightedModel(positive=True, fit_intercept=True),
+        #                        ],
+        #                positive=True, fit_intercept=True, n_alphas=100),
         SnapshotMeanModel(summary_statistic="mean"),
-        # SnapshotMeanModel(summary_statistic="median"),
+        # # SnapshotMeanModel(summary_statistic="median"),
         GlobalMeanModel(),
         TrafficMeanModel(summary_statistic="mean"),
-        # TrafficMeanModel(summary_statistic="median"),
-        ModelsSequenciator(models=[SnapshotMeanModel(summary_statistic="mean"),
-                                   TrafficMeanModel(summary_statistic="mean")],
-                           name="SnapshotPollutionTraffic")
+        # # TrafficMeanModel(summary_statistic="median"),
+        # ModelsSequenciator(models=[SnapshotMeanModel(summary_statistic="mean"),
+        #                            TrafficMeanModel(summary_statistic="mean")],
+        #                    name="SnapshotPollutionTraffic")
     ]
 
-    lab = LabPipeline()
-    lab.define_new_block_of_functions("true_values", llo4test)
-    lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
-    lab.execute(
-        data_manager,
-        num_cores=num_cores,
-        forget=False,
-        recalculate=False,
-        save_on_iteration=None,
-        station=station_coordinates.columns.to_list()
-    )
+    models_second = [
+        ModelsSequenciator(models=[
+            SnapshotMeanModel(summary_statistic="mean"),
+            TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
+                                    sigma=Bounds(0, 2 * longer_distance),
+                                    loss=mse, optim_method=UNIFORM, niter=10, verbose=True)],
+            name="SnapTrafficConv"),
+        ModelsAverager(models=[
+            GlobalMeanModel(),
+            TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
+                                    sigma=Bounds(0, 2 * longer_distance),
+                                    loss=mse, optim_method=UNIFORM, niter=10, verbose=True),
+            TrafficMeanModel(summary_statistic="mean"),
+            TrafficMeanModel(summary_statistic="median"),
+            SnapshotMeanModel(summary_statistic="mean"),
+            SnapshotMeanModel(summary_statistic="median"),
+            SnapshotWeightedModel(positive=True, fit_intercept=True),
+        ],
+            positive=True, fit_intercept=False),
+    ]
 
-    # ----- Plotting results ----- #
+    for models in [models_first]:  # , models_second
+        lab = LabPipeline()
+        lab.define_new_block_of_functions("true_values", llo4test)
+        lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
+        lab.execute(
+            data_manager,
+            num_cores=num_cores,
+            forget=True,
+            recalculate=False,
+            save_on_iteration=None,
+            station=station_coordinates.columns.to_list()
+        )
 
-    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
-                 mse=lambda estimation, future_pollution:
-                 np.sqrt(((estimation - future_pollution.values.ravel()).ravel() ** 2).mean()))
+        # ----- Plotting results ----- #
 
-    generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
-                 error=lambda estimation, future_pollution:
-                 np.abs((estimation - future_pollution.values.ravel()).ravel()))
+        generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+                     mse=lambda error: np.sqrt(error.mean()))
 
-    generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
-    generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
+        generic_plot(data_manager, x="station", y="l1_error", label="model", plot_func=sns.boxenplot,
+                     sort_by=["mse"],
+                     l1_error=lambda error: np.abs(error).ravel(),
+                     mse=lambda error: np.sqrt(error.mean()))
 
-    dfvbyhe
-    # Conv
-    print(longer_distance)
-    models = [TrafficConvolutionModel(conv_kernel=gaussker, normalize=False, sigma=Bounds(0, 2 * longer_distance),
-                                      loss=mse, optim_method=UNIFORM, niter=10, verbose=True)]
+        generic_plot(data_manager, x="l1_error", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
+                     sort_by=["mse"],
+                     l1_error=lambda error: np.abs(error).ravel(),
+                     mse=lambda error: np.sqrt(error.mean()))
 
-    lab = LabPipeline()
-    lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
-    lab.execute(
-        data_manager,
-        num_cores=num_cores,
-        forget=False,
-        recalculate=False,
-        save_on_iteration=None,
-        station=station_coordinates.columns.to_list()
-    )
+        generic_plot(data_manager, x="mse", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
+                     sort_by=["mse"],
+                     mse=lambda error: np.sqrt(np.nanmean(error)))
 
-    # ----- Plotting results ----- #
-    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
-                 mse=lambda estimation, station:
-                 np.sqrt(((estimation - split_by_station(
-                     unknown_station=station, observed_stations=station_coordinates,
-                     observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                        np.newaxis]).ravel() ** 2).mean()))
+        # generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+        #              mse=lambda estimation, future_pollution:
+        #              np.sqrt(((estimation - future_pollution.values.ravel()).ravel() ** 2).mean()))
+        #
+        # generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
+        #              error=lambda estimation, future_pollution:
+        #              np.abs((estimation - future_pollution.values.ravel()).ravel()))
 
-    generic_plot(data_manager, x="station", y="error", label="model", plot_func=sns.boxenplot,
-                 error=lambda estimation, station:
-                 np.abs((estimation - split_by_station(
-                     unknown_station=station, observed_stations=station_coordinates,
-                     observed_pollution=pollution_future, traffic=traffic_future)[1].values[:,
-                                      np.newaxis]).ravel()))
-
-    generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
-    generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
+        generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
+        generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
