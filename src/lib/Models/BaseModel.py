@@ -145,6 +145,8 @@ class BaseModel:
                            tqdm(zip(*samples.values()), desc=f"Training {self}")}
             best_ix = np.argmin(self.losses.values())
             self.set_params(**{k: v[best_ix] for k, v in samples.items()})
+            self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=samples.keys()),
+                                    name="loss")
 
         elif self.optim_method == NONE_OPTIM_METHOD:
             return None
@@ -161,6 +163,7 @@ class ModelsSequenciator:
         self.models = models
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
         self.amp = [1.0] * len(models)
+        self.losses = list()
 
     @property
     def params(self):
@@ -203,6 +206,7 @@ class ModelsSequenciator:
         observed_pollution_i = observed_pollution.copy()
         for i, model in enumerate(self.models):
             model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+            self.losses.append(model.losses)
             self.amp[i] = np.nanmean((observed_pollution_i.values / model.state_estimation(observed_stations,
                                                                                            observed_pollution, traffic,
                                                                                            observed_stations,
@@ -224,6 +228,7 @@ class ModelsAverager(BaseModel):
     def __init__(self, models: List[BaseModel], positive=False, fit_intercept=False,
                  weights: Union[Dict, List, np.ndarray] = None, name=None, n_alphas=None):
         super().__init__()
+        self.losses = list()
         self.name = name
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
 
@@ -287,6 +292,7 @@ class ModelsAverager(BaseModel):
             # calibrate models
             for model in self.models:
                 model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+                self.losses.append(model.losses)
             # find optimal weights for model averaging
             individual_predictions, target = \
                 self.state_estimation_for_optim(observed_stations, observed_pollution, traffic, **kwargs)

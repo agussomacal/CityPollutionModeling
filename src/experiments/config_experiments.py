@@ -11,14 +11,16 @@ sns.set_theme()
 recalculate_traffic_by_pixel = False
 proportion_of_past_times = 0.8
 screenshot_period = 15
+shuffle = False
 
 RAM = psutil.virtual_memory().total / 1000000000
-if RAM > 100:  # if run in server
+server = RAM > 100
+if server:  # if run in server
     nrows2load_traffic_data = None  # None 1000
-    num_cores = 1
+    num_cores = 5
 else:
-    nrows2load_traffic_data = 500  # None 1000
-    num_cores = 10
+    nrows2load_traffic_data = 1000  # None 1000
+    num_cores = 14
 
 # ----- logger ----- #
 # Create and configure logger

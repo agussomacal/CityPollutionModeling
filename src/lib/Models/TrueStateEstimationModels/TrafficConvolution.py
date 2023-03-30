@@ -74,16 +74,18 @@ class TrafficConvolutionModel(BaseModel):
             reduced_traffic /= kernel.sum(axis=1)
         return reduced_traffic
 
-    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions:pd.DataFrame,
                          traffic_coords, **kwargs) -> np.ndarray:
         """
         traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
         """
-        reduced_traffic = self.convolve(traffic=traffic, target_positions=target_positions,
-                                        traffic_coords=traffic_coords)
-        estimated_average_pollution = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, **self.params))
-        return estimated_average_pollution.values
+        estimated_average_pollution = []
+        for name, tp in target_positions.items():
+            reduced_traffic = self.convolve(traffic=traffic, target_positions=pd.DataFrame(tp),
+                                            traffic_coords=traffic_coords)
+            estimated_average_pollution.append(reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, **self.params)))
+        return pd.concat(estimated_average_pollution, axis=1).values
 
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
                                                                                                        np.ndarray]:

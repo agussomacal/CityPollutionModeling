@@ -38,7 +38,7 @@ if __name__ == "__main__":
     ]
 
     lab = LabPipeline()
-    lab.define_new_block_of_functions("true_values", loo4test)
+    # lab.define_new_block_of_functions("true_values", loo4test)
     lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
     lab.execute(
         data_manager,

@@ -3,21 +3,29 @@ import seaborn as sns
 from spiderplot import spiderplot
 
 import src.config as config
-from src.DataManager import DataManager
+from src.DataManager import DataManager, dmfilter
 from src.LabPipeline import LabPipeline
-from src.experiments.PreProcess import longer_distance, loo4test, train_test_model, station_coordinates
-from src.experiments.config_experiments import num_cores
+from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates
+from src.experiments.config_experiments import num_cores, shuffle
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
     ModelsAverager
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
-    SnapshotWeightedModel
+from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
 from src.performance_utils import NamedPartial
 from src.viz_utils import generic_plot
 
+
+def get_traffic_conv_params(losses):
+    if isinstance(losses, list):
+        losses = losses[-1]  # assumes the traffic convolution is the last model
+    losses = losses.reset_index()
+    return losses["sigma"], losses["loss"]
+
+
 if __name__ == "__main__":
-    experiment_name = "ModelComparison"
+    niter = 10
+    experiment_name = f"TrafficConvolutionModelComparison_{shuffle}"
 
     data_manager = DataManager(
         path=config.results_dir,
@@ -25,77 +33,64 @@ if __name__ == "__main__":
     )
 
     models_first = [
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            TrafficMeanModel(summary_statistic="mean"),
-        ])
-        ,
-        ModelsAverager(models=[GlobalMeanModel(),
-                               TrafficMeanModel(summary_statistic="mean"),
-                               SnapshotMeanModel(summary_statistic="mean"),
-                               ModelsSequenciator(models=[
-                                   SnapshotMeanModel(summary_statistic="mean"),
-                                   TrafficMeanModel(summary_statistic="mean"),
-                               ])
-                               ],
-                       positive=True, fit_intercept=False),
         SnapshotMeanModel(summary_statistic="mean"),
         GlobalMeanModel(),
         TrafficMeanModel(summary_statistic="mean"),
     ]
 
+    traffic_convolution = lambda: TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
+                                                          sigma=Bounds(0, 2 * longer_distance),
+                                                          loss=mse, optim_method=UNIFORM, niter=niter, verbose=True)
+    traffic_convolution_norm = lambda: TrafficConvolutionModel(conv_kernel=gaussker, normalize=True,
+                                                               sigma=Bounds(0, 2 * longer_distance),
+                                                               loss=mse, optim_method=UNIFORM, niter=niter,
+                                                               verbose=True)
     models_second = [
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            TrafficConvolutionModel(conv_kernel=0, normalize=False,
-                                    sigma=Bounds(0, 2 * longer_distance),
-                                    loss=mse, optim_method=UNIFORM, niter=10, verbose=True)
-            ,
-        ])
-        ,
-        ModelsAverager(models=[GlobalMeanModel(),
-                               TrafficMeanModel(summary_statistic="mean"),
-                               SnapshotMeanModel(summary_statistic="mean"),
-                               ModelsSequenciator(models=[
-                                   SnapshotMeanModel(summary_statistic="mean"),
-                                   TrafficMeanModel(summary_statistic="mean"),
-                               ])
-                               ],
-                       positive=True, fit_intercept=False),
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
-                                    sigma=Bounds(0, 2 * longer_distance),
-                                    loss=mse, optim_method=UNIFORM, niter=10, verbose=True)],
-            name="SnapTrafficConv"),
+        traffic_convolution(),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     traffic_convolution(),
+        # ]),
         ModelsAverager(models=[
-            GlobalMeanModel(),
-            TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
-                                    sigma=Bounds(0, 2 * longer_distance),
-                                    loss=mse, optim_method=UNIFORM, niter=10, verbose=True),
             TrafficMeanModel(summary_statistic="mean"),
-            TrafficMeanModel(summary_statistic="median"),
             SnapshotMeanModel(summary_statistic="mean"),
-            SnapshotMeanModel(summary_statistic="median"),
-            SnapshotWeightedModel(positive=True, fit_intercept=True),
+            traffic_convolution()
+        ],
+            positive=True, fit_intercept=False),
+        traffic_convolution_norm(),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     traffic_convolution_norm(),
+        # ]),
+        ModelsAverager(models=[
+            TrafficMeanModel(summary_statistic="mean"),
+            SnapshotMeanModel(summary_statistic="mean"),
+            traffic_convolution_norm()
         ],
             positive=True, fit_intercept=False),
     ]
 
-    for models in [models_first]:  # , models_second
+    for models in [models_second, models_first]:
         lab = LabPipeline()
         # lab.define_new_block_of_functions("true_values", loo4test)
         lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
         lab.execute(
             data_manager,
             num_cores=num_cores,
-            forget=True,
-            recalculate=True,
-            save_on_iteration=None,
+            forget=False,
+            recalculate=False,
+            save_on_iteration=4,
             station=station_coordinates.columns.to_list()
         )
 
         # ----- Plotting results ----- #
+        dmfilter(data_manager, names=["losses"])
+        generic_plot(data_manager, x="sigma", y="loss", label="model", plot_func=sns.boxenplot,
+                     log="y",
+                     sigma=lambda losses: get_traffic_conv_params(losses)[0],
+                     loss=lambda losses: get_traffic_conv_params(losses)[1],
+                     model=[model for model in set(data_manager["model"]) if "TrafficConvolution" in model or "TCM" in model])
+
         generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
                      mse=lambda error: np.sqrt(error.mean()))
 

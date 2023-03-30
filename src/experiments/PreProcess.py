@@ -1,34 +1,25 @@
-import logging
+import os.path
 import os.path
 import time
-from functools import partial
 
 import joblib
 import numpy as np
 import pandas as pd
-import psutil
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
-from spiderplot import spiderplot
 
 import src.config as config
 from src.DataManager import DataManager
-from src.LabPipeline import LabPipeline
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
-    proportion_of_past_times
+    proportion_of_past_times, shuffle, server
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
-from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
-    SnapshotWeightedModel
-from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
-    gaussker
-from src.performance_utils import timeit, NamedPartial
-from src.viz_utils import save_fig, generic_plot
+from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds
+from src.performance_utils import timeit
+from src.viz_utils import save_fig
 
 
 def plot_stations_in_map(background, station_coordinates, lat, long):
@@ -52,17 +43,20 @@ def plot_pairwise_info(pirewise_info):
     plt.tight_layout()
 
 
-def split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times, average=False):
+def split_data_in_time(traffic_by_pixel, pollution, proportion_of_past_times, average=False, shuffle=False):
     traffic_per_hour, pollution_per_hour = get_traffic_pollution_data_per_hour(traffic_by_pixel, pollution, average)
     n_past = int(proportion_of_past_times * len(pollution_per_hour))
     print(f"Times in the past for training: {n_past}")
     print(f"Times in the future for testing: {len(pollution_per_hour) - n_past}")
 
-    traffic_past = traffic_per_hour[:n_past]
-    traffic_future = traffic_per_hour[n_past:]
+    ix = np.random.choice(len(pollution_per_hour), replace=False) if shuffle else np.arange(len(pollution_per_hour))
+    ix = np.array(ix, dtype=int)
 
-    pollution_past = pollution_per_hour[:n_past]
-    pollution_future = pollution_per_hour[n_past:]
+    traffic_past = traffic_per_hour.iloc[ix[:n_past]]
+    traffic_future = traffic_per_hour.iloc[ix[n_past:]]
+
+    pollution_past = pollution_per_hour.iloc[ix[:n_past]]
+    pollution_future = pollution_per_hour.iloc[ix[n_past:]]
     return traffic_past, pollution_past, traffic_future, pollution_future
 
 
@@ -74,7 +68,7 @@ data_manager = DataManager(
     name=experiment_name
 )
 
-preprocessing_data_path = f"{data_manager.path}/preprocessing_data.compressed"
+preprocessing_data_path = f"{data_manager.path}/preprocessing_data{nrows2load_traffic_data}{shuffle}.compressed"
 if os.path.exists(preprocessing_data_path):
     with timeit("Time loading pre-processed data:"):
         traffic_past, pollution_past, traffic_future, pollution_future, station_coordinates = joblib.load(
@@ -129,6 +123,7 @@ def train_test_model(model: BaseModel):
         t_to_estimate = time.time() - t0
 
         return {
+            "losses": model.losses,
             "model_params": model.params,
             "estimation": estimation,
             "error": ((estimation - data_unknown.values.ravel()) ** 2).ravel(),

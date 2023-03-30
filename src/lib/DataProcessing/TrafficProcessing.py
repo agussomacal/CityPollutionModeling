@@ -77,7 +77,7 @@ def process_traffic_images(screenshot_period=15, workers=1):
 
 
 def save_load_traffic_by_pixel_data(screenshot_period=15, recalculate=False, nrows2load_traffic_data=None, workers=1,
-                                    chunksize=None):
+                                    chunksize=100):
     processed_filename = f"{config.traffic_dir}/Traffic_by_PixelDate.csv"
     if recalculate or not os.path.exists(processed_filename):
         with timeit("Extracting traffic pixels from images: "):
