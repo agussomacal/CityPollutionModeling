@@ -17,6 +17,7 @@ BFGS_OPTIM_METHOD = "bfgs"
 BFGS_PAR_OPTIM_METHOD = "bfgs_parallel"
 RANDOM = "random"
 UNIFORM = "uniform"
+LOGUNIFORM = "loguniform"
 NONE_OPTIM_METHOD = None
 
 Bounds = namedtuple("Bounds", "lower upper")
@@ -137,8 +138,15 @@ class BaseModel:
                                     options={'maxiter': self.niter}).x
 
             self.set_params(**dict(zip(self.params.keys(), optim_params)))
-        elif self.optim_method in [RANDOM, UNIFORM]:
-            sampler = np.linspace if UNIFORM else np.random.uniform
+        elif self.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
+            if self.optim_method == UNIFORM:
+                sampler = np.linspace
+            elif self.optim_method == RANDOM:
+                sampler = np.random.uniform
+            elif self.optim_method == LOGUNIFORM:
+                sampler = lambda d, u, i: np.logspace(np.log10(d), np.log10(u), i)
+            else:
+                raise Exception(f"Optim method {self.optim_method} not implemented.")
             samples = {k: sampler(*bounds, self.niter).ravel().tolist() for k, bounds in self.bounds.items() if
                        bounds is not None}
             self.losses = {x: optim_func(list({**self.params, **dict(zip(samples.keys(), x))}.values())) for x in

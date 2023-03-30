@@ -95,13 +95,10 @@ lat_bounds = Bounds(np.min(latitudes), np.max(latitudes))
 long_bounds = Bounds(np.min(longitudes), np.max(longitudes))
 longer_distance = np.sqrt(np.diff(lat_bounds) ** 2 + np.diff(long_bounds) ** 2)
 
-
-def loo4test(station):
-    _, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
-                                       observed_pollution=pollution_future, traffic=traffic_future)
-    return {
-        "future_pollution": data_unknown
-    }
+distance_between_stations_pixels = pd.DataFrame(cdist(station_coordinates.loc[["long", "lat"],:].values.T,
+                                                       traffic_pixels_coords.loc[["long", "lat"],:].values.T),
+                                                columns=traffic_pixels_coords.columns,
+                                                index=station_coordinates.columns)
 
 
 # ----- Defining Experiment ----- #
@@ -112,14 +109,16 @@ def train_test_model(model: BaseModel):
                                          observed_pollution=pollution_past, traffic=traffic_past)
         data_known.pop("target_positions")  # this are reserved only when testing.
         t0 = time.time()
-        model.calibrate(**data_known, traffic_coords=traffic_pixels_coords)
+        model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
+                        distance_between_stations_pixels=distance_between_stations_pixels)
         t_to_fit = time.time() - t0
         # in test time use the future
         data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                                     observed_pollution=pollution_future, traffic=traffic_future)
 
         t0 = time.time()
-        estimation = model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords)
+        estimation = model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
+                                            distance_between_stations_pixels=distance_between_stations_pixels)
         t_to_estimate = time.time() - t0
 
         return {
