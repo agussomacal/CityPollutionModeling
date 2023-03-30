@@ -5,7 +5,7 @@ from spiderplot import spiderplot
 import src.config as config
 from src.DataManager import DataManager
 from src.LabPipeline import LabPipeline
-from src.experiments.PreProcess import llo4test, train_test_model, station_coordinates
+from src.experiments.PreProcess import loo4test, train_test_model, station_coordinates
 from src.experiments.config_experiments import num_cores
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel, SnapshotWeightedStd
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     ]
 
     lab = LabPipeline()
-    lab.define_new_block_of_functions("true_values", llo4test)
+    lab.define_new_block_of_functions("true_values", loo4test)
     lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
     lab.execute(
         data_manager,

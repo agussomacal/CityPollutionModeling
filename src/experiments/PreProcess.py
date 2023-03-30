@@ -102,7 +102,7 @@ long_bounds = Bounds(np.min(longitudes), np.max(longitudes))
 longer_distance = np.sqrt(np.diff(lat_bounds) ** 2 + np.diff(long_bounds) ** 2)
 
 
-def llo4test(station):
+def loo4test(station):
     _, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                        observed_pollution=pollution_future, traffic=traffic_future)
     return {
