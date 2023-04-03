@@ -28,7 +28,9 @@ class TrafficMeanModel(SummaryModel):
         average_pollution_by_time = summary_function(observed_pollution.values, axis=1)
 
         reduced_traffic = reduce_traffic_to_colors(traffic, kernel=1)
-        lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, average_pollution_by_time)
+        lr = LinearRegression(fit_intercept=False).fit(np.median(reduced_traffic.values, axis=0, keepdims=True),
+                                                       np.mean(average_pollution_by_time, axis=0, keepdims=True))
+        # lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, average_pollution_by_time)
         self.set_params(**dict(zip(reduced_traffic.columns, lr.coef_)))
         return self
 

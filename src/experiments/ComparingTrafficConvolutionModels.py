@@ -49,7 +49,7 @@ def plot_kernel_in_map(data_manager, screenshot_period, station="OPERA", model="
 
 
 if __name__ == "__main__":
-    niter = 10
+    niter = 25
     experiment_name = f"TrafficConvolutionModelComparison_{shuffle}"
 
     data_manager = DataManager(
@@ -86,10 +86,10 @@ if __name__ == "__main__":
     ]
 
     lab = LabPipeline()
-    lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, models)))
+    lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, base_models + models)))
     lab.define_new_block_of_functions("model",
                                       *list(map(partial(train_test_averagers, positive=True, fit_intercept=False),
-                                                [[model] for model in base_models + models] +
+                                                [[model] for model in base_models + models]  +
                                                 [base_models + [model] for model in models]
                                                 )))
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         forget=False,
         recalculate=False,
         save_on_iteration=4,
-        station=stations2test[:2]  # station_coordinates.columns.to_list()[:2]
+        station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #
@@ -107,7 +107,6 @@ if __name__ == "__main__":
                  log="y",
                  sigma=lambda losses: get_traffic_conv_params(losses)[0],
                  loss=lambda losses: get_traffic_conv_params(losses)[1],
-                 # model=['TrafficConvolutionModelgaussker', 'TrafficConvolutionModelgausskerNorm'],
                  model=[model for model in set(data_manager["model"]) if
                         "TrafficConvolution" in model or "TCM" in model]
                  )
