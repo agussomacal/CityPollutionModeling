@@ -1,24 +1,30 @@
 from functools import partial
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
+from matplotlib import pyplot as plt
 from spiderplot import spiderplot
 
 import src.config as config
-from src.DataManager import DataManager, dmfilter
+from src.DataManager import DataManager, dmfilter, apply
 from src.LabPipeline import LabPipeline
-from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates
-from src.experiments.config_experiments import num_cores, shuffle
+from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates, \
+    distance_between_stations_pixels, train_test_averagers
+from src.experiments.config_experiments import num_cores, shuffle, stations2test
+from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager, LOGUNIFORM
+    ModelsAverager, LOGUNIFORM, medianse, GRAD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
 from src.performance_utils import NamedPartial
-from src.viz_utils import generic_plot
+from src.viz_utils import generic_plot, save_fig
 
 
 def get_traffic_conv_params(losses):
+    if isinstance(losses, list):
+        losses = losses[-1]  # assumes the traffic convolution is the last model
     if isinstance(losses, list):
         losses = losses[-1]  # assumes the traffic convolution is the last model
     if losses is None:
@@ -27,8 +33,23 @@ def get_traffic_conv_params(losses):
     return losses["sigma"], losses["loss"]
 
 
+def plot_kernel_in_map(data_manager, screenshot_period, station="OPERA", model="TrafficConvolutionModelgaussker"):
+    plt.close("all")
+    with save_fig(data_manager.path, "CharacteristicTrafficConvDistance.png"):
+        plt.imshow(load_background(screenshot_period))
+        d = apply(dmfilter(data_manager, names=["losses"], model=[model]), names=["losses"],
+                  sigma=lambda losses: get_traffic_conv_params(losses)[0],
+                  loss=lambda losses: get_traffic_conv_params(losses)[1])
+        sigma_optim = pd.concat(d["sigma"], axis=1).mean(axis=1).values[
+            np.argmin(pd.concat(d["loss"], axis=1).mean(axis=1))]
+        ker = gaussker(distance_between_stations_pixels.loc[station, :], sigma=sigma_optim)
+
+        plt.scatter(*list(zip(*ker.index))[::-1], s=1, c=ker.values, marker=".", cmap="jet")
+        plt.tight_layout()
+
+
 if __name__ == "__main__":
-    niter = 20
+    niter = 10
     experiment_name = f"TrafficConvolutionModelComparison_{shuffle}"
 
     data_manager = DataManager(
@@ -37,62 +58,61 @@ if __name__ == "__main__":
     )
 
     traffic_convolution = lambda: TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
-                                                          sigma=Bounds(longer_distance / 10, 2 * longer_distance),
-                                                          loss=mse, optim_method=LOGUNIFORM, niter=niter, verbose=True)
+                                                          sigma=Bounds(longer_distance.ravel()[0] / 10,
+                                                                       2 * longer_distance),
+                                                          loss=medianse, optim_method=LOGUNIFORM, niter=niter,
+                                                          verbose=True)
     traffic_convolution_norm = lambda: TrafficConvolutionModel(conv_kernel=gaussker, normalize=True,
-                                                               sigma=Bounds(longer_distance / 10, 2 * longer_distance),
-                                                               loss=mse, optim_method=LOGUNIFORM, niter=niter,
+                                                               sigma=Bounds(longer_distance.ravel()[0] / 10,
+                                                                            2 * longer_distance),
+                                                               loss=medianse, optim_method=LOGUNIFORM, niter=niter,
                                                                verbose=True)
-    models = [
+    base_models = [
         SnapshotMeanModel(summary_statistic="mean"),
-        GlobalMeanModel(),
+        GlobalMeanModel()
+    ]
+    models = [
         TrafficMeanModel(summary_statistic="mean"),
         traffic_convolution(),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
             traffic_convolution(),
         ]),
-        ModelsAverager(models=[
-            TrafficMeanModel(summary_statistic="mean"),
-            SnapshotMeanModel(summary_statistic="mean"),
-            traffic_convolution()
-        ],
-            positive=True, fit_intercept=False),
         traffic_convolution_norm(),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
             traffic_convolution_norm(),
         ]),
-        ModelsAverager(models=[
-            TrafficMeanModel(summary_statistic="mean"),
-            SnapshotMeanModel(summary_statistic="mean"),
-            traffic_convolution_norm()
-        ],
-            positive=True, fit_intercept=False),
     ]
 
     lab = LabPipeline()
-    # lab.define_new_block_of_functions("true_values", loo4test)
-    lab.define_new_block_of_functions("model", *list(map(train_test_model, models)))
+    lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, models)))
+    lab.define_new_block_of_functions("model",
+                                      *list(map(partial(train_test_averagers, positive=True, fit_intercept=False),
+                                                [[model] for model in base_models + models] +
+                                                [base_models + [model] for model in models]
+                                                )))
+
     lab.execute(
         data_manager,
         num_cores=num_cores,
-        forget=True,
+        forget=False,
         recalculate=False,
         save_on_iteration=4,
-        station=station_coordinates.columns.to_list()
+        station=stations2test[:2]  # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #
-    # list(zip(*dmfilter(data_manager, names=["model", "losses"],
-    #                    model=[model for model in set(data_manager["model"]) if
-    #                           "TrafficConvolution" in model or "TCM" in model]).values()))
     generic_plot(data_manager, x="sigma", y="loss", label="model", plot_func=NamedPartial(sns.lineplot, marker="o"),
                  log="y",
                  sigma=lambda losses: get_traffic_conv_params(losses)[0],
                  loss=lambda losses: get_traffic_conv_params(losses)[1],
+                 # model=['TrafficConvolutionModelgaussker', 'TrafficConvolutionModelgausskerNorm'],
                  model=[model for model in set(data_manager["model"]) if
-                        "TrafficConvolution" in model or "TCM" in model])
+                        "TrafficConvolution" in model or "TCM" in model]
+                 )
+
+    # plot_kernel_in_map(data_manager, 15, station="OPERA", model="TrafficConvolutionModelgaussker")
 
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
                  mse=lambda error: np.sqrt(error.mean()))
@@ -100,16 +120,26 @@ if __name__ == "__main__":
     generic_plot(data_manager, x="station", y="l1_error", label="model", plot_func=sns.boxenplot,
                  sort_by=["mse"],
                  l1_error=lambda error: np.abs(error).ravel(),
-                 mse=lambda error: np.sqrt(error.mean()))
+                 mse=lambda error: np.sqrt(error.mean()),
+                 ylim=(0, 100))
+
+    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
+                 sort_by=["mse"],
+                 mse=lambda error: np.sqrt(error.mean()),
+                 ylim=(0, 60))
 
     generic_plot(data_manager, x="l1_error", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
                  sort_by=["mse"],
                  l1_error=lambda error: np.abs(error).ravel(),
-                 mse=lambda error: np.sqrt(error.mean()), xlim=(0, 20))
+                 mse=lambda error: np.sqrt(error.mean()),
+                 # xlim=(0, 20)
+                 )
 
     generic_plot(data_manager, x="mse", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
                  sort_by=["mse"],
-                 mse=lambda error: np.sqrt(np.nanmean(error)), xlim=(0, 20))
+                 mse=lambda error: np.sqrt(np.nanmean(error)),
+                 xlim=(0, 100)
+                 )
 
     # generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
     #              mse=lambda estimation, future_pollution:

@@ -65,7 +65,8 @@ class TrafficConvolutionModel(BaseModel):
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
         """
         if target_positions.columns[0] in distance_between_stations_pixels.index:
-            dist = distance_between_stations_pixels.loc[target_positions.columns[0] , traffic_coords.columns]
+            # dist = distance_between_stations_pixels.loc[target_positions.columns[0], traffic_coords.columns]
+            dist = distance_between_stations_pixels.loc[target_positions.columns[0], :].values
         else:
             dist = np.sqrt(
                 ((traffic_coords.loc[["long", "lat"], :] -
@@ -103,11 +104,14 @@ class TrafficConvolutionModel(BaseModel):
             list(zip(*[(target_pollution,
                         partial_filter(self.convolve, distance_between_stations_pixels=distance_between_stations_pixels,
                                        **{**kwargs, **known_data}))
-                       for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
+                       for known_data, target_pollution in
+                       loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
         target_pollution = pd.concat(target_pollution)
         reduced_traffic = pd.concat(reduced_traffic)
-
-        lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, target_pollution)
+        # use median to fit to avoid outliers to interfere
+        lr = LinearRegression(fit_intercept=False).fit(np.median(reduced_traffic.values, axis=0, keepdims=True),
+                                                       np.mean(target_pollution.values, axis=0, keepdims=True))
+        # lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, target_pollution)
         self.set_params(**dict(zip(reduced_traffic.columns, lr.coef_)))
         estimated_average_pollution = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, **self.params))
         return target_pollution, estimated_average_pollution.values

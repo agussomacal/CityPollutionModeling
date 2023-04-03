@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 from src.performance_utils import if_true_str
 
-CMA_OPTIM_METHOD = "cma"
-BFGS_OPTIM_METHOD = "bfgs"
+CMA = "cma"
+GRAD = "bfgs"
 BFGS_PAR_OPTIM_METHOD = "bfgs_parallel"
 RANDOM = "random"
 UNIFORM = "uniform"
@@ -35,13 +35,14 @@ def split_by_station(unknown_station, observed_stations, observed_pollution, tra
             observed_pollution.loc[valid_times, unknown_station]
 
 
-def loo(observed_stations, observed_pollution, traffic):
+def loo(observed_stations, observed_pollution, traffic, stations2test=None):
     loo = LeaveOneOut()
     for _, unknown_station_ix in loo.split(observed_stations.columns):
         unknown_station = observed_stations.columns[unknown_station_ix].to_list().pop()
-        split = split_by_station(unknown_station, observed_stations, observed_pollution, traffic)
-        if split is not None:
-            yield split
+        if stations2test is None or unknown_station in stations2test:
+            split = split_by_station(unknown_station, observed_stations, observed_pollution, traffic)
+            if split is not None:
+                yield split
 
 
 def mse(x, y):
@@ -53,6 +54,17 @@ def mse(x, y):
     """
 
     return np.nanmean((x - y) ** 2)
+
+
+def medianse(x, y):
+    """
+
+    @param x: vector 1
+    @param y: vector 2
+    @return:
+    """
+
+    return np.nanmedian((x - y) ** 2)
 
 
 class BaseModel:
@@ -75,6 +87,7 @@ class BaseModel:
             else:
                 self.set_params(**{k: v})
         self.losses = dict()
+        self.calibrated = False
 
     @property
     def params(self):
@@ -98,13 +111,14 @@ class BaseModel:
         target_pollution, predicted_pollution = \
             list(zip(*[(target_pollution,
                         self.state_estimation(**known_data, target_pollution=target_pollution, **kwargs))
-                       for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
+                       for known_data, target_pollution in
+                       loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
 
         return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        if len(self.params) == 1 and self.optim_method == CMA_OPTIM_METHOD:
-            self.optim_method = BFGS_OPTIM_METHOD
+        if len(self.params) == 1 and self.optim_method == CMA:
+            self.optim_method = GRAD
 
         def optim_func(params):
             if self.verbose:
@@ -112,32 +126,27 @@ class BaseModel:
             self.set_params(**dict(zip(self.params, params)))
             target_pollution, predicted_pollution = self.state_estimation_for_optim(
                 observed_stations, observed_pollution, traffic, **kwargs)
-            # target_pollution, predicted_pollution = \
-            #     list(zip(*[(target_pollution,
-            #                 self.state_estimation_for_optim(**known_data, target_pollution=target_pollution, **kwargs))
-            #                for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
-
             loss = self.loss(target_pollution, predicted_pollution)
-            # self.losses[tuple(params)] = loss
+            self.losses[tuple(params)] = loss
             if self.verbose:
                 logging.info(loss)
             return loss
 
-        if self.optim_method == CMA_OPTIM_METHOD:
-            raise Exception("Not implemente, bounds or params?")
-            x0 = np.array(list([self.params[k] for k in self.bounds]))
+        if self.optim_method == CMA:
+            x0 = np.array([self.params[k] if k in self.params else self.bounds[k][0] for k in self.bounds])
             optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
                                         sigma0=1, eval_initial_x=True,
                                         options={'popsize': 10, 'maxfevals': self.niter})
             self.set_params(**dict(zip(self.params.keys(), optim_params)))
-        elif self.optim_method == BFGS_OPTIM_METHOD:
-            raise Exception("Not implemente, bounds or params?")
-            x0 = np.array(list([self.params[k] for k in self.bounds]))
-            optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds,
+        elif self.optim_method == GRAD:
+            x0 = np.array([self.params[k] if k in self.params else self.bounds[k][0] for k in self.bounds])
+            optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds.values(),
                                     method="L-BFGS-B" if all([b is None for b in self.bounds.values()]) else 'SLSQP',
                                     options={'maxiter': self.niter}).x
 
             self.set_params(**dict(zip(self.params.keys(), optim_params)))
+            self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=self.bounds.keys()),
+                                    name="loss")
         elif self.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
             if self.optim_method == UNIFORM:
                 sampler = np.linspace
@@ -161,6 +170,7 @@ class BaseModel:
         else:
             raise Exception("Not implemented.")
         logging.info("Optim params: ", self.params)
+        self.calibrated = True
         return self
 
 
@@ -172,6 +182,7 @@ class ModelsSequenciator:
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
         self.amp = [1.0] * len(models)
         self.losses = list()
+        self.calibrated = False
 
     @property
     def params(self):
@@ -229,6 +240,7 @@ class ModelsSequenciator:
                 #                                    for known_data, target_pollution in
                 #                                    loo(observed_stations, observed_pollution_i, traffic)], axis=1)
         print("Amplitudes: ", self.amp)
+        self.calibrated = True
         return self
 
 
@@ -291,7 +303,8 @@ class ModelsAverager(BaseModel):
         target_pollution, predicted_pollution = \
             list(zip(*[(target_pollution,
                         self.state_estimation_concatenated(**known_data, target_pollution=target_pollution, **kwargs))
-                       for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
+                       for known_data, target_pollution in
+                       loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
 
         return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
 
@@ -299,11 +312,13 @@ class ModelsAverager(BaseModel):
         if not hasattr(self.lr, "coefs_") or not hasattr(self.lr, "intercept_"):
             # calibrate models
             for model in self.models:
-                model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+                if not model.calibrated:
+                    model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
                 self.losses.append(model.losses)
             # find optimal weights for model averaging
             individual_predictions, target = \
                 self.state_estimation_for_optim(observed_stations, observed_pollution, traffic, **kwargs)
             not_nan = ~np.any(np.isnan(individual_predictions), axis=1) & ~np.isnan(target)
             self.lr.fit(individual_predictions[not_nan], target[not_nan])
+            self.calibrated = True
         print(f"Models importance: {self.model_importance}")

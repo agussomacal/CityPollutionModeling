@@ -54,7 +54,8 @@ class SnapshotWeightedModel(BaseModel):
         """
         target, pollution = \
             list(zip(*[(target_pollution, pd.concat((known_data["observed_pollution"], target_pollution), axis=1))
-                       for known_data, target_pollution in loo(observed_stations, observed_pollution, traffic)]))
+                       for known_data, target_pollution in
+                       loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
         target = pd.concat(target).values
         pollution = pd.concat(pollution)
         pollution_columns = pollution.columns
