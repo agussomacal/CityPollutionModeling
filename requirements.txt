@@ -16,3 +16,4 @@ scikit-learn
 cma
 spiderplot
 psutil
+osmnx
