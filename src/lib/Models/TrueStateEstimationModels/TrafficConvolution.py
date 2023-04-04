@@ -67,8 +67,10 @@ class TrafficConvolutionModel(BaseModel):
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
         """
         if target_positions.columns[0] in distance_between_stations_pixels.index:
+            dist = distance_between_stations_pixels.iloc[
+                   list(distance_between_stations_pixels.index).index(target_positions.columns[0]), :]
             # dist = distance_between_stations_pixels.loc[target_positions.columns[0], traffic_coords.columns]
-            dist = distance_between_stations_pixels.loc[target_positions.columns[0], :].values
+            # dist = distance_between_stations_pixels.loc[target_positions.columns[0], :].values
         else:
             dist = np.sqrt(
                 ((traffic_coords.loc[["long", "lat"], :] -

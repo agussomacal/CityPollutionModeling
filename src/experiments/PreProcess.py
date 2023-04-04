@@ -14,7 +14,7 @@ from scipy.spatial.distance import cdist
 import src.config as config
 from src.DataManager import DataManager
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
-    proportion_of_past_times, shuffle, server, chunksize, stations2test
+    proportion_of_past_times, shuffle, server, chunksize, stations2test, simulation, max_num_stations, seed
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
@@ -69,7 +69,8 @@ data_manager = DataManager(
     path=config.results_dir,
     name=experiment_name
 )
-path2models = Path(f"{data_manager.path}/Rows{nrows2load_traffic_data}_Shuffle{shuffle}_models")
+path2models = Path(
+    f"{data_manager.path}/Rows{nrows2load_traffic_data}{if_true_str(simulation, '_Sim')}{if_true_str(shuffle, '_Shuffle')}_models")
 path2models.mkdir(parents=True, exist_ok=True)
 
 preprocessing_data_path = f"{data_manager.path}/preprocessing_data{nrows2load_traffic_data}Shuffle{shuffle}.compressed"
@@ -103,6 +104,46 @@ distance_between_stations_pixels = pd.DataFrame(cdist(station_coordinates.loc[["
                                                       traffic_pixels_coords.loc[["long", "lat"], :].values.T),
                                                 columns=traffic_pixels_coords.columns,
                                                 index=station_coordinates.columns)
+
+if simulation:
+    from src.experiments.config_experiments import simulated_model
+
+    with timeit("Simulating dataset"):
+        np.random.seed(seed)
+        target_positions = traffic_pixels_coords.iloc[:,
+                           np.random.choice(traffic_pixels_coords.shape[1], size=max_num_stations)]
+        stations2test = list(target_positions.columns)
+        station_coordinates = traffic_pixels_coords.loc[["long", "lat"], stations2test]
+        distance_between_stations_pixels = pd.DataFrame(
+            cdist(station_coordinates.values.T,
+                  traffic_pixels_coords.loc[["long", "lat"], :].values.T),
+            columns=traffic_pixels_coords.columns,
+            index=stations2test)
+        pollution_past = pd.DataFrame(simulated_model.state_estimation(
+            observed_stations=station_coordinates,
+            observed_pollution=pollution_past.iloc[:10],
+            traffic=traffic_past.iloc[:10],
+            target_positions=target_positions,
+            traffic_coords=traffic_pixels_coords,
+            distance_between_stations_pixels=distance_between_stations_pixels),
+            index=traffic_past.index[:10],
+            columns=target_positions.columns)
+
+        pollution_future = pd.DataFrame(simulated_model.state_estimation(
+            observed_stations=station_coordinates,
+            observed_pollution=pollution_future.iloc[:10],
+            traffic=traffic_future.iloc[:10],
+            target_positions=target_positions,
+            traffic_coords=traffic_pixels_coords,
+            distance_between_stations_pixels=distance_between_stations_pixels),
+            index=traffic_future.index[:10],
+            columns=target_positions.columns)
+        traffic_past = traffic_past.loc[pollution_past.index]
+        traffic_future = traffic_future.loc[pollution_future.index]
+
+        stations2test = stations2test[:2]
+else:
+    stations2test = stations2test
 
 
 # ----- Defining Experiment ----- #

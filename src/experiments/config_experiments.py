@@ -4,6 +4,7 @@ import psutil
 import seaborn as sns
 
 import src.config as config
+from src.performance_utils import if_true_str
 
 sns.set_theme()
 
@@ -12,6 +13,9 @@ recalculate_traffic_by_pixel = False
 proportion_of_past_times = 0.8
 screenshot_period = 15
 shuffle = True
+simulation = True
+max_num_stations = 100
+seed = 42
 # stations2test = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS', 'PA15L']
 # stations that are inside Paris so traffic information is all around
 stations2test = ['OPERA', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA13', 'PA18', 'HAUS']
@@ -29,12 +33,31 @@ else:
     num_cores = 14
     chunksize = None
 
+if simulation:
+    import datetime
+
+    from src.lib.Models.BaseModel import ModelsAverager
+    from src.lib.Models.TrueStateEstimationModels.AverageModels import GlobalMeanModel
+    from src.lib.Models.TrueStateEstimationModels.TemporalDependentModels import CosinusModel
+    from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficConvolutionModel, \
+        gaussker
+
+    simulated_model = ModelsAverager(
+        models=[
+            GlobalMeanModel(global_mean=60),
+            CosinusModel(t0=datetime.datetime(year=2023, month=1, day=1, hour=8), amplitude=40, period=12, phase=0),
+            TrafficConvolutionModel(conv_kernel=gaussker, normalize=True,
+                                    sigma=0.05, green=0.4, yellow=5, red=26, dark_red=64.46007627922917)
+        ],
+        weights=[1, 1, 1, 0]
+    )
+
 # ----- logger ----- #
 # Create and configure logger
 logging.basicConfig(
     level=logging.INFO,
     # handlers=[logging.FileHandler(f"{data_manager.path}/experiment.log"), logging.StreamHandler()],
-    filename=f"{config.results_dir}/Shuffle{shuffle}_experiment.log",
+    filename=f"{config.results_dir}/Shuffle{shuffle}_experiment{if_true_str(simulation, '_Sim')}.log",
     format='%(asctime)s %(message)s',
     filemode='a')
 

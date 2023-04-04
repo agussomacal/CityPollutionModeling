@@ -10,15 +10,15 @@ import src.config as config
 from src.DataManager import DataManager, dmfilter, apply
 from src.LabPipeline import LabPipeline
 from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates, \
-    distance_between_stations_pixels, train_test_averagers
-from src.experiments.config_experiments import num_cores, shuffle, stations2test
+    distance_between_stations_pixels, train_test_averagers, simulation, stations2test
+from src.experiments.config_experiments import num_cores, shuffle
 from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
     ModelsAverager, LOGUNIFORM, medianse, GRAD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
-from src.performance_utils import NamedPartial
+from src.performance_utils import NamedPartial, if_true_str
 from src.viz_utils import generic_plot, save_fig
 
 
@@ -50,7 +50,7 @@ def plot_kernel_in_map(data_manager, screenshot_period, station="OPERA", model="
 
 if __name__ == "__main__":
     niter = 25
-    experiment_name = f"TrafficConvolutionModelComparison_{shuffle}"
+    experiment_name = f"TrafficConvolutionModelComparison{if_true_str(shuffle, '_Shuffled')}{if_true_str(simulation, '_Sim')}"
 
     data_manager = DataManager(
         path=config.results_dir,
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, base_models + models)))
     lab.define_new_block_of_functions("model",
                                       *list(map(partial(train_test_averagers, positive=True, fit_intercept=False),
-                                                [[model] for model in base_models + models]  +
+                                                [[model] for model in base_models + models] +
                                                 [base_models + [model] for model in models]
                                                 )))
 
@@ -103,25 +103,7 @@ if __name__ == "__main__":
     )
 
     # ----- Plotting results ----- #
-    generic_plot(data_manager, x="sigma", y="loss", label="model", plot_func=NamedPartial(sns.lineplot, marker="o"),
-                 log="y",
-                 sigma=lambda losses: get_traffic_conv_params(losses)[0],
-                 loss=lambda losses: get_traffic_conv_params(losses)[1],
-                 model=[model for model in set(data_manager["model"]) if
-                        "TrafficConvolution" in model or "TCM" in model]
-                 )
-
     # plot_kernel_in_map(data_manager, 15, station="OPERA", model="TrafficConvolutionModelgaussker")
-
-    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
-                 mse=lambda error: np.sqrt(error.mean()))
-
-    generic_plot(data_manager, x="station", y="l1_error", label="model", plot_func=sns.boxenplot,
-                 sort_by=["mse"],
-                 l1_error=lambda error: np.abs(error).ravel(),
-                 mse=lambda error: np.sqrt(error.mean()),
-                 ylim=(0, 100))
-
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(error.mean()),
@@ -134,10 +116,12 @@ if __name__ == "__main__":
                  # xlim=(0, 20)
                  )
 
-    generic_plot(data_manager, x="mse", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
+    generic_plot(data_manager, x="mse", y="model",
+                 plot_func=NamedPartial(sns.violinplot, orient="horizontal", inner="stick"),
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(np.nanmean(error)),
-                 xlim=(0, 100)
+                 xlim=(0, 100),
+                 model=["SnapshotMeanModelmean", "A+SMM,GMM,SMMTCMN", "GlobalMeanModelmean"]
                  )
 
     # generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
@@ -150,3 +134,12 @@ if __name__ == "__main__":
 
     generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
     generic_plot(data_manager, x="model", y="time_to_estimate", plot_func=sns.boxenplot)
+
+    generic_plot(data_manager, x="station", y="mse", label="model", plot_func=spiderplot,
+                 mse=lambda error: np.sqrt(error.mean()))
+
+    generic_plot(data_manager, x="station", y="l1_error", label="model", plot_func=sns.boxenplot,
+                 sort_by=["mse"],
+                 l1_error=lambda error: np.abs(error).ravel(),
+                 mse=lambda error: np.sqrt(error.mean()),
+                 ylim=(0, 100))
