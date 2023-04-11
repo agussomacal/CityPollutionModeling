@@ -111,15 +111,17 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
                                                     index=station_coordinates.columns)
 
 with data_manager.track_emissions("PreprocessGraph"):
-    graph = osm_graph(path=city_dir, filename="ParisGraph", south=lat_bounds.lower, north=lat_bounds.upper,
-                      west=long_bounds.lower, east=long_bounds.upper)
-    edges_pixels = project_pixels2edges(path=city_dir, filename="EdgesPixels", graph=graph,
-                                        traffic_pixels_coords=traffic_pixels_coords)
-    traffic_graph_filename = f"TrafficGraph{nrows2load_traffic_data}Shuffle{shuffle}"
-    traffic_graph_past = project_traffic_to_edges(path=city_dir, filename=f"{traffic_graph_filename}_past",
-                                                  traffic_by_pixel=traffic_past, edges_pixels=edges_pixels)
-    traffic_graph_future = project_traffic_to_edges(path=city_dir, filename=f"{traffic_graph_filename}_future",
-                                                    traffic_by_pixel=traffic_future, edges_pixels=edges_pixels)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        graph = osm_graph(path=city_dir, filename="ParisGraph", south=lat_bounds.lower, north=lat_bounds.upper,
+                          west=long_bounds.lower, east=long_bounds.upper)
+        edges_pixels = project_pixels2edges(path=city_dir, filename="EdgesPixels", graph=graph,
+                                            traffic_pixels_coords=traffic_pixels_coords)
+        traffic_graph = project_traffic_to_edges(path=city_dir, filename=f"TrafficGraph",
+                                                 traffic_by_pixel=pd.concat((traffic_past, traffic_future),
+                                                                            axis=0).sort_index(),
+                                                 edges_pixels=edges_pixels)
 
 if simulation:
     with data_manager.track_emissions("Simulations"):
@@ -243,7 +245,7 @@ if __name__ == "__main__":
         plt.scatter(distance_between_stations.values.ravel(), pollution_past.corr().values.ravel())
 
     with save_fig(data_manager.path, "traffic_num_pixels.png"):
-        num_pixels = (traffic_past.append(traffic_future) > 0).sum(axis=1)
+        num_pixels = (pd.concat((traffic_past, traffic_future)) > 0).sum(axis=1)
         num_pixels.hist(bins="sqrt")
         median = np.median(num_pixels)
         delta = np.max(num_pixels) - median
@@ -263,10 +265,14 @@ if __name__ == "__main__":
     with save_fig(data_manager.path, "Pixels2Edges.png"):
         img = load_background(screenshot_period)
         mask = np.zeros(np.shape(img)[:2])
-        for i, pixels in zip(np.random.choice(len(edges_pixels), size=len(edges_pixels), replace=False), edges_pixels.values()):
-            mask[np.array(pixels)[:, 0], np.array(pixels)[:, 1]] = float(i)/len(edges_pixels)
+        for i, pixels in zip(np.random.choice(len(edges_pixels), size=len(edges_pixels), replace=False),
+                             edges_pixels.values()):
+            mask[np.array(pixels)[:, 0], np.array(pixels)[:, 1]] = float(i) / len(edges_pixels)
         plt.imshow(mask, cmap="jet")
         plt.imshow(img, alpha=0.5)
         plt.title(f"Graph compression percentage: \n"
-                  f"filtered graph: {len(edges_pixels)/np.shape(traffic_future)[1]*100:.2f}% and "
-                  f"full graph: {len(graph.edges())/np.shape(traffic_future)[1]*100:.2f}%")
+                  f"filtered graph: {len(edges_pixels) / np.shape(traffic_future)[1] * 100:.2f}% and "
+                  f"full graph: {len(graph.edges()) / np.shape(traffic_future)[1] * 100:.2f}%")
+
+    print(f"CO2 {data_manager.CO2kg}kg")
+    print(f"Electricity consumption {data_manager.electricity_consumption_kWh}kWh")
