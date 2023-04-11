@@ -36,6 +36,8 @@ def project_pixels2edges(graph, traffic_pixels_coords):
 def project_traffic_to_edges(traffic_by_pixel: pd.DataFrame, edges_pixels: Dict[Tuple, Tuple]):
     """
     traffic_by_pixel: columns: tuple of pixel coords; index: times; values: [0, 1, 2, 3, 4] for [no traffic info, green, yellow...]
+    @:return edges_traffic: Dict[DataFrame] each key an edge, each value a dataframe with the amount of pixels with a certain
+    color [columns] for each time [rows]
     """
     edges_traffic = {e: pd.DataFrame(0, index=traffic_by_pixel.index, columns=TRAFFIC_VALUES.keys()) for e in
                      edges_pixels.keys()}

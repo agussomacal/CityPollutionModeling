@@ -1,5 +1,6 @@
 import glob
 import os.path
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -14,12 +15,12 @@ from src.performance_utils import get_map_function, timeit
 
 TRAFFIC_TS_LAG = -1  # 1 hour less because GMT+1 vs GMT+0
 
-TRAFFIC_VALUES = {
-    "green": 1,
-    "yellow": 2,
-    "red": 3,
-    "dark_red": 4
-}
+TRAFFIC_VALUES = OrderedDict([
+    ("green", 1),
+    ("yellow", 2),
+    ("red", 3),
+    ("dark_red", 4)
+])
 
 TRAFFIC_COLORS = {
     "green": (99, 214, 104),
