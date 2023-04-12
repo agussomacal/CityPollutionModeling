@@ -16,7 +16,7 @@ from src.performance_utils import filter_dict, timeit
 
 class GraphModelBase(BaseModel):
 
-    def __init__(self, name="", loss=mse, optim_method=GRAD, verbose=False, niter=1000, **kwargs):
+    def __init__(self, name="", loss=mse, optim_method=GRAD, verbose=False, niter=1000, k_neighbours=None, **kwargs):
         # super call
         super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, **kwargs)
         self.position2node_index = dict()
@@ -26,6 +26,7 @@ class GraphModelBase(BaseModel):
         self.last_nodes = None
         self.last_times = None
         self.traffic_by_node = None
+        self.k_neighbours = k_neighbours
 
     def preprocess_graph(self, graph: nx.Graph):
         graph = nx.Graph(graph).to_undirected()
@@ -83,26 +84,41 @@ class GraphModelBase(BaseModel):
         assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
         kwargs.update(self.preprocess_graph(kwargs["graph"]))
         with timeit("update postitions"):
-            self.update_position2node_index(target_positions)
-        with timeit("traffic by node"):
-            traffic_by_node = self.get_traffic_by_node(observed_pollution, kwargs["traffic_by_edge"], kwargs["graph"])
-        with timeit("emissions"):
-            emissions = self.get_emissions(traffic_by_node)
-        with timeit("solutions"):
-            solutions = self.state_estimation_core(emissions, **kwargs)
+            self.update_position2node_index(target_positions, re_update=self.k_neighbours is not None)
 
         with timeit("indexes"):
             indexes = [self.position2node_index[position] for position in zip(target_positions.loc["long"].values,
                                                                               target_positions.loc["lat"].values)]
+        if self.k_neighbours is not None and len(indexes) < len(kwargs["graph"]) // 4:
+            nodes = set()
+            for i in indexes:
+                nodes.update(list(nx.single_source_shortest_path_length(kwargs["graph"], list(kwargs["graph"].nodes)[i],
+                                                                        cutoff=self.k_neighbours).keys()))
+            kwargs["graph"] = nx.subgraph(kwargs["graph"], nodes)
+            print(f"After filtering with {self.k_neighbours}-neighbours: "
+                  f"{kwargs['graph'].number_of_nodes()} nodes and "
+                  f"{kwargs['graph'].number_of_edges()} edges.")
+            kwargs.update(self.preprocess_graph(kwargs["graph"]))
+            with timeit("update postitions"):
+                self.update_position2node_index(target_positions, re_update=True)
+
+            with timeit("indexes"):
+                indexes = [self.position2node_index[position] for position in zip(target_positions.loc["long"].values,
+                                                                                  target_positions.loc["lat"].values)]
+
+        with timeit("traffic by node"):
+            traffic_by_node = self.get_traffic_by_node(observed_pollution, kwargs["traffic_by_edge"], kwargs["graph"])
+        with timeit("emissions"):
+            emissions = self.get_emissions(traffic_by_node)
+
+        with timeit("solutions"):
+            solutions = self.state_estimation_core(emissions, **kwargs)
+
         return solutions[:, indexes]
 
-    @property
-    def domain(self):
-        return self.node_positions
-
-    def update_position2node_index(self, target_positions: pd.DataFrame):
+    def update_position2node_index(self, target_positions: pd.DataFrame, re_update=False):
         for tp in map(tuple, target_positions.values.T):
-            if tp not in self.position2node_index:
+            if re_update or tp not in self.position2node_index:
                 # TODO: instead of looking for the nearset node, predict using the point in the edge
                 self.position2node_index[tp] = int(np.argmin(cdist(self.node_positions, np.array([tp])), axis=0))
 
@@ -122,9 +138,9 @@ class HEqStaticModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
     def __init__(self, absorption: Union[float, Optim], diffusion: Union[float, Optim], green=Union[float, Optim],
-                 yellow=Union[float, Optim], red=Union[float, Optim], dark_red=Union[float, Optim], name="",
-                 loss=mse, optim_method="lsq", verbose=False, niter=1000):
-        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose,
+                 yellow=Union[float, Optim], red=Union[float, Optim], dark_red=Union[float, Optim], k_neighbours=None,
+                 name="", loss=mse, optim_method="lsq", verbose=False, niter=1000):
+        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, k_neighbours=k_neighbours,
                          absorption=absorption, diffusion=diffusion, green=green, yellow=yellow, red=red,
                          dark_red=dark_red, niter=niter)
 
@@ -145,8 +161,8 @@ class HEqStaticModel(GraphModelBase):
         return preprocess_dict
 
     def state_estimation_core(self, emissions, Kd, Ms, **kwargs):
-        A = self.params["diffusion"] * Kd + self.params["absorption"] * Ms
-        return spsolve(A, emissions).T
+        # A = self.params["diffusion"] * Kd + self.params["absorption"] * Ms
+        # return spsolve(A, emissions).T
         # n=2 1.11s/it A calculated each time: 16min A precalculated: 10.3min
         # A precalculated: 30s
         # return np.concatenate(
@@ -162,4 +178,4 @@ class HEqStaticModel(GraphModelBase):
         #     [lu_solve((lu, piv), emissions[:, i:i + n], overwrite_b=True, check_finite=False).T for i in
         #      tqdm(range(0, emissions.shape[1], n))])
         # return lu_solve((lu, piv), emissions, overwrite_b=True, check_finite=False).T
-        # return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T
+        return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T

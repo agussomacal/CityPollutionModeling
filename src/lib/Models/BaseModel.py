@@ -90,8 +90,6 @@ class BaseModel:
                 self.set_params(**{k: v})
         self.losses = dict()
         self.calibrated = False
-        # By default state estimation for optim uses loo
-        self.state_estimation_for_optim = self.state_estimation_for_optim_agnostic if self.POLLUTION_AGNOSTIC else self.state_estimation_for_optim_loo
 
     @property
     def params(self):
@@ -110,24 +108,22 @@ class BaseModel:
         """
         raise Exception("Not implemented.")
 
-    def state_estimation_for_optim_loo(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
-                                                                                                           np.ndarray]:
-
-        target_pollution, predicted_pollution = \
-            list(zip(*[(target_pollution,
-                        self.state_estimation(**known_data, target_pollution=target_pollution, **kwargs))
-                       for known_data, target_pollution in
-                       loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
-
-        return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
-
-    def state_estimation_for_optim_agnostic(self, observed_stations, observed_pollution, traffic, **kwargs) -> [
+    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [
         np.ndarray,
         np.ndarray]:
-        # No need for leave one out because the graph model do not make use of the pollution values,
-        # it tries to infer them directly from traffic
-        return self.state_estimation(observed_stations, observed_pollution, traffic, observed_stations,
-                                     **kwargs), observed_pollution
+        if self.POLLUTION_AGNOSTIC:
+            # No need for leave one out because the graph model do not make use of the pollution values,
+            # it tries to infer them directly from traffic
+            return self.state_estimation(observed_stations, observed_pollution, traffic, observed_stations,
+                                         **kwargs), observed_pollution
+        else:
+            target_pollution, predicted_pollution = \
+                list(zip(*[(target_pollution,
+                            self.state_estimation(**known_data, target_pollution=target_pollution, **kwargs))
+                           for known_data, target_pollution in
+                           loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
+
+            return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
         if len(self.params) == 1 and self.optim_method == CMA:

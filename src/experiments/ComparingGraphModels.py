@@ -14,7 +14,7 @@ from src.experiments.PreProcess import longer_distance, train_test_model, statio
 from src.experiments.config_experiments import num_cores, shuffle, filter_graph
 from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim
+    ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
@@ -23,7 +23,7 @@ from src.performance_utils import NamedPartial, if_true_str
 from src.viz_utils import generic_plot, save_fig
 
 if __name__ == "__main__":
-    niter = 10
+    niter = 1000
     experiment_name = f"TrafficGraphModelComparison{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
@@ -46,9 +46,11 @@ if __name__ == "__main__":
             # red=Optim(1, 0, 1), dark_red=Optim(1, 0, 1),
             absorption=Optim(start=1, lower=0, upper=np.inf),
             diffusion=Optim(start=1, lower=0, upper=np.inf),
-            green=Optim(0, None, None), yellow=Optim(0, None, None),
-            red=Optim(0, None, None), dark_red=Optim(0, None, None),
-            name="", loss=medianse, optim_method=GRAD, verbose=True, niter=niter),
+            green=Optim(1, None, None), yellow=Optim(2, None, None),
+            red=Optim(4, None, None), dark_red=Optim(8, None, None),
+            name="", loss=medianse, optim_method=CMA, verbose=True,
+            niter=niter,
+            k_neighbours=2),
     ]
 
     lab = LabPipeline()
@@ -63,7 +65,7 @@ if __name__ == "__main__":
         data_manager,
         num_cores=num_cores,
         forget=False,
-        recalculate=False,
+        recalculate=True,
         save_on_iteration=4,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
