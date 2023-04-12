@@ -83,7 +83,7 @@ class KernelModel(BaseModel):
         # TODO: only calculate the distances between the new positions and the new+old.
         self.k_matrix = pd.DataFrame(
             self.kernel_function(self.observed_locations.values.T, self.observed_locations.values.T,
-                                 **filter_dict(self.kernel_func_param_names, **self.params)),
+                                 filter_dict(self.kernel_func_param_names, **self.params)),
             columns=self.observed_locations.columns, index=self.observed_locations.columns)
 
     def kernel_eval(self, observed_stations, target_positions) -> np.ndarray:
@@ -93,7 +93,7 @@ class KernelModel(BaseModel):
         """
 
         return self.kernel_function(observed_stations.values.T, target_positions.values.T,
-                                    **filter_dict(self.kernel_func_param_names, **self.params))
+                                    **filter_dict(self.kernel_func_param_names, self.params))
 
 
 # ================ ================ ================ #

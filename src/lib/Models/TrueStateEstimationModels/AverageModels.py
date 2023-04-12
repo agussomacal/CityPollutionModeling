@@ -37,13 +37,13 @@ class SnapshotWeightedModel(BaseModel):
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
                          **kwargs) -> np.ndarray:
-        weight = pd.concat([pd.Series(filter_dict(observed_stations.columns, **self.params))] * len(observed_pollution),
+        weight = pd.concat([pd.Series(filter_dict(observed_stations.columns, self.params))] * len(observed_pollution),
                            axis=1).T
         p_up = observed_pollution.shape[1] / (~observed_pollution.isna().values).sum(axis=1)
 
         return np.nansum(observed_pollution.values * weight.values * p_up[:, np.newaxis], axis=1, keepdims=True)
 
-        # pred = (observed_pollution @ pd.Series(filter_dict(observed_stations.columns, **self.params))).values \
+        # pred = (observed_pollution @ pd.Series(filter_dict(observed_stations.columns, self.params))).values \
         #     .reshape((-1, np.shape(target_positions)[1]))
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs) -> [np.ndarray,
@@ -73,7 +73,7 @@ class SnapshotWeightedModel(BaseModel):
 class SnapshotWeightedStd(BaseModel):
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
                          **kwargs) -> np.ndarray:
-        weight = pd.concat([pd.Series(filter_dict(observed_stations.columns, **self.params))] * len(observed_pollution),
+        weight = pd.concat([pd.Series(filter_dict(observed_stations.columns, self.params))] * len(observed_pollution),
                            axis=1).T
         weight.values[observed_pollution.isna().values] = 0
         return np.nansum(observed_pollution.values * weight.values / weight.sum(axis=1).values[:, np.newaxis], axis=1,

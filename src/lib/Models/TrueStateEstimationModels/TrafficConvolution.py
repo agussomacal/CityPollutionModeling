@@ -94,7 +94,7 @@ class TrafficConvolutionModel(BaseModel):
                                             traffic_coords=traffic_coords,
                                             distance_between_stations_pixels=distance_between_stations_pixels)
             estimated_average_pollution.append(
-                reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, **self.params)))
+                reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, self.params)))
         return pd.concat(estimated_average_pollution, axis=1).values
 
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic,
@@ -117,5 +117,5 @@ class TrafficConvolutionModel(BaseModel):
                                                        np.mean(target_pollution.values, axis=0, keepdims=True))
         # lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, target_pollution)
         self.set_params(**dict(zip(reduced_traffic.columns, lr.coef_)))
-        estimated_average_pollution = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, **self.params))
+        estimated_average_pollution = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, self.params))
         return target_pollution, estimated_average_pollution.values

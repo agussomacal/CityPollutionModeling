@@ -97,6 +97,6 @@ def filter_pollution_dates(pollution, station_coordinates, traffic_by_pixel, tra
                 ((station_coordinates.T <= max_coords) & (station_coordinates.T >= min_coords)).all(axis=1)]
     pollution.sort_index(inplace=True)
     station_coordinates = station_coordinates[pollution.columns]
-    logging.info(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
+    print(f"Remaining {pollution.shape[1]} stations with enough data in studied period and selected region: "
                  f"{pollution.columns}")
     return pollution, station_coordinates

@@ -21,6 +21,7 @@ LOGUNIFORM = "loguniform"
 NONE_OPTIM_METHOD = None
 
 Bounds = namedtuple("Bounds", "lower upper")
+Optim = namedtuple("Optim", "start lower upper", defaults=[0, None, None])
 
 
 def split_by_station(unknown_station, observed_stations, observed_pollution, traffic):
@@ -69,6 +70,7 @@ def medianse(x, y):
 
 class BaseModel:
     TRUE_MODEL = True
+    POLLUTION_AGNOSTIC = False
 
     def __init__(self, name="", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False,
                  **kwargs):
@@ -80,14 +82,16 @@ class BaseModel:
         self._params = dict()
         self.bounds = dict()
         for k, v in kwargs.items():
-            if v is None or isinstance(v, Bounds):
-                self.bounds[k] = v
+            if isinstance(v, Optim):
+                self.bounds[k] = Bounds(lower=v.lower, upper=v.upper)
                 # self.set_params(**{k: np.mean(v)})  # starting value the center
-                self.set_params(**{k: v.lower})  # starting value the center
+                self.set_params(**{k: v.start})  # starting value the center
             else:
                 self.set_params(**{k: v})
         self.losses = dict()
         self.calibrated = False
+        # By default state estimation for optim uses loo
+        self.state_estimation_for_optim = self.state_estimation_for_optim_agnostic if self.POLLUTION_AGNOSTIC else self.state_estimation_for_optim_loo
 
     @property
     def params(self):
@@ -106,8 +110,9 @@ class BaseModel:
         """
         raise Exception("Not implemented.")
 
-    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
-                                                                                                       np.ndarray]:
+    def state_estimation_for_optim_loo(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
+                                                                                                           np.ndarray]:
+
         target_pollution, predicted_pollution = \
             list(zip(*[(target_pollution,
                         self.state_estimation(**known_data, target_pollution=target_pollution, **kwargs))
@@ -116,35 +121,44 @@ class BaseModel:
 
         return np.concatenate(predicted_pollution, axis=0), np.concatenate(target_pollution, axis=0)
 
+    def state_estimation_for_optim_agnostic(self, observed_stations, observed_pollution, traffic, **kwargs) -> [
+        np.ndarray,
+        np.ndarray]:
+        # No need for leave one out because the graph model do not make use of the pollution values,
+        # it tries to infer them directly from traffic
+        return self.state_estimation(observed_stations, observed_pollution, traffic, observed_stations,
+                                     **kwargs), observed_pollution
+
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
         if len(self.params) == 1 and self.optim_method == CMA:
             self.optim_method = GRAD
 
         def optim_func(params):
             if self.verbose:
-                logging.info(f"Params for optimization: {params}")
+                print(f"Params for optimization: {params}")
             self.set_params(**dict(zip(self.params, params)))
             target_pollution, predicted_pollution = self.state_estimation_for_optim(
                 observed_stations, observed_pollution, traffic, **kwargs)
             loss = self.loss(target_pollution, predicted_pollution)
             self.losses[tuple(params)] = loss
             if self.verbose:
-                logging.info(loss)
+                print(loss)
             return loss
 
         if self.optim_method == CMA:
-            x0 = np.array([self.params[k] if k in self.params else self.bounds[k][0] for k in self.bounds])
+            self.losses = dict()
+            x0 = np.array([self.params[k] for k in self.bounds])
             optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
                                         sigma0=1, eval_initial_x=True,
                                         options={'popsize': 10, 'maxfevals': self.niter})
             self.set_params(**dict(zip(self.params.keys(), optim_params)))
         elif self.optim_method == GRAD:
-            x0 = np.array([self.params[k] if k in self.params else self.bounds[k][0] for k in self.bounds])
+            self.losses = dict()
+            x0 = np.array([self.params[k] for k in self.bounds])
             optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds.values(),
-                                    method="L-BFGS-B" if all([b is None for b in self.bounds.values()]) else 'SLSQP',
-                                    options={'maxiter': self.niter}).x
+                                    method="L-BFGS-B", options={'maxiter': self.niter}).x
 
-            self.set_params(**dict(zip(self.params.keys(), optim_params)))
+            self.set_params(**dict(zip(self.bounds.keys(), optim_params)))
             self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=self.bounds.keys()),
                                     name="loss")
         elif self.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
@@ -156,7 +170,8 @@ class BaseModel:
                 sampler = lambda d, u, i: np.logspace(np.log10(d), np.log10(u), i)
             else:
                 raise Exception(f"Optim method {self.optim_method} not implemented.")
-            samples = {k: sampler(*bounds, self.niter).ravel().tolist() for k, bounds in self.bounds.items() if
+            samples = {k: sampler(bounds.lower, bounds.upper, self.niter).ravel().tolist() for k, bounds in
+                       self.bounds.items() if
                        bounds is not None}
             self.losses = {x: optim_func(list({**self.params, **dict(zip(samples.keys(), x))}.values())) for x in
                            tqdm(zip(*samples.values()), desc=f"Training {self}")}
@@ -169,7 +184,7 @@ class BaseModel:
             return None
         else:
             raise Exception("Not implemented.")
-        logging.info("Optim params: ", self.params)
+        print("Optim params: ", self.params)
         self.calibrated = True
         return self
 
@@ -226,10 +241,11 @@ class ModelsSequenciator:
         for i, model in enumerate(self.models):
             model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
             self.losses.append(model.losses)
-            self.amp[i] = np.nanmean((observed_pollution_i.values / model.state_estimation(observed_stations,
-                                                                                           observed_pollution, traffic,
-                                                                                           observed_stations,
-                                                                                           **kwargs)))
+            self.amp[i] = np.nanmedian((observed_pollution_i.values / model.state_estimation(observed_stations,
+                                                                                             observed_pollution,
+                                                                                             traffic,
+                                                                                             observed_stations,
+                                                                                             **kwargs)))
 
             if i < len(self.models) - 1:  # only actualize if it is not the las model
                 observed_pollution_i -= self.amp[i] * model.state_estimation(observed_stations, observed_pollution,
@@ -319,6 +335,7 @@ class ModelsAverager(BaseModel):
             individual_predictions, target = \
                 self.state_estimation_for_optim(observed_stations, observed_pollution, traffic, **kwargs)
             not_nan = ~np.any(np.isnan(individual_predictions), axis=1) & ~np.isnan(target)
-            self.lr.fit(individual_predictions[not_nan], target[not_nan])
+            self.lr.fit(np.median(individual_predictions[not_nan], axis=0, keepdims=True),
+                        np.median(target[not_nan], axis=0, keepdims=True))
             self.calibrated = True
         print(f"Models importance: {self.model_importance}")

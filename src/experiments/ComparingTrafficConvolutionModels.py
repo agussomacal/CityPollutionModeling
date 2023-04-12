@@ -103,6 +103,13 @@ if __name__ == "__main__":
     )
 
     # ----- Plotting results ----- #
+    generic_plot(data_manager, x="sigma", y="loss", label="model", plot_func=NamedPartial(sns.lineplot, marker="o"),
+                 log="y",
+                 sigma=lambda losses: get_traffic_conv_params(losses)[0],
+                 loss=lambda losses: get_traffic_conv_params(losses)[1],
+                 model=[model for model in set(data_manager["model"]) if
+                        "TrafficConvolution" in model or "TCM" in model]
+                 )
     # plot_kernel_in_map(data_manager, 15, station="OPERA", model="TrafficConvolutionModelgaussker")
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
                  sort_by=["mse"],

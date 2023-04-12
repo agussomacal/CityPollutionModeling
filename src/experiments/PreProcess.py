@@ -1,10 +1,12 @@
 import os.path
 import os.path
 import time
+from itertools import chain
 from pathlib import Path
 from typing import List, Type
 
 import joblib
+import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -14,14 +16,15 @@ from scipy.spatial.distance import cdist
 from src.DataManager import DataManager
 from src.config import results_dir, city_dir
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
-    proportion_of_past_times, shuffle, server, chunksize, stations2test, simulation, max_num_stations, seed
+    proportion_of_past_times, shuffle, server, chunksize, stations2test, simulation, max_num_stations, seed, \
+    filter_graph
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
 from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, ModelsAverager
-from src.performance_utils import timeit, if_true_str
+from src.performance_utils import timeit, if_true_str, filter_dict
 from src.viz_utils import save_fig
 
 
@@ -112,16 +115,27 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
 
 with data_manager.track_emissions("PreprocessGraph"):
     import warnings
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         graph = osm_graph(path=city_dir, filename="ParisGraph", south=lat_bounds.lower, north=lat_bounds.upper,
                           west=long_bounds.lower, east=long_bounds.upper)
         edges_pixels = project_pixels2edges(path=city_dir, filename="EdgesPixels", graph=graph,
                                             traffic_pixels_coords=traffic_pixels_coords)
-        traffic_graph = project_traffic_to_edges(path=city_dir, filename=f"TrafficGraph",
-                                                 traffic_by_pixel=pd.concat((traffic_past, traffic_future),
-                                                                            axis=0).sort_index(),
-                                                 edges_pixels=edges_pixels)
+        traffic_by_edge = project_traffic_to_edges(path=city_dir, filename=f"TrafficGraph",
+                                                   traffic_by_pixel=pd.concat((traffic_past, traffic_future),
+                                                                              axis=0).sort_index(),
+                                                   edges_pixels=edges_pixels)
+        if filter_graph:
+            # filter by nodes with neighboaring edges having traffic and keep the biggest commponent.
+            graph = nx.subgraph(graph, set(chain(*traffic_by_edge.keys())))
+            print(f"nodes after filtering: {graph.number_of_nodes()}\n"
+                  f"edges after filtering: {graph.number_of_edges()}")
+            graph = nx.subgraph(graph, max(nx.connected_components(graph.to_undirected()), key=len))
+            print(f"nodes after keeping biggest component: {graph.number_of_nodes()}\n"
+                  f"edges after  keeping biggest component: {graph.number_of_edges()}")
+            edges_pixels = filter_dict(graph.to_undirected().edges, edges_pixels)
+            traffic_by_edge = filter_dict(graph.to_undirected().edges, traffic_by_edge)
 
 if simulation:
     with data_manager.track_emissions("Simulations"):
@@ -175,7 +189,8 @@ def train_test_model(model: BaseModel):
         t0 = time.time()
         model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
                         distance_between_stations_pixels=distance_between_stations_pixels,
-                        stations2test=stations2test)
+                        stations2test=stations2test,
+                        graph=graph, traffic_by_edge=traffic_by_edge)
         t_to_fit = time.time() - t0
 
         path2model = Path(f"{path2models}/{station}")
@@ -204,7 +219,7 @@ def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=F
         t0 = time.time()
         model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
                         distance_between_stations_pixels=distance_between_stations_pixels,
-                        stations2test=stations2test)
+                        stations2test=stations2test, graph=graph, traffic_by_edge=traffic_by_edge)
         t_to_fit = time.time() - t0 + np.sum(fitting_time)
         # in test time use the future
         data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
@@ -212,7 +227,8 @@ def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=F
 
         t0 = time.time()
         estimation = model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
-                                            distance_between_stations_pixels=distance_between_stations_pixels)
+                                            distance_between_stations_pixels=distance_between_stations_pixels,
+                                            graph=graph, traffic_by_edge=traffic_by_edge)
         t_to_estimate = time.time() - t0
 
         return {
@@ -229,6 +245,9 @@ def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=F
     decorated_func.__name__ = str(models[0]) if len(models) == 1 else name
     return decorated_func
 
+
+print(f"CO2 {data_manager.CO2kg}kg")
+print(f"Electricity consumption {data_manager.electricity_consumption_kWh}kWh")
 
 if __name__ == "__main__":
     # ----- insight on the data -----
