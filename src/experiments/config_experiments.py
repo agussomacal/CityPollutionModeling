@@ -26,7 +26,7 @@ server = RAM > 50
 if server:  # if run in server
     print("running in server")
     nrows2load_traffic_data = None  # None 1000
-    num_cores = 1
+    num_cores = 8
     chunksize = 500
 else:
     print("running in local machine")

@@ -134,8 +134,9 @@ with data_manager.track_emissions("PreprocessGraph"):
             graph = nx.subgraph(graph, max(nx.connected_components(graph.to_undirected()), key=len))
             print(f"nodes after keeping biggest component: {graph.number_of_nodes()}\n"
                   f"edges after  keeping biggest component: {graph.number_of_edges()}")
-            edges_pixels = filter_dict(graph.to_undirected().edges, edges_pixels)
-            traffic_by_edge = filter_dict(graph.to_undirected().edges, traffic_by_edge)
+            edges = set([(e[0], e[1]) for e in graph.to_undirected().edges])
+            edges_pixels = filter_dict(edges, edges_pixels)
+            traffic_by_edge = filter_dict(edges, traffic_by_edge)
 
 if simulation:
     with data_manager.track_emissions("Simulations"):
@@ -204,7 +205,7 @@ def train_test_model(model: BaseModel):
 
 
 # ----- Defining Experiment ----- #
-def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=False):
+def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=True):
     def decorated_func(station):
         path2model = Path(f"{path2models}/{station}")
         path2model.mkdir(parents=True, exist_ok=True)

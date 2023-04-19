@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
-from src.lib.Models.BaseModel import BaseModel, NONE_OPTIM_METHOD, mse, loo
+from src.lib.Models.BaseModel import BaseModel, NONE_OPTIM_METHOD, mse, loo, pollution_agnostic
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SummaryModel
 from src.performance_utils import partial_filter, filter_dict, if_true_str
 
@@ -97,6 +97,7 @@ class TrafficConvolutionModel(BaseModel):
                 reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, self.params)))
         return pd.concat(estimated_average_pollution, axis=1).values
 
+    @pollution_agnostic
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic,
                                    distance_between_stations_pixels, **kwargs) -> [np.ndarray,
                                                                                    np.ndarray]:
@@ -104,6 +105,8 @@ class TrafficConvolutionModel(BaseModel):
         traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
         """
+        raise Exception("Reimplement with pollution_agnostic decorator.")
+        # TODO: no need for cross validation because no pollution is used to infer
         target_pollution, reduced_traffic = \
             list(zip(*[(target_pollution,
                         partial_filter(self.convolve, distance_between_stations_pixels=distance_between_stations_pixels,
@@ -117,5 +120,5 @@ class TrafficConvolutionModel(BaseModel):
                                                        np.mean(target_pollution.values, axis=0, keepdims=True))
         # lr = LinearRegression(fit_intercept=False).fit(reduced_traffic.values, target_pollution)
         self.set_params(**dict(zip(reduced_traffic.columns, lr.coef_)))
-        estimated_average_pollution = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, self.params))
-        return target_pollution, estimated_average_pollution.values
+        state_estimation = reduced_traffic @ pd.Series(filter_dict(reduced_traffic.columns, self.params))
+        return state_estimation.values, target_pollution

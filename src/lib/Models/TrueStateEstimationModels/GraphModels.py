@@ -1,24 +1,25 @@
-from typing import Callable, List, Union
+from typing import Callable, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
-from scipy.linalg import lu_factor, lu_solve
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import gmres
 from scipy.spatial.distance import cdist
-from numpy.linalg import solve
+from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
-from src.lib.Models.BaseModel import BaseModel, mse, GRAD, NONE_OPTIM_METHOD, Bounds, Optim
-from src.performance_utils import filter_dict, timeit
+from src.lib.Models.BaseModel import BaseModel, mse, GRAD, Optim, pollution_agnostic
+from src.performance_utils import filter_dict, timeit, if_true_str
 
 
 class GraphModelBase(BaseModel):
 
-    def __init__(self, name="", loss=mse, optim_method=GRAD, verbose=False, niter=1000, k_neighbours=None, **kwargs):
+    def __init__(self, name="", loss=mse, optim_method=GRAD, verbose=False, niter=1000, k_neighbours=None, sigma0=1,
+                 **kwargs):
         # super call
-        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, **kwargs)
+        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, sigma0=sigma0,
+                         **kwargs)
         self.position2node_index = dict()
         self.nodes = None
         self.node_positions = None
@@ -43,33 +44,22 @@ class GraphModelBase(BaseModel):
     def state_estimation_core(self, emissions, **kwargs):
         raise Exception("Not implemented.")
 
-    def get_traffic_by_node(self, observed_pollution, traffic_by_edge, graph):
-        # TODO: not recalculate if graph have been already seen.
-        traffic_by_node = np.zeros((len(observed_pollution), graph.number_of_nodes(), len(TRAFFIC_VALUES)))
-        for e, df in traffic_by_edge.items():
-            for i, color in enumerate(TRAFFIC_VALUES):
-                # length is added because we are doing the integral against the P1 elements.
-                # a factor of 1/2 may be added too.
-                update_val = df.loc[observed_pollution.index, color] * graph.edges[e]["length"] * graph.edges[e][
-                    "lanes"] / 2
-                traffic_by_node[:, self.node2index[e[0]], i] += update_val
-                traffic_by_node[:, self.node2index[e[1]], i] += update_val
-        return traffic_by_node
-
-    # def get_traffic_by_node(self, observed_pollution, traffic_by_edge, graph):
-    #     # if self.last_nodes != set(graph.nodes) or self.last_times != set(list(observed_pollution.index)):
-    #     #     self.last_nodes = set(graph.nodes)
-    #     #     self.last_times = set(list(observed_pollution.index))
-    #         self.traffic_by_node = np.zeros((len(observed_pollution), graph.number_of_nodes(), len(TRAFFIC_VALUES)))
-    #         for e, df in traffic_by_edge.items():
-    #             for i, color in enumerate(TRAFFIC_VALUES):
-    #                 # length is added because we are doing the integral against the P1 elements.
-    #                 # a factor of 1/2 may be added too.
-    #                 update_val = df.loc[observed_pollution.index, color] * graph.edges[e]["length"] * graph.edges[e][
-    #                     "lanes"] / 2
-    #                 self.traffic_by_node[:, self.node2index[e[0]], i] += update_val
-    #                 self.traffic_by_node[:, self.node2index[e[1]], i] += update_val
-    #     return self.traffic_by_node
+    def get_traffic_by_node(self, observed_pollution, traffic_by_edge, graph, nodes=None):
+        nodes = graph.nodes if nodes is None else nodes
+        if self.last_nodes != set(nodes) or self.last_times != set(list(observed_pollution.index)):
+            # TODO: make it incremental instead of replacing the whole matrix.
+            self.last_nodes = set(nodes)
+            self.last_times = set(list(observed_pollution.index))
+            self.traffic_by_node = np.zeros((len(observed_pollution), nodes, len(TRAFFIC_VALUES)))
+            for e, df in traffic_by_edge.items():
+                for i, color in enumerate(TRAFFIC_VALUES):
+                    # length is added because we are doing the integral against the P1 elements.
+                    # a factor of 1/2 may be added too.
+                    update_val = df.loc[observed_pollution.index, color] * graph.edges[e]["length"] * graph.edges[e][
+                        "lanes"] / 2
+                    self.traffic_by_node[:, self.node2index[e[0]], i] += update_val
+                    self.traffic_by_node[:, self.node2index[e[1]], i] += update_val
+        return self.traffic_by_node
 
     def get_emissions(self, traffic_by_node):
         """
@@ -77,7 +67,7 @@ class GraphModelBase(BaseModel):
         :param traffic:
         :return: Linear problem.
         """
-        return np.einsum("tnp,p", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values()))
+        return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values()))
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
@@ -127,22 +117,122 @@ class GraphModelBase(BaseModel):
 # -------- prepare_graph auxiliary functions ------- #
 
 # ------------- auxiliary functions ------------ #
-def compute_laplacian_matrix_from_graph(graph, edge_function: Callable):
+def compute_function_on_graph_edges(function, graph, edge_function: Callable):
     nx.set_edge_attributes(graph,
                            {(u, v): edge_function(data) for u, v, data in graph.edges.data()},
                            'weight')
-    return (nx.laplacian_matrix(graph, weight="weight")).toarray()
+    return function(graph, weight="weight")
+
+
+def compute_adjacency(graph, edge_function: Callable):
+    return compute_function_on_graph_edges(nx.adjacency_matrix, graph, edge_function)
+
+
+def compute_laplacian_matrix_from_graph(graph, edge_function: Callable):
+    # return (nx.laplacian_matrix(graph, weight="weight")).toarray()
+    return compute_function_on_graph_edges(nx.laplacian_matrix, graph, edge_function)
+
+
+def compute_degree_from_graph(graph, edge_function: Callable):
+    return compute_function_on_graph_edges(nx.degree, graph, edge_function)
+
+
+class GraphEmissionsModel(GraphModelBase):
+    POLLUTION_AGNOSTIC = True
+
+    def __init__(self, tau: Union[float, Optim] = None, gamma: Union[float, Optim] = None,
+                 # green: Union[float, Optim] = None, yellow: Union[float, Optim] = None,
+                 # red: Union[float, Optim] = None, dark_red: Union[float, Optim] = None,
+                 k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD, fit_intercept=False, **kwargs):
+        assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
+        self.fit_intercept = fit_intercept
+        super().__init__(name=name + if_true_str(fit_intercept, "_Intercept"), loss=loss, verbose=verbose,
+                         k_neighbours=k_neighbours, optim_method=optim_method,
+                         # green=green, yellow=yellow, red=red, dark_red=dark_red,
+                         tau=tau, gamma=gamma, **kwargs)
+
+    def get_traffic_by_node(self, times, traffic_by_edge, graph, nodes, nodes_ix, tau, gamma=1):
+        traffic_by_node = np.zeros((len(times), len(nodes), len(TRAFFIC_VALUES)))
+        deg = compute_adjacency(graph, lambda data: data["length"] * data["lanes"]).toarray().sum(axis=1)
+        node2ix = {n: i for i, n in enumerate(graph.nodes)}
+        traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
+
+        for c, color in enumerate(TRAFFIC_VALUES):
+            for i, t in enumerate(times):
+                for j, node in enumerate(nodes):
+                    depth = {node: 0}
+                    for edge in nx.bfs_tree(graph, source=node, depth_limit=self.k_neighbours).edges():
+                        if edge[1] not in depth:
+                            depth[edge[1]] = depth[edge[0]] + 1
+                        if edge in traffic_by_edge:
+                            traffic_by_node[i, j, c] += \
+                                tau ** depth[edge[0]] / deg[node2ix[edge[0]]] ** gamma / deg[node2ix[edge[1]]] ** (
+                                        1 - gamma) * \
+                                traffic_by_edge[edge].loc[t, color] / traffic_by_edge_normalization[edge] * \
+                                graph.edges[edge]["lanes"] * graph.edges[edge]["length"]
+
+        return traffic_by_node
+
+    def reduce_traffic(self, times, target_positions: pd.DataFrame, **kwargs) -> np.ndarray:
+        indexes = [self.position2node_index[position]
+                   for position in zip(target_positions.loc["long"].values, target_positions.loc["lat"].values)]
+        nodes = [list(kwargs["graph"].nodes)[i] for i in indexes]
+        traffic_by_node = self.get_traffic_by_node(times, kwargs["traffic_by_edge"], kwargs["graph"],
+                                                   nodes, indexes, self.params["tau"], self.params["gamma"])
+        return traffic_by_node  # / np.array([d for _, d in degree])[np.newaxis, indexes, np.newaxis]
+
+    def traffic2pollution(self, traffic_by_node):
+        return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
+            self.params["intercept"]
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        """
+        traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
+        target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
+        """
+        assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
+        kwargs.update(self.preprocess_graph(kwargs["graph"]))
+        self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
+        self.update_position2node_index(target_positions, re_update=self.k_neighbours is not None)
+        traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
+        return self.traffic2pollution(traffic_by_node)
+
+    @pollution_agnostic
+    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
+                                                                                                       np.ndarray]:
+        """
+        traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
+        target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
+        """
+        assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
+        kwargs.update(self.preprocess_graph(kwargs["graph"]))
+        # stations = [station for station in observed_stations.columns if station in kwargs["stations2test"]] \
+        #     if "stations2test" in kwargs else observed_stations.columns
+        # observed_stations = observed_stations[stations]
+        # observed_pollution = observed_pollution[stations]
+
+        self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
+        traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
+        # use median to fit to avoid outliers to interfere
+
+        lr = LinearRegression(fit_intercept=self.fit_intercept).fit(np.nanmedian(traffic_by_node, axis=0),
+                                                                    np.nanmean(observed_pollution.values,
+                                                                               axis=0))
+        self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
+        self.set_params(intercept=lr.intercept_)
+        return self.traffic2pollution(traffic_by_node)
 
 
 class HEqStaticModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
-    def __init__(self, absorption: Union[float, Optim], diffusion: Union[float, Optim], green=Union[float, Optim],
-                 yellow=Union[float, Optim], red=Union[float, Optim], dark_red=Union[float, Optim], k_neighbours=None,
-                 name="", loss=mse, optim_method="lsq", verbose=False, niter=1000):
+    def __init__(self, absorption: Union[float, Optim], diffusion: Union[float, Optim], green: Union[float, Optim],
+                 yellow: Union[float, Optim], red: Union[float, Optim], dark_red: Union[float, Optim],
+                 k_neighbours=None, name="", loss=mse, optim_method="lsq", verbose=False, niter=1000, sigma0=1):
         super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, k_neighbours=k_neighbours,
                          absorption=absorption, diffusion=diffusion, green=green, yellow=yellow, red=red,
-                         dark_red=dark_red, niter=niter)
+                         dark_red=dark_red, niter=niter, sigma0=sigma0)
 
     def preprocess_graph(self, graph: nx.Graph):
         preprocess_dict = super(HEqStaticModel, self).preprocess_graph(graph)
@@ -161,8 +251,13 @@ class HEqStaticModel(GraphModelBase):
         return preprocess_dict
 
     def state_estimation_core(self, emissions, Kd, Ms, **kwargs):
-        # A = self.params["diffusion"] * Kd + self.params["absorption"] * Ms
-        # return spsolve(A, emissions).T
+        print(self.params["diffusion"], self.params["absorption"])
+        if self.params["diffusion"] == 0 and self.params["absorption"] == 0:
+            return emissions / np.diagonal(Ms.toarray()) * (1 / 2)
+        else:
+            A = self.params["diffusion"] * Kd + self.params["absorption"] * Ms
+            return np.array([gmres(A, e, x0=e, maxiter=100)[0] for e in tqdm(emissions)])
+        # return spsolve(csr_matrix(A), emissions).T
         # n=2 1.11s/it A calculated each time: 16min A precalculated: 10.3min
         # A precalculated: 30s
         # return np.concatenate(
@@ -178,4 +273,4 @@ class HEqStaticModel(GraphModelBase):
         #     [lu_solve((lu, piv), emissions[:, i:i + n], overwrite_b=True, check_finite=False).T for i in
         #      tqdm(range(0, emissions.shape[1], n))])
         # return lu_solve((lu, piv), emissions, overwrite_b=True, check_finite=False).T
-        return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T
+        # return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T

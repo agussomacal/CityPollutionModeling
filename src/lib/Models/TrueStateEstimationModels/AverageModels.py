@@ -18,6 +18,7 @@ class SummaryModel(BaseModel):
 
 class SnapshotMeanModel(SummaryModel):
     def calibrate(self, observed_stations, observed_pollution, traffic, **kwargs):
+        self.calibrated = True
         return self
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
@@ -67,6 +68,7 @@ class SnapshotWeightedModel(BaseModel):
         lr = LinearRegression(fit_intercept=self.fit_intercept, positive=self.positive)
         lr.fit(pollution, target)  # , sample_weight=1 / observed_pollution[pollution_columns].std()
         self.set_params(**dict(zip(pollution_columns, lr.coef_)))
+        self.calibrated = True
         return self
 
 
@@ -86,6 +88,7 @@ class SnapshotWeightedStd(BaseModel):
         target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
         """
         self.set_params(**(1 / observed_stations.var()).to_dict())
+        self.calibrated = True
         return self
 
 
@@ -97,6 +100,7 @@ class GlobalMeanModel(SummaryModel):
     def calibrate(self, observed_stations, observed_pollution, traffic, **kwargs):
         summary_function = getattr(np, 'nan' + self.summary_statistic)
         self.set_params(global_mean=summary_function(observed_pollution.values))
+        self.calibrated = True
         return self
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,

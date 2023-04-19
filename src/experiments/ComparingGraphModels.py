@@ -14,17 +14,17 @@ from src.experiments.PreProcess import longer_distance, train_test_model, statio
 from src.experiments.config_experiments import num_cores, shuffle, filter_graph
 from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA
+    ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
-from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel
+from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
 from src.performance_utils import NamedPartial, if_true_str
 from src.viz_utils import generic_plot, save_fig
 
 if __name__ == "__main__":
-    niter = 1000
-    experiment_name = f"TrafficGraphModelComparison{if_true_str(shuffle, '_Shuffled')}" \
+    niter = 100
+    experiment_name = f"TrafficGraphModelComparisonAvg{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
@@ -38,35 +38,81 @@ if __name__ == "__main__":
         SnapshotMeanModel(summary_statistic="mean"),
         GlobalMeanModel()
     ]
+    # 621.5069384089682 = [2.87121906 0.16877082 1.04179242 1.23798909 3.42959526 3.56328527]
     models = [
-        HEqStaticModel(
-            # absorption=Optim(start=1, lower=1e-6, upper=2),
-            # diffusion=Optim(start=1, lower=1e-6, upper=2),
-            # green=Optim(1, 0, 1), yellow=Optim(1, 0, 1),
-            # red=Optim(1, 0, 1), dark_red=Optim(1, 0, 1),
-            absorption=Optim(start=1, lower=0, upper=np.inf),
-            diffusion=Optim(start=1, lower=0, upper=np.inf),
-            green=Optim(1, None, None), yellow=Optim(2, None, None),
-            red=Optim(4, None, None), dark_red=Optim(8, None, None),
-            name="", loss=medianse, optim_method=CMA, verbose=True,
-            niter=niter,
-            k_neighbours=2),
+        # GraphEmissionsModel(
+        #     name="t1g1",
+        #     tau=1,
+        #     gamma=1,
+        #     # tau=Optim(1, 0.01, 1),
+        #     # gamma=Optim(1, 0, 1),
+        #     k_neighbours=3,
+        #     # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #     # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #     niter=100, verbose=True, fit_intercept=True,
+        #     optim_method=NONE_OPTIM_METHOD,
+        #     loss=medianse),
+        ModelsSequenciator(models=[
+            SnapshotMeanModel(summary_statistic="mean"),
+            GraphEmissionsModel(
+                name="tau082g0",
+                # 'tau': 0.8200031737805101, 'gamma': 0.0
+                tau=0.82,
+                gamma=0,
+                # tau=Optim(1, 0.01, 1),
+                # gamma=Optim(1, 0, 1),
+                k_neighbours=3,
+                # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+                # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+                niter=100, verbose=True, fit_intercept=True,
+                optim_method=NONE_OPTIM_METHOD,
+                loss=medianse)
+        ])
+
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsModel(
+        #         name="t1g1",
+        #         tau=1, gamma=1, k_neighbours=1,
+        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #         loss=medianse)
+        #     # HEqStaticModel(
+        #     #     absorption=0,
+        #     #     diffusion=0,
+        #     #     green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #     #     red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #     #
+        #     #     # absorption=2.87121906,
+        #     #     # diffusion=0.16877082,
+        #     #     # green=1.04179242, yellow=1.23798909,
+        #     #     # red=3.42959526, dark_red=3.56328527,
+        #     #
+        #     #     # absorption=Optim(start=2.87121906, lower=0, upper=np.inf),
+        #     #     # diffusion=Optim(start=0.16877082, lower=0, upper=np.inf),
+        #     #     # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #     #     # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #     #     name="NormalizedEmissions", loss=medianse, optim_method=CMA, verbose=True,
+        #     #     niter=niter, sigma0=1e-2,
+        #     #     k_neighbours=None)
+        # ]),
     ]
 
     lab = LabPipeline()
     lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, base_models + models)))
     lab.define_new_block_of_functions("model",
-                                      *list(map(partial(train_test_averagers, positive=True, fit_intercept=False),
-                                                [[model] for model in base_models + models] +
-                                                [base_models + [model] for model in models]
+                                      *list(map(partial(train_test_averagers, positive=False, fit_intercept=True),
+                                                [[model] for model in models + base_models] +
+                                                [models + base_models]
+                                                # [base_models + [model] for model in models]
                                                 )))
 
     lab.execute(
         data_manager,
         num_cores=num_cores,
         forget=False,
-        recalculate=True,
-        save_on_iteration=4,
+        recalculate=False,
+        save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
 
@@ -88,7 +134,7 @@ if __name__ == "__main__":
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(np.nanmean(error)),
                  xlim=(0, 100),
-                 model=["SnapshotMeanModelmean", "A+SMM,GMM,SMMTCMN", "GlobalMeanModelmean"]
+                 # model=["SnapshotMeanModelmean", "A+SMM,GMM,SMMTCMN", "GlobalMeanModelmean"]
                  )
 
     generic_plot(data_manager, x="model", y="time_to_fit", plot_func=sns.boxenplot)
