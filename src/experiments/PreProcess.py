@@ -13,7 +13,7 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
 
-from src.DataManager import DataManager
+from PerplexityLab.DataManager import DataManager
 from src.config import results_dir, city_dir
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
     proportion_of_past_times, shuffle, server, chunksize, stations2test, simulation, max_num_stations, seed, \
@@ -24,8 +24,8 @@ from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_p
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
 from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, ModelsAverager
-from src.performance_utils import timeit, if_true_str, filter_dict
-from src.viz_utils import save_fig
+from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
+from PerplexityLab.visualization import save_fig
 
 
 def plot_stations_in_map(background, station_coordinates, lat, long):

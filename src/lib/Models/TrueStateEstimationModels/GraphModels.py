@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from src.lib.Models.BaseModel import BaseModel, mse, GRAD, Optim, pollution_agnostic
-from src.performance_utils import filter_dict, timeit, if_true_str
+from PerplexityLab.miscellaneous import filter_dict, timeit, if_true_str
 
 
 class GraphModelBase(BaseModel):

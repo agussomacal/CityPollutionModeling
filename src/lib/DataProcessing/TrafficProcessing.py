@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import src.config as config
 from src.lib.DataProcessing.SeleniumScreenshots import get_info_from_name, traffic_screenshots_folder
-from src.performance_utils import get_map_function, timeit
+from PerplexityLab.miscellaneous import get_map_function, timeit
 
 TRAFFIC_TS_LAG = -1  # 1 hour less because GMT+1 vs GMT+0
 

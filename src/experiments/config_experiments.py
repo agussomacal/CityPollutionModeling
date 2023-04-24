@@ -4,7 +4,7 @@ import psutil
 import seaborn as sns
 
 import src.config as config
-from src.performance_utils import if_true_str
+from PerplexityLab.miscellaneous import if_true_str
 
 sns.set_theme()
 

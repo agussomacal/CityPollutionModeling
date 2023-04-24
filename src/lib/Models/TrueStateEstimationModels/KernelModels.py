@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.spatial.distance import cdist
 
 from src.lib.Models.BaseModel import BaseModel, mse, GRAD
-from src.performance_utils import filter_dict
+from PerplexityLab.miscellaneous import filter_dict
 
 
 # ================ ================ ================ #

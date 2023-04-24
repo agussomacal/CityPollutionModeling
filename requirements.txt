@@ -17,3 +17,4 @@ cma
 spiderplot
 psutil
 osmnx
+-i https://test.pypi.org/simple/ PerplexityLab==0.0.1b0

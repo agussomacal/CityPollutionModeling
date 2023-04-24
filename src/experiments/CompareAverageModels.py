@@ -3,14 +3,14 @@ import seaborn as sns
 from spiderplot import spiderplot
 
 import src.config as config
-from src.DataManager import DataManager
-from src.LabPipeline import LabPipeline
+from PerplexityLab.DataManager import DataManager
+from PerplexityLab.LabPipeline import LabPipeline
 from src.experiments.PreProcess import loo4test, train_test_model, station_coordinates
 from src.experiments.config_experiments import num_cores
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel, SnapshotWeightedStd
-from src.performance_utils import NamedPartial
-from src.viz_utils import generic_plot
+from PerplexityLab.miscellaneous import NamedPartial
+from PerplexityLab.visualization import generic_plot
 
 if __name__ == "__main__":
     experiment_name = "AverageModels"

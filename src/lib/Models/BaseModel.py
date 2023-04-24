@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, LassoCV
 from tqdm import tqdm
 
-from src.performance_utils import if_true_str
+from PerplexityLab.miscellaneous import if_true_str
 
 CMA = "cma"
 GRAD = "bfgs"

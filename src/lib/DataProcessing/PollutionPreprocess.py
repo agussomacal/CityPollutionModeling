@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 import src.config as config
-from src.performance_utils import timeit
+from PerplexityLab.miscellaneous import timeit
 
 
 def download_pollution_files(year, filename):

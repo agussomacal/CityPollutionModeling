@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 from src.lib.Models.BaseModel import BaseModel, loo
-from src.performance_utils import filter_dict, if_true_str
+from PerplexityLab.miscellaneous import filter_dict, if_true_str
 
 
 class SummaryModel(BaseModel):
