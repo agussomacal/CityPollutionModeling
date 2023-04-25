@@ -45,20 +45,38 @@ class GraphModelBase(BaseModel):
         raise Exception("Not implemented.")
 
     def get_traffic_by_node(self, observed_pollution, traffic_by_edge, graph, nodes=None):
-        nodes = graph.nodes if nodes is None else nodes
+        """
+
+        :param observed_pollution:
+        :param traffic_by_edge:
+        :param graph:
+        :param nodes:
+        :return: traffic_by_node: [#times, #nodes, #traffic colors]
+        """
+        nodes = list(graph.nodes) if nodes is None else nodes
+        deg = compute_adjacency(graph, lambda data: data["length"] * data["lanes"]).toarray().sum(axis=1)
+        node2ix = {n: i for i, n in enumerate(graph.nodes)}
+        traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
         if self.last_nodes != set(nodes) or self.last_times != set(list(observed_pollution.index)):
             # TODO: make it incremental instead of replacing the whole matrix.
             self.last_nodes = set(nodes)
             self.last_times = set(list(observed_pollution.index))
-            self.traffic_by_node = np.zeros((len(observed_pollution), nodes, len(TRAFFIC_VALUES)))
-            for e, df in traffic_by_edge.items():
-                for i, color in enumerate(TRAFFIC_VALUES):
-                    # length is added because we are doing the integral against the P1 elements.
-                    # a factor of 1/2 may be added too.
-                    update_val = df.loc[observed_pollution.index, color] * graph.edges[e]["length"] * graph.edges[e][
-                        "lanes"] / 2
-                    self.traffic_by_node[:, self.node2index[e[0]], i] += update_val
-                    self.traffic_by_node[:, self.node2index[e[1]], i] += update_val
+            self.traffic_by_node = np.zeros((len(observed_pollution), len(nodes), len(TRAFFIC_VALUES)))
+            for edge, df in traffic_by_edge.items():
+                if (edge in graph.edges) and (edge[0] in nodes or edge[1] in nodes):
+                    for i, color in enumerate(TRAFFIC_VALUES):
+                        # length is added because we are doing the integral against the P1 elements.
+                        # a factor of 1/2 may be added too.
+                        update_val = df.loc[observed_pollution.index, color]
+                        update_val *= graph.edges[edge]["length"] * graph.edges[edge]["lanes"] / 2
+
+                        if edge[0] in nodes:
+                            self.traffic_by_node[:, self.node2index[edge[0]], i] += \
+                                update_val / deg[node2ix[edge[0]]] / traffic_by_edge_normalization[edge]
+
+                        if edge[1] in nodes:
+                            self.traffic_by_node[:, self.node2index[edge[1]], i] += \
+                                update_val / deg[node2ix[edge[1]]] / traffic_by_edge_normalization[edge]
         return self.traffic_by_node
 
     def get_emissions(self, traffic_by_node):
@@ -143,13 +161,19 @@ class GraphEmissionsModel(GraphModelBase):
     def __init__(self, tau: Union[float, Optim] = None, gamma: Union[float, Optim] = None,
                  # green: Union[float, Optim] = None, yellow: Union[float, Optim] = None,
                  # red: Union[float, Optim] = None, dark_red: Union[float, Optim] = None,
-                 k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD, fit_intercept=False, **kwargs):
+                 k_neighbours=1, model=LinearRegression(), name="", loss=mse, verbose=False, optim_method=GRAD,
+                 # fit_intercept=False,
+                 **kwargs):
+        self.model = model
         assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
-        self.fit_intercept = fit_intercept
-        super().__init__(name=name + if_true_str(fit_intercept, "_Intercept"), loss=loss, verbose=verbose,
-                         k_neighbours=k_neighbours, optim_method=optim_method,
-                         # green=green, yellow=yellow, red=red, dark_red=dark_red,
-                         tau=tau, gamma=gamma, **kwargs)
+        # self.fit_intercept = fit_intercept
+        super().__init__(
+            # name=name + if_true_str(fit_intercept, "_Intercept"),
+            name=name + str(model),
+            loss=loss, verbose=verbose,
+            k_neighbours=k_neighbours, optim_method=optim_method,
+            # green=green, yellow=yellow, red=red, dark_red=dark_red,
+            tau=tau, gamma=gamma, **kwargs)
 
     def get_traffic_by_node(self, times, traffic_by_edge, graph, nodes, nodes_ix, tau, gamma=1):
         traffic_by_node = np.zeros((len(times), len(nodes), len(TRAFFIC_VALUES)))
@@ -182,8 +206,11 @@ class GraphEmissionsModel(GraphModelBase):
         return traffic_by_node  # / np.array([d for _, d in degree])[np.newaxis, indexes, np.newaxis]
 
     def traffic2pollution(self, traffic_by_node):
-        return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
-            self.params["intercept"]
+        # return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
+        #     self.params["intercept"]
+        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
+        # return np.squeeze([self.model.predict(tbn) for tbn in traffic_by_node])
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
@@ -216,11 +243,16 @@ class GraphEmissionsModel(GraphModelBase):
         traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
         # use median to fit to avoid outliers to interfere
 
-        lr = LinearRegression(fit_intercept=self.fit_intercept).fit(np.nanmedian(traffic_by_node, axis=0),
-                                                                    np.nanmean(observed_pollution.values,
-                                                                               axis=0))
-        self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
-        self.set_params(intercept=lr.intercept_)
+        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        y = observed_pollution.values.reshape((-1, 1))
+        mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
+        self.model.fit(X[mask], y[mask])
+        # self.model.fit(np.nanmedian(traffic_by_node, axis=0), np.nanmean(observed_pollution.values, axis=0))
+        # lr = LinearRegression(fit_intercept=self.fit_intercept).fit(np.nanmedian(traffic_by_node, axis=0),
+        #                                                             np.nanmean(observed_pollution.values,
+        #                                                                        axis=0))
+        # self.set_params(intercept=lr.intercept_)
+        # self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
         return self.traffic2pollution(traffic_by_node)
 
 

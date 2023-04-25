@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 from spiderplot import spiderplot
+
+# from spektral.layers import GATConv
 
 import src.config as config
 from PerplexityLab.DataManager import DataManager, dmfilter, apply
@@ -16,15 +20,16 @@ from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
     ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
+from src.lib.Models.TrueStateEstimationModels.GCNN import GraphCNN
 from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
-from PerplexityLab.miscellaneous import NamedPartial, if_true_str
+from PerplexityLab.miscellaneous import NamedPartial, if_true_str, partial_filter
 from PerplexityLab.visualization import generic_plot, save_fig
 
 if __name__ == "__main__":
     niter = 100
-    experiment_name = f"TrafficGraphModelComparisonAvg{if_true_str(shuffle, '_Shuffled')}" \
+    experiment_name = f"TrafficGraphModelComparisonAvgRF{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
@@ -52,6 +57,21 @@ if __name__ == "__main__":
         #     niter=100, verbose=True, fit_intercept=True,
         #     optim_method=NONE_OPTIM_METHOD,
         #     loss=medianse),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphCNN(
+        #         name="GCNN",
+        #         spektral_layer=partial_filter(GATConv, attn_heads=1, concat_heads=True, dropout_rate=0.5,
+        #                                       return_attn_coef=False, add_self_loops=True, activation="relu",
+        #                                       use_bias=True),
+        #         hidden_layers=(10,),
+        #         loss=medianse,
+        #         epochs_to_stop=5000,
+        #         experiment_dir=data_manager.path,
+        #         verbose=False,
+        #         niter=2,
+        #     )
+        # ]),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
             GraphEmissionsModel(
@@ -62,9 +82,27 @@ if __name__ == "__main__":
                 # tau=Optim(1, 0.01, 1),
                 # gamma=Optim(1, 0, 1),
                 k_neighbours=3,
+                model=LinearRegression(),
                 # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
                 # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-                niter=100, verbose=True, fit_intercept=True,
+                niter=2, verbose=True,
+                optim_method=NONE_OPTIM_METHOD,
+                loss=medianse)
+        ]),
+        ModelsSequenciator(models=[
+            SnapshotMeanModel(summary_statistic="mean"),
+            GraphEmissionsModel(
+                name="tau082g0",
+                # 'tau': 0.8200031737805101, 'gamma': 0.0
+                tau=0.82,
+                gamma=0,
+                # tau=Optim(1, 0.01, 1),
+                # gamma=Optim(1, 0, 1),
+                k_neighbours=3,
+                model=RandomForestRegressor(n_estimators=10, max_depth=4),
+                # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+                # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+                niter=2, verbose=True,
                 optim_method=NONE_OPTIM_METHOD,
                 loss=medianse)
         ])
@@ -109,11 +147,11 @@ if __name__ == "__main__":
 
     lab.execute(
         data_manager,
-        num_cores=num_cores,
-        forget=False,
+        num_cores=15,
+        forget=True,
         recalculate=False,
         save_on_iteration=1,
-        station=stations2test  # station_coordinates.columns.to_list()[:2]
+        station=stations2test # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #

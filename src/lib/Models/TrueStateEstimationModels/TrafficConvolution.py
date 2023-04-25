@@ -76,7 +76,7 @@ class TrafficConvolutionModel(BaseModel):
                 ((traffic_coords.loc[["long", "lat"], :] -
                   target_positions.loc[["long", "lat"], :].values.reshape((2, 1)))
                  ** 2).sum())
-        kernel = partial_filter(self.conv_kernel, dist=dist, **self.params)
+        kernel = partial_filter(dist=dist, **self.params)(self.conv_kernel)
         reduced_traffic = reduce_traffic_to_colors(traffic, kernel=kernel)
         if self.normalize:
             reduced_traffic /= np.sum(kernel)
@@ -109,8 +109,8 @@ class TrafficConvolutionModel(BaseModel):
         # TODO: no need for cross validation because no pollution is used to infer
         target_pollution, reduced_traffic = \
             list(zip(*[(target_pollution,
-                        partial_filter(self.convolve, distance_between_stations_pixels=distance_between_stations_pixels,
-                                       **{**kwargs, **known_data}))
+                        partial_filter(distance_between_stations_pixels=distance_between_stations_pixels,
+                                       **{**kwargs, **known_data})(self.convolve))
                        for known_data, target_pollution in
                        loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
         target_pollution = pd.concat(target_pollution)
