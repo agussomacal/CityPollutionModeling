@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, LassoCV
+from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
 from PerplexityLab.miscellaneous import if_true_str
@@ -22,10 +23,10 @@ Bounds = namedtuple("Bounds", "lower upper")
 Optim = namedtuple("Optim", "start lower upper", defaults=[0, None, None])
 
 
-def split_by_station(unknown_station, observed_stations, observed_pollution, traffic):
+def split_by_station(unknown_station, observed_stations, observed_pollution, traffic, filterna=True):
     known_stations = observed_stations.columns.to_list()
     known_stations.remove(unknown_station)
-    valid_times = ~observed_pollution[unknown_station].isna()
+    valid_times = ~observed_pollution[unknown_station].isna() if filterna else observed_pollution.index
     if len(valid_times) > 0:
         return {"observed_stations": observed_stations[known_stations],
                 "observed_pollution": observed_pollution.loc[valid_times, known_stations],
@@ -37,6 +38,15 @@ def split_by_station(unknown_station, observed_stations, observed_pollution, tra
 def split_loo(observed_stations):
     for unknown_station_ix in range(observed_stations.shape[1]):
         yield unknown_station_ix
+
+
+def loo(observed_stations, observed_pollution, traffic, stations2test=None, filterna=True):
+    for unknown_station_ix in split_loo(observed_stations):
+        unknown_station = observed_stations.columns[unknown_station_ix]
+        if stations2test is None or unknown_station in stations2test:
+            split = split_by_station(unknown_station, observed_stations, observed_pollution, traffic, filterna)
+            if split is not None:
+                yield split
 
 
 def pollution_agnostic(state_estimation4optim):
@@ -60,15 +70,6 @@ def pollution_agnostic(state_estimation4optim):
         return se[valid_indexes, np.newaxis], target[valid_indexes, np.newaxis]
 
     return decorated
-
-
-def loo(observed_stations, observed_pollution, traffic, stations2test=None):
-    for unknown_station_ix in split_loo(observed_stations):
-        unknown_station = observed_stations.columns[unknown_station_ix]
-        if stations2test is None or unknown_station in stations2test:
-            split = split_by_station(unknown_station, observed_stations, observed_pollution, traffic)
-            if split is not None:
-                yield split
 
 
 def pollution_dependent(state_estimation4optim):
@@ -104,6 +105,17 @@ def medianse(x, y):
     """
 
     return np.nanmedian((x - y) ** 2)
+
+
+def apply_threshold(values, lower_threshold, upper_threshold):
+    values[values < lower_threshold] = lower_threshold
+    values[values > upper_threshold] = upper_threshold
+    return values
+
+
+def filter_by_quantile(values, lower_quantile, upper_quantile):
+    q = np.quantile(values, [lower_quantile, upper_quantile], axis=0)
+    return values[(values > q[0]) & (values < q[1])]
 
 
 class BaseModel:
@@ -206,7 +218,7 @@ class BaseModel:
             self.set_params(**dict(zip(self.bounds.keys(), optim_params)))
             self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=self.bounds.keys()),
                                     name="loss")
-        print("Optim params: ", self.params)
+        print(self, "Optim params: ", self.params)
         self.calibrated = True
         return self
 
@@ -216,6 +228,7 @@ class ModelsSequenciator(BaseModel):
         super().__init__(name, **kwargs)
         self.name = name
         self.models = models
+        # self.transition_model = transition_model
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
         self.amp = [1.0] * len(models)
         self.losses = list()
@@ -228,15 +241,18 @@ class ModelsSequenciator(BaseModel):
     def __str__(self):
         return '_'.join([str(model) for model in self.models]) if self.name is None else self.name
 
-    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
-                         **kwargs) -> np.ndarray:
-        predictions = np.zeros((len(observed_pollution), np.shape(target_positions)[1]))
+    def single_state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                                **kwargs) -> np.ndarray:
+        predictions_i = np.zeros((len(observed_pollution), np.shape(target_positions)[1]))
         observed_pollution_i = observed_pollution.copy()
+        observed_stations_i = observed_stations.copy()
         for i, model in enumerate(self.models):
-            preds_i = self.amp[i] * model.state_estimation(observed_stations, observed_pollution_i, traffic,
-                                                           target_positions,
+            preds_i = self.amp[i] * model.state_estimation(observed_stations=observed_stations_i,
+                                                           observed_pollution=observed_pollution_i,
+                                                           traffic=traffic,
+                                                           target_positions=target_positions,
                                                            **kwargs)
-            predictions += preds_i
+            predictions_i += preds_i
             # get the residuals on the observed values
             # the following lines are necessary for models that relly on the names of the sensors and are not properly
             # state stimation methods.
@@ -249,21 +265,21 @@ class ModelsSequenciator(BaseModel):
                 #                   columns=[target_pollution.name])
                 #      for known_data, target_pollution in
                 #      loo(observed_stations, observed_pollution_i, traffic)], axis=1)
-                # observed_pollution_i -= pd.DataFrame(
-                #     model.state_estimation(observed_stations, observed_pollution_i, traffic,
-                #                            observed_stations, **kwargs),
-                #     index=observed_pollution_i.index,
-                #     columns=observed_pollution_i.columns)
+        return predictions_i
 
-        # predictions[predictions < 0] = 0  # non negative values; pollution is positive quantity.
-        return predictions
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        return np.nanmean([self.single_state_estimation(
+            observed_stations=known_data["observed_stations"],
+            observed_pollution=known_data["observed_pollution"],
+            traffic=known_data["traffic"],
+            target_positions=target_positions, **kwargs) for known_data, target_pollution in
+            loo(observed_stations, observed_pollution, traffic, filterna=False)], axis=0)
 
-    @pollution_agnostic
+    @pollution_dependent
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
                                                                                                        np.ndarray]:
-        return self.state_estimation(observed_stations, observed_pollution, traffic,
-                                     target_positions=observed_stations, **kwargs)
-        # return reorder4agnostic(state_estimation, observed_pollution, kwargs.get("stations2test", None))
+        return self.single_state_estimation(observed_stations, observed_pollution, traffic, **kwargs)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
         observed_pollution_i = observed_pollution.copy()
@@ -271,21 +287,30 @@ class ModelsSequenciator(BaseModel):
             # model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
             model.calibrate(observed_stations, observed_pollution_i, traffic, **kwargs)
             self.losses.append(model.losses)
-            self.amp[i] = 1 if i == 0 else \
-                np.nanmedian((observed_pollution_i.values / model.state_estimation(observed_stations,
-                                                                                   observed_pollution,
-                                                                                   traffic,
-                                                                                   observed_stations,
-                                                                                   **kwargs)))
+
+            preds_i = pd.concat(
+                [pd.DataFrame(model.state_estimation(**known_data, **kwargs),
+                              index=known_data["observed_pollution"].index,
+                              columns=[target_pollution.name])
+                 for known_data, target_pollution in
+                 loo(observed_stations, observed_pollution_i, traffic)], axis=1)
+            if i == 0:
+                self.amp[i] = 1
+            else:
+                # mask = np.all(~np.isnan(preds_i), axis=1) * np.all(~np.isnan(observed_pollution_i.values), axis=1)
+                # self.amp[i] = float(np.squeeze(
+                #     LinearRegression(fit_intercept=False).fit(preds_i[mask].ravel(), observed_pollution_i.values[mask].ravel()).coef_))
+                self.amp[i] = np.nanmedian((observed_pollution_i.values / preds_i))
+            # X = preds_i.reshape((-1, 1))
+            # y = observed_pollution.values.reshape((-1, 1))
+            # mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
+            # self.transition_model[i].fit(X[mask], y[mask])
 
             if i < len(self.models) - 1:  # only actualize if it is not the las model
-                observed_pollution_i -= self.amp[i] * model.state_estimation(observed_stations, observed_pollution,
-                                                                             traffic, observed_stations, **kwargs)
-                # observed_pollution_i -= self.amp[i]*pd.concat([pd.DataFrame(model.state_estimation(**known_data, **kwargs),
-                #                                                 index=known_data["observed_pollution"].index,
-                #                                                 columns=[target_pollution.name])
-                #                                    for known_data, target_pollution in
-                #                                    loo(observed_stations, observed_pollution_i, traffic)], axis=1)
+                # observed_pollution_i -= self.amp[i] * model.state_estimation(observed_stations, observed_pollution,
+                #                                                              traffic, observed_stations, **kwargs)
+                observed_pollution_i -= self.amp[i] * preds_i
+                # observed_pollution_i -= self.transition_model[i].predict(X).reshape(np.shape(observed_pollution_i))
         print("Amplitudes: ", self.amp)
         self.calibrated = True
         return self

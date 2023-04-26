@@ -32,7 +32,7 @@ from PerplexityLab.visualization import generic_plot, save_fig
 
 if __name__ == "__main__":
     niter = 100
-    experiment_name = f"TrafficGraphModelComparisonAvgRF{if_true_str(shuffle, '_Shuffled')}" \
+    experiment_name = f"TrafficGraphModelComparisonAvgRFSeqLoopFit{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
@@ -117,34 +117,34 @@ if __name__ == "__main__":
                 optim_method=NONE_OPTIM_METHOD,
                 loss=medianse)
         ]),
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsNeigEdgeModel(
-                k_neighbours=5,
-                model=Pipeline(steps=[("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
-                niter=2, verbose=True,
-                optim_method=NONE_OPTIM_METHOD,
-                loss=medianse)
-        ]),
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsNeigEdgeModel(
-                k_neighbours=5,
-                model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)), ("LR", LinearRegression())]),
-                niter=2, verbose=True,
-                optim_method=NONE_OPTIM_METHOD,
-                loss=medianse)
-        ]),
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsNeigEdgeModel(
-                k_neighbours=5,
-                model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)),
-                                      ("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
-                niter=2, verbose=True,
-                optim_method=NONE_OPTIM_METHOD,
-                loss=medianse)
-        ]),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsNeigEdgeModel(
+        #         k_neighbours=5,
+        #         model=Pipeline(steps=[("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
+        #         niter=2, verbose=True,
+        #         optim_method=NONE_OPTIM_METHOD,
+        #         loss=medianse)
+        # ]),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsNeigEdgeModel(
+        #         k_neighbours=5,
+        #         model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)), ("LR", LinearRegression())]),
+        #         niter=2, verbose=True,
+        #         optim_method=NONE_OPTIM_METHOD,
+        #         loss=medianse)
+        # ]),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsNeigEdgeModel(
+        #         k_neighbours=5,
+        #         model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)),
+        #                               ("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
+        #         niter=2, verbose=True,
+        #         optim_method=NONE_OPTIM_METHOD,
+        #         loss=medianse)
+        # ]),
 
         # ModelsSequenciator(models=[
         #     SnapshotMeanModel(summary_statistic="mean"),
@@ -176,19 +176,21 @@ if __name__ == "__main__":
     ]
 
     lab = LabPipeline()
-    lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model, base_models + models)))
+    lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model,
+                                                                           # base_models +
+                                                                           models
+                                                                           )))
     lab.define_new_block_of_functions("model",
                                       *list(map(partial(train_test_averagers, positive=False, fit_intercept=True),
                                                 [[model] for model in models + base_models] +
                                                 [models + base_models]
-                                                # [base_models + [model] for model in models]
                                                 )))
 
     lab.execute(
         data_manager,
-        num_cores=5,
+        num_cores=15,
         forget=False,
-        recalculate=False,
+        recalculate=True,
         save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
