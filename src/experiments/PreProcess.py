@@ -183,6 +183,7 @@ else:
 # ----- Defining Experiment ----- #
 def train_test_model(model: BaseModel):
     def decorated_func(station):
+        print(model)
         # in train time use the past
         data_known, _ = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                          observed_pollution=pollution_past, traffic=traffic_past)

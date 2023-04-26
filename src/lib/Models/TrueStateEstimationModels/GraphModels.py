@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.sparse.linalg import gmres
 from scipy.spatial.distance import cdist
 from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
@@ -155,6 +156,97 @@ def compute_degree_from_graph(graph, edge_function: Callable):
     return compute_function_on_graph_edges(nx.degree, graph, edge_function)
 
 
+class GraphEmissionsNeigEdgeModel(GraphModelBase):
+    POLLUTION_AGNOSTIC = True
+
+    def __init__(self, model: Pipeline, k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD,
+                 **kwargs):
+        self.model = model
+        assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
+        # self.fit_intercept = fit_intercept
+        super().__init__(
+            name=name + "_".join([step[0] for step in model.steps]),
+            loss=loss, verbose=verbose,
+            k_neighbours=k_neighbours, optim_method=optim_method, **kwargs)
+
+    def get_traffic_by_node(self, times, traffic_by_edge, graph, nodes, nodes_ix):
+        traffic_by_node = np.zeros((len(times), len(nodes), len(TRAFFIC_VALUES) * self.k_neighbours))
+        traffic_by_edge_normalization = {e: max((1, df.sum(axis=1).max())) for e, df in traffic_by_edge.items()}
+
+        for j, node in enumerate(nodes):
+            depth = {node: 0}
+            depth_count = [0] * self.k_neighbours
+            for edge in nx.bfs_tree(graph, source=node, depth_limit=1).edges():
+                if edge[1] not in depth:
+                    depth[edge[1]] = depth[edge[0]] + 1
+                if edge in traffic_by_edge:
+                    area = graph.edges[edge]["lanes"] * graph.edges[edge]["length"]
+                    depth_count[min((depth[edge[0]], depth[edge[1]]))] += area
+                    level = np.arange(len(TRAFFIC_VALUES), dtype=int) + depth[edge[0]] * len(TRAFFIC_VALUES)
+                    traffic_by_node[:, j, level] += traffic_by_edge[edge].loc[times, :] / traffic_by_edge_normalization[
+                        edge] * area
+            for d, dc in enumerate(depth_count):
+                level = np.arange(len(TRAFFIC_VALUES), dtype=int) + d * len(TRAFFIC_VALUES)
+                # it can happen that no neighbouring edges have been with traffic so dc=0
+                traffic_by_node[:, j, level] /= max((1, dc))
+        return traffic_by_node
+
+    def reduce_traffic(self, times, target_positions: pd.DataFrame, **kwargs) -> np.ndarray:
+        indexes = [self.position2node_index[position]
+                   for position in zip(target_positions.loc["long"].values, target_positions.loc["lat"].values)]
+        nodes = [list(kwargs["graph"].nodes)[i] for i in indexes]
+        return self.get_traffic_by_node(times, kwargs["traffic_by_edge"], kwargs["graph"], nodes, indexes)
+
+    def traffic2pollution(self, traffic_by_node):
+        # return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
+        #     self.params["intercept"]
+        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        """
+        traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
+        target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
+        """
+        assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
+        kwargs.update(self.preprocess_graph(kwargs["graph"]))
+        self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
+        self.update_position2node_index(target_positions, re_update=self.k_neighbours is not None)
+        traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
+        return self.traffic2pollution(traffic_by_node)
+
+    @pollution_agnostic
+    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
+                                                                                                       np.ndarray]:
+        """
+        traffic_coords: pd.DataFrame with columns the pixel_coord and rows 'lat' and 'long' associated to the pixel
+        target_positions: pd.DataFrame with columns the name of the station and rows 'lat' and 'long'
+        """
+        assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
+        kwargs.update(self.preprocess_graph(kwargs["graph"]))
+        # stations = [station for station in observed_stations.columns if station in kwargs["stations2test"]] \
+        #     if "stations2test" in kwargs else observed_stations.columns
+        # observed_stations = observed_stations[stations]
+        # observed_pollution = observed_pollution[stations]
+
+        self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
+        traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
+        # use median to fit to avoid outliers to interfere
+
+        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        y = observed_pollution.values.reshape((-1, 1))
+        mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
+        self.model.fit(X[mask], y[mask])
+        # self.model.fit(np.nanmedian(traffic_by_node, axis=0), np.nanmean(observed_pollution.values, axis=0))
+        # lr = LinearRegression(fit_intercept=self.fit_intercept).fit(np.nanmedian(traffic_by_node, axis=0),
+        #                                                             np.nanmean(observed_pollution.values,
+        #                                                                        axis=0))
+        # self.set_params(intercept=lr.intercept_)
+        # self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
+        return self.traffic2pollution(traffic_by_node)
+
+
 class GraphEmissionsModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
@@ -195,6 +287,26 @@ class GraphEmissionsModel(GraphModelBase):
                                 traffic_by_edge[edge].loc[t, color] / traffic_by_edge_normalization[edge] * \
                                 graph.edges[edge]["lanes"] * graph.edges[edge]["length"]
 
+        return traffic_by_node
+
+    def get_traffic_by_node(self, times, traffic_by_edge, graph, nodes, nodes_ix):
+        traffic_by_node = np.zeros((len(times), len(nodes), len(TRAFFIC_VALUES) * self.k_neighbours))
+        traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
+
+        for j, node in enumerate(nodes):
+            depth = {node: 0}
+            depth_count = [0] * self.k_neighbours
+            for edge in nx.bfs_tree(graph, source=node, depth_limit=self.k_neighbours).edges():
+                if edge[1] not in depth:
+                    depth[edge[1]] = depth[edge[0]] + 1
+                if edge in traffic_by_edge:
+                    area = graph.edges[edge]["lanes"] * graph.edges[edge]["length"]
+                    depth_count[edge[0]] += area
+                    level = np.arange(len(TRAFFIC_VALUES), dtype=int) + depth[edge[0]] * len(TRAFFIC_VALUES)
+                    traffic_by_node[:, j, level] += traffic_by_edge[edge] / traffic_by_edge_normalization[edge] * area
+            for d, dc in enumerate(depth_count):
+                level = np.arange(len(TRAFFIC_VALUES), dtype=int) + d * len(TRAFFIC_VALUES)
+                traffic_by_node[:, j, level] /= dc
         return traffic_by_node
 
     def reduce_traffic(self, times, target_positions: pd.DataFrame, **kwargs) -> np.ndarray:

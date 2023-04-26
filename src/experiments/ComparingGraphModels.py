@@ -6,6 +6,8 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
 from spiderplot import spiderplot
 
 # from spektral.layers import GATConv
@@ -21,7 +23,8 @@ from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
     ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.GCNN import GraphCNN
-from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel
+from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel, \
+    GraphEmissionsNeigEdgeModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
 from PerplexityLab.miscellaneous import NamedPartial, if_true_str, partial_filter
@@ -35,7 +38,6 @@ if __name__ == "__main__":
     data_manager = DataManager(
         path=config.results_dir,
         name=experiment_name,
-        country_alpha_code="NL",
         trackCO2=True
     )
 
@@ -72,40 +74,77 @@ if __name__ == "__main__":
         #         niter=2,
         #     )
         # ]),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsModel(
+        #         name="tau082g0",
+        #         # 'tau': 0.8200031737805101, 'gamma': 0.0
+        #         tau=0.82,
+        #         gamma=0,
+        #         # tau=Optim(1, 0.01, 1),
+        #         # gamma=Optim(1, 0, 1),
+        #         k_neighbours=3,
+        #         model=LinearRegression(),
+        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #         niter=2, verbose=True,
+        #         optim_method=NONE_OPTIM_METHOD,
+        #         loss=medianse)
+        # ]),
+        # ModelsSequenciator(models=[
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        #     GraphEmissionsModel(
+        #         name="tau082g0",
+        #         # 'tau': 0.8200031737805101, 'gamma': 0.0
+        #         tau=0.82,
+        #         gamma=0,
+        #         # tau=Optim(1, 0.01, 1),
+        #         # gamma=Optim(1, 0, 1),
+        #         k_neighbours=3,
+        #         model=RandomForestRegressor(n_estimators=10, max_depth=4),
+        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
+        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+        #         niter=2, verbose=True,
+        #         optim_method=NONE_OPTIM_METHOD,
+        #         loss=medianse)
+        # ]),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsModel(
-                name="tau082g0",
-                # 'tau': 0.8200031737805101, 'gamma': 0.0
-                tau=0.82,
-                gamma=0,
-                # tau=Optim(1, 0.01, 1),
-                # gamma=Optim(1, 0, 1),
-                k_neighbours=3,
-                model=LinearRegression(),
-                # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-                # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+            GraphEmissionsNeigEdgeModel(
+                k_neighbours=5,
+                model=Pipeline(steps=[("LR", LinearRegression())]),
                 niter=2, verbose=True,
                 optim_method=NONE_OPTIM_METHOD,
                 loss=medianse)
         ]),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsModel(
-                name="tau082g0",
-                # 'tau': 0.8200031737805101, 'gamma': 0.0
-                tau=0.82,
-                gamma=0,
-                # tau=Optim(1, 0.01, 1),
-                # gamma=Optim(1, 0, 1),
-                k_neighbours=3,
-                model=RandomForestRegressor(n_estimators=10, max_depth=4),
-                # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-                # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
+            GraphEmissionsNeigEdgeModel(
+                k_neighbours=5,
+                model=Pipeline(steps=[("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
                 niter=2, verbose=True,
                 optim_method=NONE_OPTIM_METHOD,
                 loss=medianse)
-        ])
+        ]),
+        ModelsSequenciator(models=[
+            SnapshotMeanModel(summary_statistic="mean"),
+            GraphEmissionsNeigEdgeModel(
+                k_neighbours=5,
+                model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)), ("LR", LinearRegression())]),
+                niter=2, verbose=True,
+                optim_method=NONE_OPTIM_METHOD,
+                loss=medianse)
+        ]),
+        ModelsSequenciator(models=[
+            SnapshotMeanModel(summary_statistic="mean"),
+            GraphEmissionsNeigEdgeModel(
+                k_neighbours=5,
+                model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)),
+                                      ("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
+                niter=2, verbose=True,
+                optim_method=NONE_OPTIM_METHOD,
+                loss=medianse)
+        ]),
 
         # ModelsSequenciator(models=[
         #     SnapshotMeanModel(summary_statistic="mean"),
@@ -147,11 +186,11 @@ if __name__ == "__main__":
 
     lab.execute(
         data_manager,
-        num_cores=15,
-        forget=True,
+        num_cores=5,
+        forget=False,
         recalculate=False,
         save_on_iteration=1,
-        station=stations2test # station_coordinates.columns.to_list()[:2]
+        station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #

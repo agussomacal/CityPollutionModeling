@@ -19,7 +19,7 @@ filter_graph = True
 seed = 42
 # stations2test = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS', 'PA15L']
 # stations that are inside Paris so traffic information is all around
-stations2test = ['OPERA', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA13', 'PA18', 'HAUS']
+stations2test = ['OPERA', 'HAUS', 'BONAP', 'CELES',  'ELYS', 'PA07', 'PA13', 'PA18']
 
 RAM = psutil.virtual_memory().total / 1000000000
 server = RAM > 50
