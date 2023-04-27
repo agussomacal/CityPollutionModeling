@@ -5,16 +5,16 @@ from spiderplot import spiderplot
 import src.config as config
 from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
-from src.experiments.PreProcess import longer_distance, loo4test, train_test_model, station_coordinates
+from PerplexityLab.miscellaneous import NamedPartial
+from PerplexityLab.visualization import generic_plot
+from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates
 from src.experiments.config_experiments import num_cores
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager
+    ModelsAggregator
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
-from PerplexityLab.miscellaneous import NamedPartial
-from PerplexityLab.visualization import generic_plot
 
 if __name__ == "__main__":
     experiment_name = "ModelComparison"
@@ -30,15 +30,15 @@ if __name__ == "__main__":
             TrafficMeanModel(summary_statistic="mean"),
         ])
         ,
-        ModelsAverager(models=[GlobalMeanModel(),
-                               TrafficMeanModel(summary_statistic="mean"),
-                               SnapshotMeanModel(summary_statistic="mean"),
-                               ModelsSequenciator(models=[
+        ModelsAggregator(models=[GlobalMeanModel(),
+                                 TrafficMeanModel(summary_statistic="mean"),
+                                 SnapshotMeanModel(summary_statistic="mean"),
+                                 ModelsSequenciator(models=[
                                    SnapshotMeanModel(summary_statistic="mean"),
                                    TrafficMeanModel(summary_statistic="mean"),
                                ])
-                               ],
-                       positive=True, fit_intercept=False),
+                                 ],
+                         positive=True, fit_intercept=False),
         SnapshotMeanModel(summary_statistic="mean"),
         GlobalMeanModel(),
         TrafficMeanModel(summary_statistic="mean"),
@@ -53,22 +53,22 @@ if __name__ == "__main__":
             ,
         ])
         ,
-        ModelsAverager(models=[GlobalMeanModel(),
-                               TrafficMeanModel(summary_statistic="mean"),
-                               SnapshotMeanModel(summary_statistic="mean"),
-                               ModelsSequenciator(models=[
+        ModelsAggregator(models=[GlobalMeanModel(),
+                                 TrafficMeanModel(summary_statistic="mean"),
+                                 SnapshotMeanModel(summary_statistic="mean"),
+                                 ModelsSequenciator(models=[
                                    SnapshotMeanModel(summary_statistic="mean"),
                                    TrafficMeanModel(summary_statistic="mean"),
                                ])
-                               ],
-                       positive=True, fit_intercept=False),
+                                 ],
+                         positive=True, fit_intercept=False),
         ModelsSequenciator(models=[
             SnapshotMeanModel(summary_statistic="mean"),
             TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
                                     sigma=Bounds(0, 2 * longer_distance),
                                     loss=mse, optim_method=UNIFORM, niter=10, verbose=True)],
             name="SnapTrafficConv"),
-        ModelsAverager(models=[
+        ModelsAggregator(models=[
             GlobalMeanModel(),
             TrafficConvolutionModel(conv_kernel=gaussker, normalize=False,
                                     sigma=Bounds(0, 2 * longer_distance),

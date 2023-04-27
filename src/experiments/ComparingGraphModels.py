@@ -1,13 +1,17 @@
 from functools import partial
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from sklearn.base import RegressorMixin
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LassoCV
+from sklearn.model_selection import GridSearchCV
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from spiderplot import spiderplot
 
 # from spektral.layers import GATConv
@@ -20,26 +24,85 @@ from src.experiments.PreProcess import longer_distance, train_test_model, statio
 from src.experiments.config_experiments import num_cores, shuffle, filter_graph
 from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAverager, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
+    ModelsAggregator, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.GCNN import GraphCNN
 from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel, \
     GraphEmissionsNeigEdgeModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker
-from PerplexityLab.miscellaneous import NamedPartial, if_true_str, partial_filter
+from PerplexityLab.miscellaneous import NamedPartial, if_true_str, partial_filter, copy_main_script_version
 from PerplexityLab.visualization import generic_plot, save_fig
 
+
+class RFCV(RegressorMixin):
+    def __init__(
+            self,
+            parameters_for_cross_validation: Dict[str, List],
+            cv=10,
+            n_estimators=100,
+            criterion="squared_error",
+            max_depth=None,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            min_weight_fraction_leaf=0.0,
+            max_features=1.0,
+            max_leaf_nodes=None,
+            min_impurity_decrease=0.0,
+            bootstrap=True,
+            oob_score=False,
+            n_jobs=None,
+            random_state=None,
+            verbose=0,
+            warm_start=False,
+            ccp_alpha=0.0,
+            max_samples=None,
+    ):
+        # https://stackoverflow.com/questions/38151615/specific-cross-validation-with-random-forest
+        self.parameters_for_cross_validation = parameters_for_cross_validation
+        self.cv = cv
+        self.rf = RandomForestRegressor(
+            n_estimators=n_estimators,
+            criterion=criterion,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            min_weight_fraction_leaf=min_weight_fraction_leaf,
+            max_features=max_features,
+            max_leaf_nodes=max_leaf_nodes,
+            min_impurity_decrease=min_impurity_decrease,
+            bootstrap=bootstrap,
+            oob_score=oob_score,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+            warm_start=warm_start,
+            ccp_alpha=ccp_alpha,
+            max_samples=max_samples,
+        )
+
+    def fit(self, X, y, sample_weight=None):
+        grid_clf = GridSearchCV(self.rf, self.parameters_for_cross_validation, cv=self.cv)
+        grid_clf.fit(X, y.ravel())
+        self.rf = grid_clf.best_estimator_
+        return self
+
+    def predict(self, X):
+        return self.rf.predict(X)
+
+
 if __name__ == "__main__":
-    niter = 100
-    experiment_name = f"TrafficGraphModelComparisonAvgRFSeqLoopFit{if_true_str(shuffle, '_Shuffled')}" \
+    k_neighbours = 10
+    experiment_name = f"TrafficEmissions{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
         path=config.results_dir,
         name=experiment_name,
+        country_alpha_code="FR",
         trackCO2=True
     )
+    copy_main_script_version(__file__, data_manager.path)
 
     base_models = [
         SnapshotMeanModel(summary_statistic="mean"),
@@ -47,149 +110,60 @@ if __name__ == "__main__":
     ]
     # 621.5069384089682 = [2.87121906 0.16877082 1.04179242 1.23798909 3.42959526 3.56328527]
     models = [
-        # GraphEmissionsModel(
-        #     name="t1g1",
-        #     tau=1,
-        #     gamma=1,
-        #     # tau=Optim(1, 0.01, 1),
-        #     # gamma=Optim(1, 0, 1),
-        #     k_neighbours=3,
-        #     # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #     # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #     niter=100, verbose=True, fit_intercept=True,
-        #     optim_method=NONE_OPTIM_METHOD,
-        #     loss=medianse),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphCNN(
-        #         name="GCNN",
-        #         spektral_layer=partial_filter(GATConv, attn_heads=1, concat_heads=True, dropout_rate=0.5,
-        #                                       return_attn_coef=False, add_self_loops=True, activation="relu",
-        #                                       use_bias=True),
-        #         hidden_layers=(10,),
-        #         loss=medianse,
-        #         epochs_to_stop=5000,
-        #         experiment_dir=data_manager.path,
-        #         verbose=False,
-        #         niter=2,
-        #     )
-        # ]),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsModel(
-        #         name="tau082g0",
-        #         # 'tau': 0.8200031737805101, 'gamma': 0.0
-        #         tau=0.82,
-        #         gamma=0,
-        #         # tau=Optim(1, 0.01, 1),
-        #         # gamma=Optim(1, 0, 1),
-        #         k_neighbours=3,
-        #         model=LinearRegression(),
-        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #         niter=2, verbose=True,
-        #         optim_method=NONE_OPTIM_METHOD,
-        #         loss=medianse)
-        # ]),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsModel(
-        #         name="tau082g0",
-        #         # 'tau': 0.8200031737805101, 'gamma': 0.0
-        #         tau=0.82,
-        #         gamma=0,
-        #         # tau=Optim(1, 0.01, 1),
-        #         # gamma=Optim(1, 0, 1),
-        #         k_neighbours=3,
-        #         model=RandomForestRegressor(n_estimators=10, max_depth=4),
-        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #         niter=2, verbose=True,
-        #         optim_method=NONE_OPTIM_METHOD,
-        #         loss=medianse)
-        # ]),
-        ModelsSequenciator(models=[
-            SnapshotMeanModel(summary_statistic="mean"),
-            GraphEmissionsNeigEdgeModel(
-                k_neighbours=5,
-                model=Pipeline(steps=[("LR", LinearRegression())]),
-                niter=2, verbose=True,
-                optim_method=NONE_OPTIM_METHOD,
-                loss=medianse)
-        ]),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsNeigEdgeModel(
-        #         k_neighbours=5,
-        #         model=Pipeline(steps=[("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
-        #         niter=2, verbose=True,
-        #         optim_method=NONE_OPTIM_METHOD,
-        #         loss=medianse)
-        # ]),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsNeigEdgeModel(
-        #         k_neighbours=5,
-        #         model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)), ("LR", LinearRegression())]),
-        #         niter=2, verbose=True,
-        #         optim_method=NONE_OPTIM_METHOD,
-        #         loss=medianse)
-        # ]),
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsNeigEdgeModel(
-        #         k_neighbours=5,
-        #         model=Pipeline(steps=[("Poly2", PolynomialFeatures(degree=2)),
-        #                               ("RF", RandomForestRegressor(n_estimators=10, max_depth=5))]),
-        #         niter=2, verbose=True,
-        #         optim_method=NONE_OPTIM_METHOD,
-        #         loss=medianse)
-        # ]),
-
-        # ModelsSequenciator(models=[
-        #     SnapshotMeanModel(summary_statistic="mean"),
-        #     GraphEmissionsModel(
-        #         name="t1g1",
-        #         tau=1, gamma=1, k_neighbours=1,
-        #         # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #         # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #         loss=medianse)
-        #     # HEqStaticModel(
-        #     #     absorption=0,
-        #     #     diffusion=0,
-        #     #     green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #     #     red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #     #
-        #     #     # absorption=2.87121906,
-        #     #     # diffusion=0.16877082,
-        #     #     # green=1.04179242, yellow=1.23798909,
-        #     #     # red=3.42959526, dark_red=3.56328527,
-        #     #
-        #     #     # absorption=Optim(start=2.87121906, lower=0, upper=np.inf),
-        #     #     # diffusion=Optim(start=0.16877082, lower=0, upper=np.inf),
-        #     #     # green=Optim(1.04179242, None, None), yellow=Optim(1.23798909, None, None),
-        #     #     # red=Optim(3.42959526, None, None), dark_red=Optim(3.56328527, None, None),
-        #     #     name="NormalizedEmissions", loss=medianse, optim_method=CMA, verbose=True,
-        #     #     niter=niter, sigma0=1e-2,
-        #     #     k_neighbours=None)
-        # ]),
+        ModelsSequenciator(
+            name="LR",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    k_neighbours=k_neighbours,
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
+        ModelsSequenciator(
+            name="NN",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    k_neighbours=k_neighbours,
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("NN",
+                                                                         MLPRegressor(hidden_layer_sizes=(20, 20,),
+                                                                                      activation="logistic",
+                                                                                      learning_rate_init=0.1,
+                                                                                      max_iter=1000))]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
     ]
 
     lab = LabPipeline()
     lab.define_new_block_of_functions("train_individual_models", *list(map(train_test_model,
-                                                                           # base_models +
+                                                                           base_models +
                                                                            models
                                                                            )))
     lab.define_new_block_of_functions("model",
-                                      *list(map(partial(train_test_averagers, positive=False, fit_intercept=True),
+                                      *list(map(partial(train_test_averagers,
+                                                        aggregator=Pipeline([("LR", LassoCV(selection="random"))])),
                                                 [[model] for model in models + base_models] +
                                                 [models + base_models]
                                                 )))
 
     lab.execute(
         data_manager,
-        num_cores=15,
-        forget=False,
+        num_cores=5,
+        forget=True,
         recalculate=True,
         save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
@@ -199,12 +173,14 @@ if __name__ == "__main__":
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(error.mean()),
-                 ylim=(0, 60))
+                 station=stations2test,
+                 )
 
     generic_plot(data_manager, x="l1_error", y="model", plot_func=NamedPartial(sns.boxenplot, orient="horizontal"),
                  sort_by=["mse"],
                  l1_error=lambda error: np.abs(error).ravel(),
                  mse=lambda error: np.sqrt(error.mean()),
+                 station=stations2test,
                  # xlim=(0, 20)
                  )
 
@@ -212,7 +188,7 @@ if __name__ == "__main__":
                  plot_func=NamedPartial(sns.violinplot, orient="horizontal", inner="stick"),
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(np.nanmean(error)),
-                 xlim=(0, 100),
+                 # xlim=(0, 100),
                  # model=["SnapshotMeanModelmean", "A+SMM,GMM,SMMTCMN", "GlobalMeanModelmean"]
                  )
 
@@ -226,4 +202,4 @@ if __name__ == "__main__":
                  sort_by=["mse"],
                  l1_error=lambda error: np.abs(error).ravel(),
                  mse=lambda error: np.sqrt(error.mean()),
-                 ylim=(0, 100))
+                 )

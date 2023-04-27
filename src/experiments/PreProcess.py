@@ -12,6 +12,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
+from sklearn.pipeline import Pipeline
 
 from PerplexityLab.DataManager import DataManager
 from src.config import results_dir, city_dir
@@ -23,21 +24,22 @@ from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_dat
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
-from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, ModelsAverager
+from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, ModelsAggregator
 from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
 from PerplexityLab.visualization import save_fig
 
 
-def plot_stations_in_map(background, station_coordinates, lat, long):
-    plt.close("all")
-    plt.imshow(background)
-
+def plot_stations(station_coordinates, lat, long):
     x = [np.argmin((l - long[0, :]) ** 2) for l in station_coordinates.T.long]
     y = [np.argmin((l - lat[:, 0]) ** 2) for l in station_coordinates.T.lat]
     plt.scatter(x, y, s=25, c="r", marker="x", edgecolors="k")
     for pos_x, pos_y, station_name in zip(x, y, station_coordinates.columns):
         plt.text(pos_x + 25, pos_y + 25, station_name, {'size': 7, "color": "red"})
-    plt.tight_layout()
+
+
+def plot_stations_in_map(background, station_coordinates, lat, long, alpha=1.0):
+    plt.imshow(background, alpha=alpha)
+    plot_stations(station_coordinates, lat, long)
 
 
 def plot_pairwise_info(pirewise_info):
@@ -206,13 +208,13 @@ def train_test_model(model: BaseModel):
 
 
 # ----- Defining Experiment ----- #
-def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=True):
+def train_test_averagers(models: List[BaseModel], aggregator: Pipeline):
     def decorated_func(station):
         path2model = Path(f"{path2models}/{station}")
         path2model.mkdir(parents=True, exist_ok=True)
         loaded_models, fitting_time = tuple(
             list(zip(*[joblib.load(filename=f"{path2model}/{model}.compressed") for model in models])))
-        model = ModelsAverager(models=loaded_models, positive=positive, fit_intercept=fit_intercept)
+        model = ModelsAggregator(models=loaded_models, aggregator=aggregator)
 
         # in train time use the past
         data_known, _ = split_by_station(unknown_station=station, observed_stations=station_coordinates,
@@ -243,7 +245,7 @@ def train_test_averagers(models: List[BaseModel], positive=True, fit_intercept=T
         }
 
     modelnames = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in models])
-    name = f"{if_true_str(fit_intercept, 'c0')}A{if_true_str(positive, '+')}{modelnames}"
+    name = f"{aggregator}_{modelnames}"
     decorated_func.__name__ = str(models[0]) if len(models) == 1 else name
     return decorated_func
 
@@ -295,5 +297,22 @@ if __name__ == "__main__":
                   f"filtered graph: {len(edges_pixels) / np.shape(traffic_future)[1] * 100:.2f}% and "
                   f"full graph: {len(graph.edges()) / np.shape(traffic_future)[1] * 100:.2f}%")
 
-    print(f"CO2 {data_manager.CO2kg}kg")
-    print(f"Electricity consumption {data_manager.electricity_consumption_kWh}kWh")
+    k_neighbours = 10
+    with save_fig(data_manager.path, f"StationsGraphNeighbourhood{k_neighbours}.png"):
+        img = load_background(screenshot_period)
+        mask = np.zeros(np.shape(img)[:2])
+
+        node_positions = np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+        position2node_index = [int(np.argmin(cdist(node_positions, np.array([tp])), axis=0)) for tp in
+                               station_coordinates.values.T]
+        for n, ix in enumerate(position2node_index):
+            for edge in nx.bfs_tree(graph, source=list(graph.nodes)[ix], depth_limit=k_neighbours).edges():
+                if edge in edges_pixels:
+                    mask[np.array(edges_pixels[edge])[:, 0], np.array(edges_pixels[edge])[:, 1]] = 1
+
+        plot_stations(station_coordinates, latitudes, longitudes)
+        plt.imshow(img, alpha=0.25)
+        plt.imshow(mask, alpha=mask, cmap="Blues")
+        plt.title(f"Graph compression percentage: \n"
+                  f"filtered graph: {len(edges_pixels) / np.shape(traffic_future)[1] * 100:.2f}% and "
+                  f"full graph: {len(graph.edges()) / np.shape(traffic_future)[1] * 100:.2f}%")

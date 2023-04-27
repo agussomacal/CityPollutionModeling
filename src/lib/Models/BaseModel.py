@@ -224,11 +224,11 @@ class BaseModel:
 
 
 class ModelsSequenciator(BaseModel):
-    def __init__(self, models: List[BaseModel], name=None, **kwargs):
+    def __init__(self, models: List[BaseModel], transition_model: List[Pipeline], name=None, **kwargs):
         super().__init__(name, **kwargs)
         self.name = name
         self.models = models
-        # self.transition_model = transition_model
+        self.transition_model = transition_model
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
         self.amp = [1.0] * len(models)
         self.losses = list()
@@ -247,11 +247,12 @@ class ModelsSequenciator(BaseModel):
         observed_pollution_i = observed_pollution.copy()
         observed_stations_i = observed_stations.copy()
         for i, model in enumerate(self.models):
-            preds_i = self.amp[i] * model.state_estimation(observed_stations=observed_stations_i,
-                                                           observed_pollution=observed_pollution_i,
-                                                           traffic=traffic,
-                                                           target_positions=target_positions,
-                                                           **kwargs)
+            preds_i = self.transition_model[i].predict(
+                model.state_estimation(observed_stations=observed_stations_i,
+                                       observed_pollution=observed_pollution_i,
+                                       traffic=traffic,
+                                       target_positions=target_positions,
+                                       **kwargs).reshape((-1, 1))).reshape(np.shape(predictions_i))
             predictions_i += preds_i
             # get the residuals on the observed values
             # the following lines are necessary for models that relly on the names of the sensors and are not properly
@@ -259,12 +260,6 @@ class ModelsSequenciator(BaseModel):
             # only actualize if it is not the las model
             if observed_pollution_i is not None and i < len(self.models) - 1:
                 observed_pollution_i -= preds_i
-                # observed_pollution_i -= self.amp[i] * pd.concat(
-                #     [pd.DataFrame(model.state_estimation(**known_data, **kwargs),
-                #                   index=known_data["observed_pollution"].index,
-                #                   columns=[target_pollution.name])
-                #      for known_data, target_pollution in
-                #      loo(observed_stations, observed_pollution_i, traffic)], axis=1)
         return predictions_i
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
@@ -294,74 +289,51 @@ class ModelsSequenciator(BaseModel):
                               columns=[target_pollution.name])
                  for known_data, target_pollution in
                  loo(observed_stations, observed_pollution_i, traffic)], axis=1)
-            if i == 0:
-                self.amp[i] = 1
-            else:
-                # mask = np.all(~np.isnan(preds_i), axis=1) * np.all(~np.isnan(observed_pollution_i.values), axis=1)
-                # self.amp[i] = float(np.squeeze(
-                #     LinearRegression(fit_intercept=False).fit(preds_i[mask].ravel(), observed_pollution_i.values[mask].ravel()).coef_))
-                self.amp[i] = np.nanmedian((observed_pollution_i.values / preds_i))
-            # X = preds_i.reshape((-1, 1))
-            # y = observed_pollution.values.reshape((-1, 1))
-            # mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
-            # self.transition_model[i].fit(X[mask], y[mask])
+            X = preds_i.values.reshape((-1, 1))
+            y = observed_pollution.values.reshape((-1, 1))
+            mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
+            self.transition_model[i].fit(X[mask], y[mask])
 
             if i < len(self.models) - 1:  # only actualize if it is not the las model
-                # observed_pollution_i -= self.amp[i] * model.state_estimation(observed_stations, observed_pollution,
-                #                                                              traffic, observed_stations, **kwargs)
-                observed_pollution_i -= self.amp[i] * preds_i
-                # observed_pollution_i -= self.transition_model[i].predict(X).reshape(np.shape(observed_pollution_i))
-        print("Amplitudes: ", self.amp)
+                mask = np.all(~np.isnan(X), axis=1)
+                observed_pollution_i.values[mask.reshape(np.shape(observed_pollution_i))] -= self.transition_model[
+                    i].predict(X[mask]).ravel()
         self.calibrated = True
         return self
 
 
-class ModelsAverager(BaseModel):
-    def __init__(self, models: List[BaseModel], positive=False, fit_intercept=False,
-                 weights: Union[Dict, List, np.ndarray] = None, name=None, n_alphas=None):
+class ModelsAggregator(BaseModel):
+    def __init__(self, models: List[BaseModel], aggregator: Pipeline, name=None):
         super().__init__()
         self.losses = list()
         self.name = name
         self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
-
+        self.aggregator = aggregator
         self.models = models
-        self.n_alphas = n_alphas
-        if n_alphas is None:
-            self.lr = LinearRegression(positive=positive, fit_intercept=fit_intercept)
-        else:
-            self.lr = LassoCV(positive=positive, fit_intercept=fit_intercept, n_alphas=n_alphas)
-        if weights is not None:
-            if isinstance(weights, Dict):
-                self.lr.coef_ = np.array([weights[str(model)] for model in self.models])
-                self.lr.intercept_ = weights["intercept"]
-            elif isinstance(weights, (List, np.ndarray)):
-                self.lr.coef_ = np.array(weights[:-1])
-                self.lr.intercept_ = weights[-1]
 
     @property
     def weights(self):
-        return np.ravel(np.append(self.lr.coef_, self.lr.intercept_))
+        if hasattr(self.aggregator.steps[-1], "coef_") and hasattr(self.aggregator.steps[-1], "intercept_"):
+            return np.ravel(np.append(self.aggregator.steps[-1].coef_, self.aggregator.steps[-1].intercept_))
 
     @property
     def model_importance(self):
-        return {model_name: weight for model_name, weight in
-                zip(list(map(str, self.models)) + ["intercept"], np.abs(self.weights) / np.abs(self.weights).sum())}
-
-    @property
-    def params(self):
-        return {**{str(model): model.params for model in self.models}, **{"weights": self.weights.tolist()}}
+        weights = self.weights
+        if weights is not None:
+            return {model_name: weight for model_name, weight in
+                    zip(list(map(str, self.models)) + ["intercept"], np.abs(self.weights) / np.abs(self.weights).sum())}
 
     def __str__(self):
         models_names = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in
                                  self.models]) if self.name is None else self.name
-        return f"{if_true_str(self.lr.fit_intercept, 'c', '', '+')}{'LASSO' if self.n_alphas else 'LR'}{if_true_str(self.lr.positive, '+')}({models_names})"
+        return f"{self.aggregator}({models_names})"
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
         individual_predictions = np.array([
-            model.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs)
-            for model in self.models])
-        return np.einsum("m...,m", individual_predictions, self.lr.coef_.ravel()) + self.lr.intercept_
+            model.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs).squeeze()
+            for model in self.models]).T
+        return self.aggregator.predict(individual_predictions)
 
     def state_estimation_for_each_model(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
                                                                                                             np.ndarray]:
@@ -371,7 +343,7 @@ class ModelsAverager(BaseModel):
         return np.concatenate(predicted_pollution, axis=1), np.concatenate(target_pollution, axis=1)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        if not hasattr(self.lr, "coefs_") or not hasattr(self.lr, "intercept_"):
+        if not self.calibrated:
             # calibrate models
             for model in self.models:
                 if not model.calibrated:
@@ -381,6 +353,6 @@ class ModelsAverager(BaseModel):
             individual_predictions, target = \
                 self.state_estimation_for_each_model(observed_stations, observed_pollution, traffic, **kwargs)
             assert np.all(target == target[:, [0]], axis=1).all(), "All targets have to be equal."
-            self.lr.fit(individual_predictions, target.mean(axis=1, keepdims=True))
+            self.aggregator.fit(individual_predictions, target.mean(axis=1, keepdims=True))
             self.calibrated = True
         print(f"Models importance: {self.model_importance}")
