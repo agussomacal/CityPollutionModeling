@@ -37,9 +37,9 @@ def load_image(filepath, shape=(800, 1000)):
     return image[(sx // 2 - shape[0] // 2):(sx // 2 + 400), (sy // 2 - 500):(sy // 2 + 500), :-1]
 
 
-def load_background(screenshot_period):
+def load_background(screenshot_period, zoom=13):
     # Load background image
-    return load_image(glob.glob(f"{traffic_screenshots_folder(screenshot_period)}/Background_*.png")[0])
+    return load_image(glob.glob(f"{traffic_screenshots_folder(screenshot_period)}/Background_*{zoom}.png")[0])
 
 
 # =============== =============== =============== #
