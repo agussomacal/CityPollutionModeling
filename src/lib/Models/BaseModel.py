@@ -1,15 +1,13 @@
-from collections import namedtuple
-from typing import List, Union, Dict
+from typing import List
 
 import cma
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
-from sklearn.linear_model import LinearRegression, LassoCV
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
-from PerplexityLab.miscellaneous import if_true_str
+from src.lib.Modules import Bounds, Optim
 
 CMA = "cma"
 GRAD = "bfgs"
@@ -18,9 +16,6 @@ RANDOM = "random"
 UNIFORM = "uniform"
 LOGUNIFORM = "loguniform"
 NONE_OPTIM_METHOD = None
-
-Bounds = namedtuple("Bounds", "lower upper")
-Optim = namedtuple("Optim", "start lower upper", defaults=[0, None, None])
 
 
 def split_by_station(unknown_station, observed_stations, observed_pollution, traffic, filterna=True):

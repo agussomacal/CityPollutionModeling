@@ -10,7 +10,8 @@ from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
-from src.lib.Models.BaseModel import BaseModel, mse, GRAD, Optim, pollution_agnostic
+from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic
+from src.lib.Modules import Optim
 from PerplexityLab.miscellaneous import filter_dict, timeit, if_true_str
 
 

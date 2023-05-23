@@ -15,8 +15,9 @@ from src.experiments.PreProcess import longer_distance, train_test_model, distan
     train_test_averagers, simulation, stations2test
 from src.experiments.config_experiments import num_cores, shuffle
 from src.lib.DataProcessing.TrafficProcessing import load_background
-from src.lib.Models.BaseModel import Bounds, ModelsSequenciator, \
+from src.lib.Models.BaseModel import ModelsSequenciator, \
     LOGUNIFORM, medianse
+from src.lib.Modules import Bounds
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
     gaussker

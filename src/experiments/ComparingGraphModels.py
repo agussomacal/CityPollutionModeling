@@ -23,8 +23,9 @@ from src.experiments.PreProcess import longer_distance, train_test_model, statio
     distance_between_stations_pixels, train_test_averagers, simulation, stations2test
 from src.experiments.config_experiments import num_cores, shuffle, filter_graph
 from src.lib.DataProcessing.TrafficProcessing import load_background
-from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
-    ModelsAggregator, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
+from src.lib.Models.BaseModel import mse, UNIFORM, ModelsSequenciator, \
+    ModelsAggregator, LOGUNIFORM, medianse, GRAD, CMA, NONE_OPTIM_METHOD
+from src.lib.Modules import Bounds, Optim
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.GCNN import GraphCNN
 from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel, \

@@ -9,8 +9,9 @@ from PerplexityLab.miscellaneous import NamedPartial
 from PerplexityLab.visualization import generic_plot
 from src.experiments.PreProcess import longer_distance, train_test_model, station_coordinates
 from src.experiments.config_experiments import num_cores
-from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
+from src.lib.Models.BaseModel import mse, UNIFORM, ModelsSequenciator, \
     ModelsAggregator
+from src.lib.Modules import Bounds
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, \
     SnapshotWeightedModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \

@@ -24,7 +24,8 @@ from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_dat
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
-from src.lib.Models.BaseModel import BaseModel, split_by_station, Bounds, ModelsAggregator
+from src.lib.Models.BaseModel import BaseModel, split_by_station, ModelsAggregator
+from src.lib.Modules import Bounds
 from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
 from PerplexityLab.visualization import save_fig
 

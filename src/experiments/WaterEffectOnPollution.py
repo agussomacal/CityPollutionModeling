@@ -4,7 +4,6 @@ from functools import partial
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.spatial.distance import cdist
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression, LassoCV
 from sklearn.neural_network import MLPRegressor
@@ -18,33 +17,11 @@ from src.experiments.PreProcess import latitudes, longitudes, station_coordinate
     pollution_future, longer_distance
 from src.experiments.config_experiments import screenshot_period
 from src.lib.DataProcessing.TrafficProcessing import load_background, road_color
+from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEImageStaticConvolution
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 
 WaterColor = (156, 192, 249)
 GreenAreaColor = (168, 218, 181)
-
-
-class NearPixelTypeFeatureExtractor:
-    def __init__(self, mask, x_coords, y_coords, metric="euclidean"):
-        """
-
-        :param mask: image shape with True False marking the pixels belonging to the category of interest.
-        :param pixel_coordinates: [image_shape x [lat]
-        """
-        self.mask = mask
-        self.coords = np.transpose([x_coords[self.mask], y_coords[self.mask]])
-        self.metric = metric
-        self.dist = dict()
-
-    def get_distance(self, points: np.ndarray):
-        for point in map(tuple, points):
-            if point not in self.dist:
-                self.dist[tuple(point)] = cdist(XA=self.coords, XB=np.reshape(point, (1, 2)), metric=self.metric)
-            yield self.dist[tuple(point)]
-
-    def by_convolution(self, points, kernel, agg_func=np.sum):
-        return agg_func(kernel(np.ravel(list(self.get_distance(points)))).reshape((len(points), -1)), axis=1)
-
 
 if __name__ == "__main__":
     experiment_name = "WaterEffectOnPollution"
@@ -66,13 +43,13 @@ if __name__ == "__main__":
         greenarea_mask = np.all(img == GreenAreaColor, axis=-1)
         plt.imshow(roads_mask + 2 * water_mask + 3 * greenarea_mask, cmap="tab10")
 
-        water_featurer = NearPixelTypeFeatureExtractor(water_mask, longitudes, latitudes, metric="euclidean")
+        water_featurer = FEImageStaticConvolution(water_mask, longitudes, latitudes, metric="euclidean")
         water_features = pd.Series(
             water_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                           kernel=partial(gaussker, sigma=0.1), agg_func=np.sum),
             index=station_coordinates.columns)
 
-        greenarea_featurer = NearPixelTypeFeatureExtractor(greenarea_mask, longitudes, latitudes, metric="euclidean")
+        greenarea_featurer = FEImageStaticConvolution(greenarea_mask, longitudes, latitudes, metric="euclidean")
         greenarea_features = pd.Series(
             greenarea_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                               kernel=partial(gaussker, sigma=0.1), agg_func=np.sum),
@@ -107,19 +84,19 @@ if __name__ == "__main__":
     correlation_std = defaultdict(list)
     sigmas = np.linspace(0, longer_distance, 10)
     for sigma in sigmas:
-        water_featurer = NearPixelTypeFeatureExtractor(water_mask, longitudes, latitudes, metric="euclidean")
+        water_featurer = FEImageStaticConvolution(water_mask, longitudes, latitudes, metric="euclidean")
         water_features = pd.Series(
             water_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                           kernel=partial(gaussker, sigma=sigma), agg_func=np.sum),
             index=station_coordinates.columns)
 
-        greenarea_featurer = NearPixelTypeFeatureExtractor(greenarea_mask, longitudes, latitudes, metric="euclidean")
+        greenarea_featurer = FEImageStaticConvolution(greenarea_mask, longitudes, latitudes, metric="euclidean")
         greenarea_features = pd.Series(
             greenarea_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                               kernel=partial(gaussker, sigma=sigma), agg_func=np.sum),
             index=station_coordinates.columns)
 
-        street_featurer = NearPixelTypeFeatureExtractor(roads_mask, longitudes, latitudes, metric="euclidean")
+        street_featurer = FEImageStaticConvolution(roads_mask, longitudes, latitudes, metric="euclidean")
         street_features = pd.Series(
             greenarea_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                               kernel=partial(gaussker, sigma=sigma), agg_func=np.sum),
