@@ -13,9 +13,9 @@ from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
 from PerplexityLab.visualization import generic_plot
 from src.experiments.PreProcess import train_test_model, station_coordinates, train_test_averagers
 from src.experiments.config_experiments import num_cores, stations2test
-from src.lib.Models.BaseModel import Bounds, UNIFORM, Optim, NONE_OPTIM_METHOD
+from src.lib.Models.BaseModel import Bounds, UNIFORM, Optim, NONE_OPTIM_METHOD, GRAD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, SnapshotPCAModel, \
-    SnapshotBLUEModel
+    SnapshotBLUEModel, SnapshotQuantileModel
 
 if __name__ == "__main__":
     experiment_name = "AverageModels"
@@ -29,12 +29,13 @@ if __name__ == "__main__":
     copy_main_script_version(__file__, data_manager.path)
 
     models = [
-        SnapshotBLUEModel(sensor_distrust=Optim(start=0, lower=0, upper=1), optim_method=UNIFORM, niter=10,
+        SnapshotBLUEModel(sensor_distrust=Optim(start=0, lower=0, upper=1), optim_method=GRAD, niter=100,
                           verbose=False),
         # GlobalMeanModel(),
-        # SnapshotMeanModel(summary_statistic="mean"),
+        SnapshotMeanModel(summary_statistic="mean"),
         SnapshotPCAModel(n_components=Optim(start=1, lower=1, upper=7), niter=7, summary_statistic="mean",
                          optim_method=UNIFORM),
+        SnapshotQuantileModel()
     ]
 
     lab = LabPipeline()
@@ -51,14 +52,14 @@ if __name__ == "__main__":
         data_manager,
         num_cores=10,
         forget=False,
-        recalculate=True,
+        recalculate=False,
         save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
-                 sort_by=["mse"],
+                 sort_by=["station"],
                  mse=lambda error: np.sqrt(error.mean()),
                  station=stations2test,
                  )

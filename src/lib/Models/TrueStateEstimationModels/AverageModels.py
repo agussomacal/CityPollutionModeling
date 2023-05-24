@@ -28,8 +28,8 @@ class SnapshotMeanModel(SummaryModel):
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
                          **kwargs) -> np.ndarray:
         summary_function = getattr(np, 'nan' + self.summary_statistic)
-        return summary_function(observed_pollution.values, axis=1)[:, np.newaxis] * \
-               np.ones((1, np.shape(target_positions)[1]))
+        return summary_function(observed_pollution.values, axis=1, keepdims=True) * \
+            np.ones((1, np.shape(target_positions)[1]))
 
 
 class SnapshotQuantileModel(SummaryModel):
@@ -48,16 +48,16 @@ class SnapshotQuantileModel(SummaryModel):
                          **kwargs) -> np.ndarray:
         summary_function = getattr(np, 'nan' + self.summary_statistic)
 
-        stabilized_observations = pd.DataFrame([
-            np.quantile(self.sorted_observed_pollution,
-                        q=np.searchsorted(self.sorted_observed_pollution[station],
-                                          observed_pollution[station]) / len(
-                            self.sorted_observed_pollution))
-            for station in observed_pollution.columns],
-            index=observed_pollution.columns).T
+        quantiles = np.nanmedian([
+            np.searchsorted(self.sorted_observed_pollution[station], observed_pollution[station]) / len(
+                self.sorted_observed_pollution)
+            for station in observed_pollution.columns], axis=0)
 
-        return summary_function(stabilized_observations, axis=1, keepdims=True) * np.ones(
-            (1, np.shape(target_positions)[1]))
+        stabilized_observations = summary_function(
+            [np.nanquantile(self.sorted_observed_pollution[station], q=quantiles) for station in
+             observed_pollution.columns], axis=0)
+
+        return stabilized_observations[:, np.newaxis] * np.ones((1, np.shape(target_positions)[1]))
 
 
 class SnapshotPCAModel(SummaryModel, BaseModel):
@@ -77,46 +77,30 @@ class SnapshotPCAModel(SummaryModel, BaseModel):
         not_nan = ~np.isnan(observed_pollution).any(axis=1)
         self.pca = PCA(n_components=int(self.params["n_components"]))
         self.pca.fit(self.zscore.fit_transform(observed_pollution)[not_nan, :])
-        # self.vectors = (self.pca.singular_values_[:, np.newaxis] * self.pca.components_) / np.sqrt(
-        #     (self.pca.singular_values_ ** 2).sum())
         return self.state_estimation(observed_stations, observed_pollution, traffic, observed_stations, **kwargs)
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions,
                          **kwargs) -> np.ndarray:
         xy, x_ind, y_ind = np.intersect1d(self.zscore.feature_names_in_, observed_pollution.columns,
                                           return_indices=True)
-        stabilized_observations = self.zscore.inverse_transform(
-            (self.zscore.transform(observed_pollution.iloc[:, y_ind]) @ self.pca.components_[x_ind]) @
-            self.pca.components_[x_ind])
+        new_zscore = copy.deepcopy(self.zscore)
+        new_zscore.mean_ = self.zscore.mean_[x_ind]
+        new_zscore.scale_ = self.zscore.scale_[x_ind]
+        new_zscore.feature_names_in_ = self.zscore.feature_names_in_[x_ind]
+        new_zscore.n_features_in_ = len(x_ind)
 
+        new_pca = copy.deepcopy(self.pca)
+        new_pca.components_ = self.pca.components_[:, x_ind]
+        new_pca.mean_ = self.pca.mean_[x_ind]
+        new_pca.n_features = len(x_ind)
+        new_pca.n_features_in_ = len(x_ind)
+        stabilized_observations = new_zscore.inverse_transform(np.nansum(
+            new_zscore.transform(observed_pollution.iloc[:, y_ind])[:, :, np.newaxis] * new_pca.components_.T[
+                                                                                        np.newaxis, :, :],
+            axis=1) @ new_pca.components_)
         summary_function = getattr(np, 'nan' + self.summary_statistic)
         return summary_function(stabilized_observations, axis=1, keepdims=True) * np.ones(
             (1, np.shape(target_positions)[1]))
-        # preds = []
-        # for i in range(len(observed_pollution)):
-        #     pollution_t = observed_pollution.iloc[[i], :]
-        #     pollution_t = pollution_t.dropna(thresh=1, axis=1)
-        #     # pollution_t[~pollution_t.isna()]
-        #     # pollution_t.loc[:, ~np.isnan(pollution_t.values.ravel())]
-        #     xy, x_ind, y_ind = np.intersect1d(self.zscore.feature_names_in_, pollution_t.columns, return_indices=True)
-        #
-        #     new_zscore = copy.deepcopy(self.zscore)
-        #     new_zscore.mean_ = self.zscore.mean_[x_ind]
-        #     new_zscore.scale_ = self.zscore.scale_[x_ind]
-        #     new_zscore.feature_names_in_ = self.zscore.feature_names_in_[x_ind]
-        #     new_zscore.n_features_in_ = len(x_ind)
-        #
-        #     new_pca = copy.deepcopy(self.pca)
-        #     new_pca.components_ = self.pca.components_[:, x_ind]
-        #     new_pca.mean_ = self.pca.mean_[x_ind]
-        #     new_pca.n_features = len(x_ind)
-        #     new_pca.n_features_in_ = len(x_ind)
-        #
-        #     stabilized_observations = new_zscore.inverse_transform(
-        #         new_pca.transform(new_zscore.transform(pollution_t[xy])) @ self.vectors[:, x_ind])
-        #
-        #     preds.append(summary_function(stabilized_observations, axis=1))
-        # return np.array(preds) * np.ones((1, np.shape(target_positions)[1]))
 
 
 class SnapshotBLUEModel(BaseModel):
