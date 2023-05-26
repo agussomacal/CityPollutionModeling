@@ -25,8 +25,8 @@ from src.experiments.config_experiments import num_cores, shuffle, filter_graph
 from src.lib.DataProcessing.TrafficProcessing import load_background
 from src.lib.Models.BaseModel import Bounds, mse, UNIFORM, ModelsSequenciator, \
     ModelsAggregator, LOGUNIFORM, medianse, GRAD, Optim, CMA, NONE_OPTIM_METHOD
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
-from src.lib.Models.TrueStateEstimationModels.GCNN import GraphCNN
+from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, SnapshotPCAModel, \
+    SnapshotBLUEModel
 from src.lib.Models.TrueStateEstimationModels.GraphModels import HEqStaticModel, GraphEmissionsModel, \
     GraphEmissionsNeigEdgeModel
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficMeanModel, TrafficConvolutionModel, \
@@ -93,7 +93,7 @@ class RFCV(RegressorMixin):
 
 if __name__ == "__main__":
     k_neighbours = 10
-    experiment_name = f"TrafficEmissions{if_true_str(shuffle, '_Shuffled')}" \
+    experiment_name = f"ExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
@@ -106,7 +106,9 @@ if __name__ == "__main__":
 
     base_models = [
         SnapshotMeanModel(summary_statistic="mean"),
-        GlobalMeanModel()
+        # SnapshotBLUEModel(sensor_distrust=0),
+        # SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        # GlobalMeanModel()
     ]
     # 621.5069384089682 = [2.87121906 0.16877082 1.04179242 1.23798909 3.42959526 3.56328527]
     models = [
@@ -115,6 +117,7 @@ if __name__ == "__main__":
             models=[
                 SnapshotMeanModel(summary_statistic="mean"),
                 GraphEmissionsNeigEdgeModel(
+                    extra_regressors=[],
                     k_neighbours=k_neighbours,
                     model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
                     niter=2, verbose=True,
@@ -127,16 +130,13 @@ if __name__ == "__main__":
             ]
         ),
         ModelsSequenciator(
-            name="NN",
+            name="LR_Temp",
             models=[
                 SnapshotMeanModel(summary_statistic="mean"),
                 GraphEmissionsNeigEdgeModel(
+                    extra_regressors=["temperature"],
                     k_neighbours=k_neighbours,
-                    model=Pipeline(steps=[("zscore", StandardScaler()), ("NN",
-                                                                         MLPRegressor(hidden_layer_sizes=(20, 20,),
-                                                                                      activation="logistic",
-                                                                                      learning_rate_init=0.1,
-                                                                                      max_iter=1000))]),
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
                     niter=2, verbose=True,
                     optim_method=NONE_OPTIM_METHOD,
                     loss=medianse)
@@ -146,6 +146,43 @@ if __name__ == "__main__":
                 Pipeline([("Lss", LassoCV(selection="cyclic"))])
             ]
         ),
+        ModelsSequenciator(
+            name="LR_TempWind",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    extra_regressors=["temperature", "wind"],
+                    k_neighbours=k_neighbours,
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
+        # ModelsSequenciator(
+        #     name="NN",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             k_neighbours=k_neighbours,
+        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("NN",
+        #                                                                  MLPRegressor(hidden_layer_sizes=(20, 20,),
+        #                                                                               activation="logistic",
+        #                                                                               learning_rate_init=0.1,
+        #                                                                               max_iter=1000))]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
     ]
 
     lab = LabPipeline()
@@ -156,15 +193,15 @@ if __name__ == "__main__":
     lab.define_new_block_of_functions("model",
                                       *list(map(partial(train_test_averagers,
                                                         aggregator=Pipeline([("LR", LassoCV(selection="random"))])),
-                                                [[model] for model in models + base_models] +
-                                                [models + base_models]
+                                                [[model] for model in models + base_models]
+                                                # + [models + base_models]
                                                 )))
 
     lab.execute(
         data_manager,
-        num_cores=5,
-        forget=True,
-        recalculate=True,
+        num_cores=10,
+        forget=False,
+        recalculate=False,
         save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )

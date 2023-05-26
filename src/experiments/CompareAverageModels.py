@@ -2,7 +2,7 @@ from functools import partial
 
 import numpy as np
 import seaborn as sns
-from sklearn.linear_model import LassoCV
+from sklearn.linear_model import LassoCV, LinearRegression
 from sklearn.pipeline import Pipeline
 from spiderplot import spiderplot
 
@@ -13,12 +13,12 @@ from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
 from PerplexityLab.visualization import generic_plot
 from src.experiments.PreProcess import train_test_model, station_coordinates, train_test_averagers
 from src.experiments.config_experiments import num_cores, stations2test
-from src.lib.Models.BaseModel import Bounds, UNIFORM, Optim, NONE_OPTIM_METHOD, GRAD
+from src.lib.Models.BaseModel import Bounds, UNIFORM, Optim, NONE_OPTIM_METHOD, GRAD, ModelsSequenciator
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel, SnapshotPCAModel, \
     SnapshotBLUEModel, SnapshotQuantileModel
 
 if __name__ == "__main__":
-    experiment_name = "AverageModels"
+    experiment_name = "AverageModelsChained"
 
     data_manager = DataManager(
         path=config.results_dir,
@@ -29,13 +29,61 @@ if __name__ == "__main__":
     copy_main_script_version(__file__, data_manager.path)
 
     models = [
-        SnapshotBLUEModel(sensor_distrust=Optim(start=0, lower=0, upper=1), optim_method=GRAD, niter=100,
-                          verbose=False),
         # GlobalMeanModel(),
         SnapshotMeanModel(summary_statistic="mean"),
-        SnapshotPCAModel(n_components=Optim(start=1, lower=1, upper=7), niter=7, summary_statistic="mean",
-                         optim_method=UNIFORM),
-        SnapshotQuantileModel()
+        # SnapshotBLUEModel(sensor_distrust=Optim(start=0, lower=0, upper=1), optim_method=GRAD, niter=100,
+        #                   verbose=False),
+        # SnapshotPCAModel(n_components=Optim(start=1, lower=1, upper=7), niter=7, summary_statistic="mean",
+        #                  optim_method=UNIFORM),
+        SnapshotBLUEModel(sensor_distrust=0),
+        SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        SnapshotQuantileModel(),
+
+        ModelsSequenciator(
+            name="ChainPCA",
+            models=[
+                SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+                SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+                SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("LR", LinearRegression())]),
+            ]
+        ),
+        ModelsSequenciator(
+            name="ChainBLUE",
+            models=[
+                SnapshotBLUEModel(sensor_distrust=0),
+                SnapshotBLUEModel(sensor_distrust=0),
+                SnapshotBLUEModel(sensor_distrust=0),
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("LR", LinearRegression())]),
+            ]
+        ),
+        # ModelsSequenciator(
+        #     name="Chain",
+        #     models=[
+        #         SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        #         SnapshotBLUEModel(sensor_distrust=0),
+        #         SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        #         SnapshotBLUEModel(sensor_distrust=0),
+        #         SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        #         SnapshotBLUEModel(sensor_distrust=0),
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("LR", LinearRegression())]),
+        #     ]
+        # ),
     ]
 
     lab = LabPipeline()
@@ -46,6 +94,7 @@ if __name__ == "__main__":
                                       *list(map(partial(train_test_averagers,
                                                         aggregator=Pipeline([("LR", LassoCV(selection="random"))])),
                                                 [[model] for model in models]
+                                                # + [models]
                                                 )))
 
     lab.execute(

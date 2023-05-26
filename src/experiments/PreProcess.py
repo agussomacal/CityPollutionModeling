@@ -1,9 +1,8 @@
 import os.path
-import os.path
 import time
 from itertools import chain
 from pathlib import Path
-from typing import List, Type
+from typing import List
 
 import joblib
 import networkx as nx
@@ -17,8 +16,9 @@ from sklearn.pipeline import Pipeline
 from PerplexityLab.DataManager import DataManager
 from src.config import results_dir, city_dir
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
-    proportion_of_past_times, shuffle, server, chunksize, stations2test, simulation, max_num_stations, seed, \
+    proportion_of_past_times, shuffle, chunksize, stations2test, simulation, max_num_stations, seed, \
     filter_graph
+from src.lib.DataProcessing.OtherVariablesPreprocess import process_windGuru_data
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
@@ -115,6 +115,20 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
                                                     columns=traffic_pixels_coords.columns,
                                                     index=station_coordinates.columns)
 
+    # ------ Other data ------ #
+    wind = process_windGuru_data("WindVelocity")
+    temperature = process_windGuru_data("Temperature")
+
+    # filter times where wind and temperature also exist.
+    available_times = temperature[~temperature.isna()].index.intersection(
+        wind[~wind.isna().values].index.intersection(pollution_past.index.union(pollution_future.index)))
+    print("Available times after filtering Temperature and Wind NaNs", len(available_times))
+
+    pollution_past = pollution_past.loc[pollution_past.index.intersection(available_times), :]
+    pollution_future = pollution_future.loc[pollution_future.index.intersection(available_times), :]
+    traffic_past = pollution_past.loc[traffic_past.index.intersection(available_times), :]
+    traffic_future = pollution_future.loc[traffic_future.index.intersection(available_times), :]
+
 with data_manager.track_emissions("PreprocessGraph"):
     import warnings
 
@@ -194,7 +208,8 @@ def train_test_model(model: BaseModel):
         model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
                         distance_between_stations_pixels=distance_between_stations_pixels,
                         stations2test=stations2test,
-                        graph=graph, traffic_by_edge=traffic_by_edge)
+                        graph=graph, traffic_by_edge=traffic_by_edge,
+                        temperature=temperature, wind=wind)
         t_to_fit = time.time() - t0
 
         path2model = Path(f"{path2models}/{station}")
@@ -223,7 +238,8 @@ def train_test_averagers(models: List[BaseModel], aggregator: Pipeline):
         t0 = time.time()
         model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
                         distance_between_stations_pixels=distance_between_stations_pixels,
-                        stations2test=stations2test, graph=graph, traffic_by_edge=traffic_by_edge)
+                        stations2test=stations2test, graph=graph, traffic_by_edge=traffic_by_edge,
+                        temperature=temperature, wind=wind)
         t_to_fit = time.time() - t0 + np.sum(fitting_time)
         # in test time use the future
         data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
@@ -232,7 +248,8 @@ def train_test_averagers(models: List[BaseModel], aggregator: Pipeline):
         t0 = time.time()
         estimation = model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
                                             distance_between_stations_pixels=distance_between_stations_pixels,
-                                            graph=graph, traffic_by_edge=traffic_by_edge)
+                                            graph=graph, traffic_by_edge=traffic_by_edge,
+                                            temperature=temperature, wind=wind)
         t_to_estimate = time.time() - t0
 
         return {

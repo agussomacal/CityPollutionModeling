@@ -160,10 +160,11 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
     def __init__(self, model: Pipeline, k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD,
-                 **kwargs):
+                 extra_regressors=[], **kwargs):
         self.model = model
         assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
         # self.fit_intercept = fit_intercept
+        self.extra_regressors = extra_regressors
         super().__init__(
             name=name + "_".join([step[0] for step in model.steps]),
             loss=loss, verbose=verbose,
@@ -197,11 +198,13 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         nodes = [list(kwargs["graph"].nodes)[i] for i in indexes]
         return self.get_traffic_by_node(times, kwargs["traffic_by_edge"], kwargs["graph"], nodes, indexes)
 
-    def traffic2pollution(self, traffic_by_node):
+    def traffic2pollution(self, times, positions, **kwargs):
         # return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
         #     self.params["intercept"]
-        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
-        return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
+        X = self.prepare_input2model(times=times, positions=positions, **kwargs)
+        return self.model.predict(X).reshape((len(times), np.shape(positions)[-1]))
+        # X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        # return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
@@ -213,8 +216,9 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         kwargs.update(self.preprocess_graph(kwargs["graph"]))
         self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
         self.update_position2node_index(target_positions, re_update=self.k_neighbours is not None)
-        traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
-        return self.traffic2pollution(traffic_by_node)
+        # traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
+        # return self.traffic2pollution(traffic_by_node)
+        return self.traffic2pollution(times=observed_pollution.index, positions=target_positions, **kwargs)
 
     @pollution_agnostic
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
@@ -231,10 +235,11 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         # observed_pollution = observed_pollution[stations]
 
         self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
-        traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
-        # use median to fit to avoid outliers to interfere
-
-        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        X = self.prepare_input2model(times=observed_pollution.index, positions=observed_stations, **kwargs)
+        # traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
+        # # use median to fit to avoid outliers to interfere
+        #
+        # X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
         y = observed_pollution.values.reshape((-1, 1))
         mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
         self.model.fit(X[mask], y[mask])
@@ -244,7 +249,23 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         #                                                                        axis=0))
         # self.set_params(intercept=lr.intercept_)
         # self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
-        return self.traffic2pollution(traffic_by_node)
+        # return self.traffic2pollution(traffic_by_node)
+        return self.traffic2pollution(times=observed_pollution.index, positions=observed_stations, **kwargs)
+
+    def prepare_input2model(self, times, positions, **kwargs):
+        traffic_by_node = self.reduce_traffic(times, positions, **kwargs)
+        X = [traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))]
+
+        for regressor_name in self.extra_regressors:
+            regressor = kwargs.get(regressor_name, None)
+            if regressor is not None:
+                if regressor_name in ["temperature", "wind"]:
+                    regressor.index.intersection(times)
+                    regressor = np.reshape([regressor.loc[times, :].values]*np.shape(positions)[-1], (-1, 1))
+                else:
+                    continue
+                X.append(regressor)
+        return np.hstack(X)
 
 
 class GraphEmissionsModel(GraphModelBase):
