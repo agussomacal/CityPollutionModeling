@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Dict, List
 
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from sklearn.base import RegressorMixin
@@ -17,7 +18,8 @@ from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
 from PerplexityLab.miscellaneous import NamedPartial, if_true_str, copy_main_script_version
 from PerplexityLab.visualization import generic_plot
-from src.experiments.PreProcess import train_test_model, train_test_averagers, simulation, stations2test
+from src.experiments.PreProcess import train_test_model, train_test_averagers, simulation, stations2test, \
+    plot_pollution_map, times_future
 from src.experiments.config_experiments import shuffle, filter_graph
 from src.lib.Models.BaseModel import ModelsSequenciator, \
     medianse, NONE_OPTIM_METHOD
@@ -87,7 +89,7 @@ class RFCV(RegressorMixin):
 
 if __name__ == "__main__":
     k_neighbours = 10
-    experiment_name = f"ExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
+    experiment_name = f"MapExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
                       f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
     data_manager = DataManager(
@@ -99,10 +101,10 @@ if __name__ == "__main__":
     copy_main_script_version(__file__, data_manager.path)
 
     base_models = [
-        # SnapshotMeanModel(summary_statistic="mean"),
-        SnapshotBLUEModel(sensor_distrust=0),
-        SnapshotPCAModel(n_components=1, summary_statistic="mean"),
-        GlobalMeanModel()
+        SnapshotMeanModel(summary_statistic="mean"),
+        # SnapshotBLUEModel(sensor_distrust=0),
+        # SnapshotPCAModel(n_components=1, summary_statistic="mean"),
+        # GlobalMeanModel()
     ]
     # 621.5069384089682 = [2.87121906 0.16877082 1.04179242 1.23798909 3.42959526 3.56328527]
     models = [
@@ -125,7 +127,7 @@ if __name__ == "__main__":
             ]
         ),
         ModelsSequenciator(
-            name="LR_all",
+            name="LR_Extra",
             models=[
                 SnapshotMeanModel(summary_statistic="mean"),
                 GraphEmissionsNeigEdgeModel(
@@ -142,29 +144,29 @@ if __name__ == "__main__":
                 Pipeline([("Lss", LassoCV(selection="cyclic"))])
             ]
         ),
-        # ModelsSequenciator(
-        #     name="NN_all",
-        #     models=[
-        #         SnapshotMeanModel(summary_statistic="mean"),
-        #         GraphEmissionsNeigEdgeModel(
-        #             extra_regressors=["temperature", "wind", "water", "green"],
-        #             k_neighbours=k_neighbours,
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-        #             model=Pipeline(
-        #                 steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=(20, 20,),
-        #                                                                          activation="logistic",
-        #                                                                          learning_rate_init=0.1,
-        #                                                                          max_iter=1000))]),
-        #             niter=2, verbose=True,
-        #             optim_method=NONE_OPTIM_METHOD,
-        #             loss=medianse)
-        #     ],
-        #     transition_model=[
-        #         Pipeline([("LR", LinearRegression())]),
-        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
-        #     ]
-        # ),
+        ModelsSequenciator(
+            name="NN_Extra",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    extra_regressors=["temperature", "wind", "water", "green"],
+                    k_neighbours=k_neighbours,
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+                    model=Pipeline(
+                        steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=(20, 20,),
+                                                                                 activation="logistic",
+                                                                                 learning_rate_init=0.1,
+                                                                                 max_iter=1000))]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
         # ModelsSequenciator(
         #     name="NN_TW",
         #     models=[
@@ -224,12 +226,15 @@ if __name__ == "__main__":
         data_manager,
         num_cores=14,
         forget=False,
-        recalculate=True,
+        recalculate=False,
         save_on_iteration=1,
         station=stations2test  # station_coordinates.columns.to_list()[:2]
     )
 
     # ----- Plotting results ----- #
+    plot_pollution_map(data_manager, time=times_future[0], station="OPERA", plot_by=["model", "station"], num_cores=10,
+                       num_points=100, cmap="cividis")
+
     generic_plot(data_manager, x="station", y="mse", label="model", plot_func=sns.barplot,
                  sort_by=["mse"],
                  mse=lambda error: np.sqrt(error.mean()),

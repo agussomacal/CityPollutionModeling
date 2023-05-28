@@ -1,6 +1,7 @@
 import os.path
 import time
 from itertools import chain
+from pathos.multiprocessing import Pool
 from pathlib import Path
 from typing import List
 
@@ -14,6 +15,8 @@ from scipy.spatial.distance import cdist
 from sklearn.pipeline import Pipeline
 
 from PerplexityLab.DataManager import DataManager
+from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
+from PerplexityLab.visualization import save_fig, perplex_plot
 from src.config import results_dir, city_dir
 from src.experiments.config_experiments import screenshot_period, recalculate_traffic_by_pixel, nrows2load_traffic_data, \
     proportion_of_past_times, shuffle, chunksize, stations2test, simulation, max_num_stations, seed, \
@@ -26,8 +29,6 @@ from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_
     load_background
 from src.lib.Models.BaseModel import BaseModel, split_by_station, ModelsAggregator
 from src.lib.Modules import Bounds
-from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
-from PerplexityLab.visualization import save_fig
 
 
 def plot_stations(station_coordinates, lat, long):
@@ -129,6 +130,7 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
     pollution_future = pollution_future.loc[pollution_future.index.intersection(available_times), :]
     traffic_past = pollution_past.loc[traffic_past.index.intersection(available_times), :]
     traffic_future = pollution_future.loc[traffic_future.index.intersection(available_times), :]
+    times_future = pollution_future.index
 
 with data_manager.track_emissions("PreprocessGraph"):
     import warnings
@@ -261,12 +263,63 @@ def train_test_averagers(models: List[BaseModel], aggregator: Pipeline):
             "error": ((estimation.ravel() - data_unknown.values.ravel()) ** 2).ravel(),
             "time_to_fit": t_to_fit,
             "time_to_estimate": t_to_estimate,
+            "trained_model": model
         }
 
     modelnames = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in models])
     name = f"{aggregator}_{modelnames}"
     decorated_func.__name__ = str(models[0]) if len(models) == 1 else name
     return decorated_func
+
+
+def estimate_pollution_map(time, station, trained_model, num_points):
+    data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
+                                                observed_pollution=pollution_future.loc[[time], :],
+                                                traffic=traffic_future.loc[[time], :])
+    long, lat = np.meshgrid(np.linspace(*long_bounds, num=num_points), np.linspace(*lat_bounds, num=num_points))
+
+    data_known["target_positions"] = pd.DataFrame([long.ravel(), lat.ravel()], index=["long", "lat"])
+    estimation = trained_model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
+                                                distance_between_stations_pixels=distance_between_stations_pixels,
+                                                graph=graph, traffic_by_edge=traffic_by_edge,
+                                                temperature=temperature, wind=wind, longitudes=longitudes,
+                                                latitudes=latitudes)
+
+    # def par_func(arg):
+    #     dk = arg[0]
+    #     dk["target_positions"] = arg[1]
+    #     return trained_model.state_estimation(**dk, traffic_coords=traffic_pixels_coords,
+    #                                           distance_between_stations_pixels=distance_between_stations_pixels,
+    #                                           graph=graph, traffic_by_edge=traffic_by_edge,
+    #                                           temperature=temperature, wind=wind, longitudes=longitudes,
+    #                                           latitudes=latitudes)
+    #
+    # ncores = 10
+    # step = num_points ** 2 // ncores
+    # estimation = np.hstack(list(Pool(ncores).map(par_func, [(data_known.copy(),
+    #                                                          pd.DataFrame([long.ravel()[i * step:(i + 1) * step],
+    #                                                                        lat.ravel()[i * step:(i + 1) * step]],
+    #                                                                       index=["long", "lat"])) for i in
+    #                                                         range(ncores)])))
+
+    return long, lat, estimation.reshape((num_points, num_points))
+
+
+@perplex_plot
+def plot_pollution_map(fig, ax, station, trained_model, time, cmap='RdGy', num_points=20):
+    station = station[0]
+    trained_model = trained_model[0]
+    img = load_background(screenshot_period)
+    ax.imshow(img, extent=[0, 1, 0, 1], alpha=1)
+
+    long, lat, estimation = estimate_pollution_map(time, station, trained_model, num_points=num_points)
+
+    # long = (long - long_bounds.lower) / (long_bounds.upper - long_bounds.lower)
+    # lat = (lat - lat_bounds.lower) / (lat_bounds.upper - lat_bounds.lower)
+    # contours = ax.contour(long, lat, estimation, 3, colors='black', alpha=0.5)
+    # ax.clabel(contours, inline=True, fontsize=8)
+    ax.imshow(estimation, extent=[0, 1, 0, 1], origin='lower', cmap=cmap, alpha=0.5)
+    # ax.colorbar()
 
 
 print(f"CO2 {data_manager.CO2kg}kg")

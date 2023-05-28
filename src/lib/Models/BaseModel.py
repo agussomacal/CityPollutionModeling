@@ -242,19 +242,23 @@ class ModelsSequenciator(BaseModel):
         observed_pollution_i = observed_pollution.copy()
         observed_stations_i = observed_stations.copy()
         for i, model in enumerate(self.models):
-            preds_i = self.transition_model[i].predict(
+            predictions_i += self.transition_model[i].predict(
                 model.state_estimation(observed_stations=observed_stations_i,
                                        observed_pollution=observed_pollution_i,
                                        traffic=traffic,
                                        target_positions=target_positions,
                                        **kwargs).reshape((-1, 1))).reshape(np.shape(predictions_i))
-            predictions_i += preds_i
             # get the residuals on the observed values
             # the following lines are necessary for models that relly on the names of the sensors and are not properly
             # state stimation methods.
             # only actualize if it is not the las model
             if observed_pollution_i is not None and i < len(self.models) - 1:
-                observed_pollution_i -= preds_i
+                observed_pollution_i -= self.transition_model[i].predict(
+                    model.state_estimation(observed_stations=observed_stations_i,
+                                           observed_pollution=observed_pollution_i,
+                                           traffic=traffic,
+                                           target_positions=observed_stations_i,
+                                           **kwargs).reshape((-1, 1))).reshape(np.shape(observed_pollution_i))
         return predictions_i
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
