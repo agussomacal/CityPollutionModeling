@@ -3,9 +3,11 @@ import pandas as pd
 from scipy.spatial.distance import cdist
 
 from PerplexityLab.miscellaneous import partial_filter, if_true_str
-from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from src.lib.FeatureExtractors.FeatureExtractorsBase import FeatureExtractor
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
+
+WaterColor = (156, 192, 249)
+GreenAreaColor = (168, 218, 181)
 
 
 class FEConvolution(FeatureExtractor):
@@ -27,12 +29,12 @@ class FEConvolution(FeatureExtractor):
         for point in map(tuple, positions.values.T):
             if point not in self.dist:
                 self.dist[tuple(point)] = cdist(XA=self.coords, XB=np.reshape(point, (1, 2)), metric=self.metric)
-            yield self.dist[tuple(point)]
+            yield np.squeeze(self.dist[tuple(point)])
 
     def extract_features(self, times, positions: pd.DataFrame, mask=None, *args, **kwargs) -> np.ndarray:
         """
 
-        :param spatial_coords: List of spatial coordinates. num points x spatial dimension
+        :param positions: Dataframe with [x y] two rows and as many possitions as columns.
         :param mask: which points are to be considered: None means all or a matrix of Bool of size #times x #coords
         :param args:
         :param kwargs:

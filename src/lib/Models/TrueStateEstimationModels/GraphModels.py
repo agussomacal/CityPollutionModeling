@@ -9,10 +9,74 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
-from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
+from PerplexityLab.miscellaneous import filter_dict, timeit
+from src.experiments.config_experiments import screenshot_period
+from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES, load_background
+from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEConvolutionFixedPixels, WaterColor, GreenAreaColor
 from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic
+from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
-from PerplexityLab.miscellaneous import filter_dict, timeit, if_true_str
+
+
+def check_is_fitted(estimator):
+    """Perform is_fitted validation for estimator.
+
+    Checks if the estimator is fitted by verifying the presence of
+    fitted attributes (ending with a trailing underscore) and otherwise
+    raises a NotFittedError with the given message.
+
+    If an estimator does not set any attributes with a trailing underscore, it
+    can define a ``__sklearn_is_fitted__`` method returning a boolean to specify if the
+    estimator is fitted or not.
+
+    Parameters
+    ----------
+    estimator : estimator instance
+        Estimator instance for which the check is performed.
+
+    attributes : str, list or tuple of str, default=None
+        Attribute name(s) given as string or a list/tuple of strings
+        Eg.: ``["coef_", "estimator_", ...], "coef_"``
+
+        If `None`, `estimator` is considered fitted if there exist an
+        attribute that ends with a underscore and does not start with double
+        underscore.
+
+    msg : str, default=None
+        The default error message is, "This %(name)s instance is not fitted
+        yet. Call 'fit' with appropriate arguments before using this
+        estimator."
+
+        For custom messages if "%(name)s" is present in the message string,
+        it is substituted for the estimator name.
+
+        Eg. : "Estimator, %(name)s, must be fitted before sparsifying".
+
+    all_or_any : callable, {all, any}, default=all
+        Specify whether all or any of the given attributes must exist.
+
+    Raises
+    ------
+    TypeError
+        If the estimator is a class or not an estimator instance
+
+    NotFittedError
+        If the attributes are not found.
+    """
+
+    if not hasattr(estimator, "fit"):
+        raise TypeError("%s is not an estimator instance." % (estimator))
+
+    if hasattr(estimator, "__sklearn_is_fitted__"):
+        fitted = estimator.__sklearn_is_fitted__()
+    else:
+        fitted = [
+            v for v in vars(estimator) if v.endswith("_") and not v.startswith("__")
+        ]
+
+    if not fitted:
+        return False
+    return True
 
 
 class GraphModelBase(BaseModel):
@@ -161,10 +225,11 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
     def __init__(self, model: Pipeline, k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD,
-                 **kwargs):
+                 extra_regressors=[], **kwargs):
         self.model = model
         assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
         # self.fit_intercept = fit_intercept
+        self.extra_regressors = extra_regressors
         super().__init__(
             name=name + "_".join([step[0] for step in model.steps]),
             loss=loss, verbose=verbose,
@@ -198,11 +263,13 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         nodes = [list(kwargs["graph"].nodes)[i] for i in indexes]
         return self.get_traffic_by_node(times, kwargs["traffic_by_edge"], kwargs["graph"], nodes, indexes)
 
-    def traffic2pollution(self, traffic_by_node):
+    def traffic2pollution(self, times, positions, **kwargs):
         # return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
         #     self.params["intercept"]
-        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
-        return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
+        X = self.prepare_input2model(times=times, positions=positions, **kwargs)
+        return self.model.predict(X).reshape((len(times), np.shape(positions)[-1]))
+        # X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
+        # return self.model.predict(X).reshape(np.shape(traffic_by_node)[:-1])
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
@@ -214,8 +281,9 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         kwargs.update(self.preprocess_graph(kwargs["graph"]))
         self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
         self.update_position2node_index(target_positions, re_update=self.k_neighbours is not None)
-        traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
-        return self.traffic2pollution(traffic_by_node)
+        # traffic_by_node = self.reduce_traffic(observed_pollution.index, target_positions, **kwargs)
+        # return self.traffic2pollution(traffic_by_node)
+        return self.traffic2pollution(times=observed_pollution.index, positions=target_positions, **kwargs)
 
     @pollution_agnostic
     def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray,
@@ -226,26 +294,56 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
         """
         assert "traffic_by_edge" in kwargs is not None, f"Model {self} does not work if no traffic_by_edge is given."
         kwargs.update(self.preprocess_graph(kwargs["graph"]))
-        # stations = [station for station in observed_stations.columns if station in kwargs["stations2test"]] \
-        #     if "stations2test" in kwargs else observed_stations.columns
-        # observed_stations = observed_stations[stations]
-        # observed_pollution = observed_pollution[stations]
-
         self.update_position2node_index(observed_stations, re_update=self.k_neighbours is not None)
-        traffic_by_node = self.reduce_traffic(observed_pollution.index, observed_stations, **kwargs)
-        # use median to fit to avoid outliers to interfere
+        if not check_is_fitted(self.model):
+            X = self.prepare_input2model(times=observed_pollution.index, positions=observed_stations, **kwargs)
+            y = observed_pollution.values.reshape((-1, 1))
+            mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
+            self.model.fit(X[mask], y[mask])
+        return self.traffic2pollution(times=observed_pollution.index, positions=observed_stations, **kwargs)
 
-        X = traffic_by_node.reshape((-1, np.shape(traffic_by_node)[-1]))
-        y = observed_pollution.values.reshape((-1, 1))
-        mask = np.all(~np.isnan(X), axis=1) * np.all(~np.isnan(y), axis=1)
-        self.model.fit(X[mask], y[mask])
-        # self.model.fit(np.nanmedian(traffic_by_node, axis=0), np.nanmean(observed_pollution.values, axis=0))
-        # lr = LinearRegression(fit_intercept=self.fit_intercept).fit(np.nanmedian(traffic_by_node, axis=0),
-        #                                                             np.nanmean(observed_pollution.values,
-        #                                                                        axis=0))
-        # self.set_params(intercept=lr.intercept_)
-        # self.set_params(**dict(zip(TRAFFIC_VALUES, lr.coef_)))
-        return self.traffic2pollution(traffic_by_node)
+    def prepare_input2model(self, times, positions, **kwargs):
+        X = []
+        traffic = self.reduce_traffic(times, positions, **kwargs)
+
+        for regressor_name in self.extra_regressors:
+            if regressor_name in ["water", "green"]:
+                if regressor_name in ["water"]:
+                    img = load_background(screenshot_period)
+                    regressor = FEConvolutionFixedPixels(name="water", mask=np.all(img == WaterColor, axis=-1),
+                                                         x_coords=kwargs["longitudes"], normalize=False,
+                                                         y_coords=kwargs["latitudes"], agg_func=np.sum,
+                                                         kernel=gaussker, sigma=0.1).extract_features(times,
+                                                                                                      positions)[:, :,
+                                np.newaxis] * np.mean(traffic, axis=-1, keepdims=True)
+                elif regressor_name in ["green"]:
+                    img = load_background(screenshot_period)
+                    regressor = FEConvolutionFixedPixels(name="green", mask=np.all(img == GreenAreaColor, axis=-1),
+                                                         x_coords=kwargs["longitudes"], normalize=False,
+                                                         y_coords=kwargs["latitudes"], agg_func=np.sum,
+                                                         kernel=gaussker, sigma=0.1).extract_features(times,
+                                                                                                      positions)[:, :,
+                                np.newaxis] * np.mean(traffic, axis=-1, keepdims=True)
+
+                else:
+                    continue
+            else:
+                regressor = kwargs.get(regressor_name, None)
+                if regressor is not None:
+                    if regressor_name in ["temperature", "wind"]:
+                        regressor.index.intersection(times)
+                        regressor = np.transpose([regressor.loc[times, :].values.ravel()] * np.shape(positions)[-1])[:,
+                                    :, np.newaxis]
+
+                    else:
+                        continue
+            X.append(regressor)
+
+        X.append(traffic)
+        X = np.concatenate(X, axis=-1)
+        X = X.reshape((-1, np.shape(X)[-1]))
+        # print(np.shape(X))
+        return X
 
 
 class GraphEmissionsModel(GraphModelBase):

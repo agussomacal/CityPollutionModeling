@@ -17,11 +17,8 @@ from src.experiments.PreProcess import latitudes, longitudes, station_coordinate
     pollution_future, longer_distance
 from src.experiments.config_experiments import screenshot_period
 from src.lib.DataProcessing.TrafficProcessing import load_background, road_color
-from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEImageStaticConvolution
+from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import WaterColor, GreenAreaColor
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
-
-WaterColor = (156, 192, 249)
-GreenAreaColor = (168, 218, 181)
 
 if __name__ == "__main__":
     experiment_name = "WaterEffectOnPollution"
@@ -43,13 +40,13 @@ if __name__ == "__main__":
         greenarea_mask = np.all(img == GreenAreaColor, axis=-1)
         plt.imshow(roads_mask + 2 * water_mask + 3 * greenarea_mask, cmap="tab10")
 
-        water_featurer = FEImageStaticConvolution(water_mask, longitudes, latitudes, metric="euclidean")
+        water_featurer = FEConvolutionFixedPixels(water_mask, longitudes, latitudes, metric="euclidean")
         water_features = pd.Series(
             water_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                           kernel=partial(gaussker, sigma=0.1), agg_func=np.sum),
             index=station_coordinates.columns)
 
-        greenarea_featurer = FEImageStaticConvolution(greenarea_mask, longitudes, latitudes, metric="euclidean")
+        greenarea_featurer = FEConvolutionFixedPixels(greenarea_mask, longitudes, latitudes, metric="euclidean")
         greenarea_features = pd.Series(
             greenarea_featurer.by_convolution(points=station_coordinates.loc[["long", "lat"], :].values.T,
                                               kernel=partial(gaussker, sigma=0.1), agg_func=np.sum),
