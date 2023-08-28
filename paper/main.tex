@@ -1,0 +1,1213 @@
+\documentclass[11pt,a4paper,twoside]{article}
+
+% Layout and encoding
+%%%%%%%%%%%%
+\usepackage{fullpage}
+\setlength\marginparwidth{2cm}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{float}
+
+%\usepackage{showkeys}
+
+% Packages
+%%%%%%%
+
+% packages from the American Mathematical Society (AMS)
+\usepackage{amsmath, amsthm, amssymb, amsfonts}
+% More fancy functionality for theorems
+\usepackage{thmtools, thm-restate}
+% For bold font in math environment
+\usepackage{bm}
+% For \MoveEqLeft, \coloneqq, etc.
+\usepackage{mathtools}
+\mathtoolsset{showonlyrefs}
+%Images
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+% \usepackage{tikz}
+% \usetikzlibrary{calc}
+\usepackage{color}
+\usepackage{xcolor}
+% \usepackage{caption}
+% \usepackage{xifthen}
+% \usepackage{soul}
+
+\graphicspath{{figures/}}
+
+% Keys
+% \mathtoolsset{showonlyrefs} % show refs only when referred to
+
+% Setup the matha font (from mathabx.sty)
+\DeclareFontFamily{U}{matha}{\hyphenchar\font45}
+\DeclareFontShape{U}{matha}{m}{n}{
+      <5> <6> <7> <8> <9> <10> gen * matha
+      <10.95> matha10 <12> <14.4> <17.28> <20.74> <24.88> matha12
+      }{}
+\DeclareSymbolFont{matha}{U}{matha}{m}{n}
+
+% Setup the mathx font (from mathabx.sty)
+\DeclareFontFamily{U}{mathx}{\hyphenchar\font45}
+\DeclareFontShape{U}{mathx}{m}{n}{
+      <5> <6> <7> <8> <9> <10>
+      <10.95> <12> <14.4> <17.28> <20.74> <24.88>
+      mathx10
+      }{}
+\DeclareSymbolFont{mathx}{U}{mathx}{m}{n}
+
+% Define the energy norm character from that font (from mathabx.dcl)
+
+%\DeclareMathSymbol{\vvvert}{0}{matha}{"7E}% extens. delimiter
+\DeclareMathDelimiter{\vvvert}{0}{matha}{"7E}{mathx}{"17}
+
+% for the jump brackets
+\usepackage{stmaryrd}
+
+% % for black board digits (\mathds{1})
+\usepackage{dsfont}
+
+% To calculate the width of formulæ
+\usepackage{calc}
+
+% For pseudo code
+\usepackage{algorithm,algorithmicx,algpseudocode}
+
+% % for TODO notes in the margin
+% \usepackage[textwidth=2cm]{todonotes}
+% \presetkeys{todonotes}{inline}{}
+
+% Automatic creation of hyperlinks in the document
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{hyperref}
+\hypersetup{
+ pdfauthor={},
+ pdftitle={},
+ pdfsubject={},
+ pdfkeywords={}
+}
+\usepackage{cleveref}
+\usepackage{ulem}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%              Perplexity inserter preamble                %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Import packages and define command \insertval for inputing experiments information directly 
+% into the latex to keep an updated-paired version of the article.
+
+% package to open file containing variables
+\usepackage{datatool, filecontents}
+\DTLsetseparator{,}% Set the separator between the columns.
+\DTLloadrawdb[noheader, keys={thekey,thevalue}]{runsinfo}{runsinfo.csv}
+% % import data
+% % Loads mydata.dat with column headers 'thekey' and 'thevalue'
+% \newcommand{\perplexityinsert}[1]{\DTLfetch{runsinfo}{thekey}{#1}{thevalue}}
+\newcommand{\perplexityinsert}[1]{\DTLgetvalueforkey{\datavalue}{thevalue}{runsinfo}{thekey}{#1}\datavalue}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                End Perplexity inserter                   %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% Math environments for theorems, lemmas, etc.
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\verify}[1]{{\color{blue} Verify: #1}}
+\newcommand{\ascomment}[1]{{\color{teal} Agus: #1}}
+\newcommand{\asmodif}[2]{{\color{teal} #1} {\sout{#2}}}
+
+
+% Math environments for theorems, lemmas, etc.
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{prop}[theorem]{Proposition}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+\newtheorem{note}[theorem]{Note}
+\newtheorem{remark}[theorem]{Remark}
+
+% prefix equation numbers with section number
+\numberwithin{equation}{section}
+
+% Commands and short-hand notations
+%%%%%%%%%%%%%%%%%%%%
+
+% sets
+\newcommand{\C}{\ensuremath{\mathbb{C}}}
+\newcommand{\R}{\ensuremath{\mathbb{R}}}
+\newcommand{\Z}{\ensuremath{\mathbb{Z}}}
+\newcommand{\N}{\ensuremath{\mathbb{N}}}
+
+% caligraphic symbols
+\newcommand{\cA}{\ensuremath{\mathcal{A}}}
+\newcommand{\cB}{\ensuremath{\mathcal{B}}}
+\newcommand{\cC}{\ensuremath{\mathcal{C}}}
+\newcommand{\cD}{\ensuremath{\mathcal{D}}}
+\newcommand{\cE}{\ensuremath{\mathcal{E}}}
+\newcommand{\cF}{\ensuremath{\mathcal{F}}}
+\newcommand{\cG}{\ensuremath{\mathcal{G}}}
+\newcommand{\cH}{\ensuremath{\mathcal{H}}}
+\newcommand{\cI}{\ensuremath{\mathcal{I}}}
+\newcommand{\cJ}{\ensuremath{\mathcal{J}}}
+\newcommand{\cK}{\ensuremath{\mathcal{K}}}
+\newcommand{\cL}{\ensuremath{\mathcal{L}}}
+\newcommand{\cM}{\ensuremath{\mathcal{M}}}
+\newcommand{\cN}{\ensuremath{\mathcal{N}}}
+\newcommand{\cO}{\ensuremath{\mathcal{O}}}
+\newcommand{\cP}{\ensuremath{\mathcal{P}}}
+\newcommand{\cQ}{\ensuremath{\mathcal{Q}}}
+\newcommand{\cR}{\ensuremath{\mathcal{R}}}
+\newcommand{\cS}{\ensuremath{\mathcal{S}}}
+\newcommand{\cT}{\ensuremath{\mathcal{T}}}
+\newcommand{\cU}{\ensuremath{\mathcal{U}}}
+\newcommand{\cV}{\ensuremath{\mathcal{V}}}
+\newcommand{\cW}{\ensuremath{\mathcal{W}}}
+\newcommand{\cX}{\ensuremath{\mathcal{X}}}
+\newcommand{\cY}{\ensuremath{\mathcal{Y}}}
+\newcommand{\cZ}{\ensuremath{\mathcal{Z}}}
+
+% Bold symbols
+\newcommand{\bA}{\ensuremath{\mathbb{A}}}
+\newcommand{\bB}{\ensuremath{\mathbb{B}}}
+\newcommand{\bC}{\ensuremath{\mathbb{C}}}
+\newcommand{\bD}{\ensuremath{\mathbb{D}}}
+\newcommand{\bE}{\ensuremath{\mathbb{E}}}
+\newcommand{\bF}{\ensuremath{\mathbb{F}}}
+\newcommand{\bG}{\ensuremath{\mathbb{G}}}
+\newcommand{\bH}{\ensuremath{\mathbb{H}}}
+\newcommand{\bI}{\ensuremath{\mathbb{I}}}
+\newcommand{\bJ}{\ensuremath{\mathbb{J}}}
+\newcommand{\bK}{\ensuremath{\mathbb{K}}}
+\newcommand{\bL}{\ensuremath{\mathbb{L}}}
+\newcommand{\bM}{\ensuremath{\mathbb{M}}}
+\newcommand{\bN}{\ensuremath{\mathbb{N}}}
+\newcommand{\bO}{\ensuremath{\mathbb{O}}}
+\newcommand{\bP}{\ensuremath{\mathbb{P}}}
+\newcommand{\bQ}{\ensuremath{\mathbb{Q}}}
+\newcommand{\bR}{\ensuremath{\mathbb{R}}}
+\newcommand{\bS}{\ensuremath{\mathbb{S}}}
+\newcommand{\bT}{\ensuremath{\mathbb{T}}}
+\newcommand{\bU}{\ensuremath{\mathbb{U}}}
+\newcommand{\bV}{\ensuremath{\mathbb{V}}}
+\newcommand{\bW}{\ensuremath{\mathbb{W}}}
+\newcommand{\bX}{\ensuremath{\mathbb{X}}}
+\newcommand{\bY}{\ensuremath{\mathbb{Y}}}
+\newcommand{\bZ}{\ensuremath{\mathbb{Z}}}
+
+% Roman style symbols
+\newcommand{\rA}{\ensuremath{\mathrm{A}}}
+\newcommand{\rB}{\ensuremath{\mathrm{B}}}
+\newcommand{\rC}{\ensuremath{\mathrm{C}}}
+\newcommand{\rD}{\ensuremath{\mathrm{D}}}
+\newcommand{\rE}{\ensuremath{\mathrm{E}}}
+\newcommand{\rF}{\ensuremath{\mathrm{F}}}
+\newcommand{\rG}{\ensuremath{\mathrm{G}}}
+\newcommand{\rH}{\ensuremath{\mathrm{H}}}
+\newcommand{\rI}{\ensuremath{\mathrm{I}}}
+\newcommand{\rJ}{\ensuremath{\mathrm{J}}}
+\newcommand{\rK}{\ensuremath{\mathrm{K}}}
+\newcommand{\rL}{\ensuremath{\mathrm{L}}}
+\newcommand{\rM}{\ensuremath{\mathrm{M}}}
+\newcommand{\rN}{\ensuremath{\mathrm{N}}}
+\newcommand{\rO}{\ensuremath{\mathrm{O}}}
+\newcommand{\rP}{\ensuremath{\mathrm{P}}}
+\newcommand{\rQ}{\ensuremath{\mathrm{Q}}}
+\newcommand{\rR}{\ensuremath{\mathrm{R}}}
+\newcommand{\rS}{\ensuremath{\mathrm{S}}}
+\newcommand{\rT}{\ensuremath{\mathrm{T}}}
+\newcommand{\rU}{\ensuremath{\mathrm{U}}}
+\newcommand{\rV}{\ensuremath{\mathrm{V}}}
+\newcommand{\rW}{\ensuremath{\mathrm{W}}}
+\newcommand{\rX}{\ensuremath{\mathrm{X}}}
+\newcommand{\rY}{\ensuremath{\mathrm{Y}}}
+\newcommand{\rZ}{\ensuremath{\mathrm{Z}}}
+
+
+% Graph
+\newcommand{\G}{\ensuremath{\textsf{G}}} % Graph
+\newcommand{\E}{\ensuremath{\textsf{E}}} % Edges
+\newcommand{\V}{\ensuremath{\textsf{V}}} % Vertices
+
+% Node Vertices
+\newcommand{\vv}{\ensuremath{\textsf{v}}}
+\newcommand{\ww}{\ensuremath{\textsf{w}}}
+\newcommand{\ee}{\ensuremath{\textsf{e}}}
+
+% Vectors
+\newcommand{\ba}{\ensuremath{\textbf{a}}}
+\newcommand{\bb}{\ensuremath{\textbf{b}}}
+\newcommand{\bc}{\ensuremath{\textbf{c}}}
+\newcommand{\bz}{\ensuremath{\textbf{z}}}
+
+% % Shortcut equation
+% \newcommand{\be}{\begin{equation}}
+% \newcommand{\ee}{\end{equation}}
+
+% Shortcut brackets
+\newcommand{\<}{\langle}
+\renewcommand{\>}{\rangle}
+
+% Order of magnitude
+\newcommand{\ord}{\ensuremath{\mathcal{O}}}
+
+% Epsilon
+\newcommand{\e}{\varepsilon}
+
+% for vector that looks nice with prime
+% see https://tex.stackexchange.com/questions/120029/how-to-typeset-a-primed-vector/120034
+% and https://tex.stackexchange.com/questions/136056/combining-vectors-accents-and-subscripts-produces-bad-result/136127
+% \newcommand{\pvec}[1]{\vec{#1}\mkern2mu\vphantom{#1}}
+\DeclareRobustCommand{\pvec}[1]{%
+  \mathrlap{\vec{\mkern-2mu\phantom{#1}}}#1%
+}
+
+% support
+\newcommand{\supp}{\operatorname{supp}}
+% diameter
+\newcommand{\diam}{\operatorname{diam}}
+% best approximation
+\newcommand{\dist}{\operatorname{dist}}
+% characteristic function
+\newcommand{\charFun}{\ensuremath{\mathds{1}}}
+% Vectorial space
+\newcommand{\vspan}{\operatorname{span}}
+% argmin, argmax
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\argmax}{\operatorname{argmax}}
+
+\newcommand{\cond}{\ensuremath{\,:\,}}
+\newcommand{\av}{\text{av}}
+\newcommand{\Boundary}{\text{Boundary}}
+
+\newcommand{\traffic}{\ensuremath{\text{traffic}}}
+\newcommand{\heating}{\ensuremath{\text{heating}}}
+\newcommand{\emission}{\ensuremath{\text{emission}}}
+\newcommand{\trafficlevel}{\ensuremath{\text{traffic\_level}}}
+
+\newcommand{\obs}{\ensuremath{\text{obs}}}
+\newcommand{\lazy}{\ensuremath{\text{lazy}}}
+\newcommand{\diag}{\ensuremath{\text{diag}}}
+\newcommand{\id}{\ensuremath{\bI}}
+
+\newcommand{\rkhs}{\ensuremath{\texttt{rkhs}}}
+
+\newcommand{\train}{\text{train}}
+\newcommand{\val}{\text{val}}
+
+% integrals
+\newcommand{\dd}{\ensuremath{\mathrm d}}
+\newcommand{\dr}{\ensuremath{\mathrm dr}}
+\newcommand{\ds}{\ensuremath{\mathrm ds}}
+\newcommand{\dt}{\ensuremath{\mathrm dt}}
+\newcommand{\dx}{\ensuremath{\mathrm dx}}
+\newcommand{\dy}{\ensuremath{\mathrm dy}}
+\newcommand{\dz}{\ensuremath{\mathrm dz}}
+\newcommand{\dGamma}{\ensuremath{\mathrm d\Gamma}}
+
+
+% Comments
+\newcommand{\om}[1]{\textcolor{blue}{#1}}
+% \newcommand{\om}[1]{#1}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\title{Ensemble Super-Learning for State Estimation. \\Application to the reconstruction of urban pollution.}
+\author{Albert, Matthieu, Olga, Agustín, (Joubine, Rachida?)\thanks{This research was funded by the Emergences Project Grant ``Models and Measures'' of the Paris City Council.}
+}
+\date{}
+\maketitle
+
+\begin{abstract}
+Some abstract.
+\end{abstract}
+
+\section*{Remaining things to do}
+\begin{itemize}
+\item Add a bit more citations.
+\item Update some data about the graph in section \ref{sec:problem-setting} 
+\item Explain the concrete methods (section \ref{sec:concrete-methods})
+\item section \ref{sec:numerical-tests} on numerical results
+\item abstract and conclusion
+\item streamline notation for leave-one-out
+\end{itemize}
+
+% \section*{Structure of the paper}
+% \begin{itemize}
+% \item Our goal: state estimation of urban air pollution at time t.
+% \item Available data: sensor measurements, traffic images from the past [-T, 0], temperature, wind module (wind direction), (data from other pollutants).
+% \item Strategy: Work on a graph --> Thus project data on graph
+% \item Several methods: naive spatial average, graph neural networks, physical PDEs (training: learn parameters, online: update source term coming from traffic). We use leave one out in space. We use a subset of times.
+% \item Collaborative approaches (Ensemble state estimation): linear or nonlinear regression to combinatione outputs. We use leave one out in space. We use another subset of times.
+% \item Results:
+% \begin{itemize}
+%       \item Performance of each model separately, and with a nonlinear combination (ensemble)
+%       \item Each method separately ``fails'' to beat baseline. Only ensembles improve performance. 
+% \end{itemize}
+% \end{itemize}
+
+% \textcolor{red}{Notation: positions: $r \in \bR^2$, input data $x\in \cX$, traffic $q:\Gamma\to \bR$.}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Background and motivation}
+Data-driven estimations are becoming increasingly relevant and widespread as the volume of available data increases, and numerical algorithms develop to exploit them more efficiently. However, given a set of data, fundamental challenges arise related to building numerical methods that optimally exploit these data in a sense to be specified depending on each application. The present paper addresses some principal computational aspects connected to this question when trying to numerically capture a function $u$ which is a state of a physical process for which we have at hand heterogeneous sources of data coming from direct partial observations (from direct sensor measurements of $u$ or from quantities related to the physical process), and the knowledge that the fundamental mechanisms of the process can be modeled with physical laws. These laws are usually expressed in the form of Partial Differential Equations (PDEs), and increasing the complexity of the physical description usually translates into an increasing number of variables, and parameters to deal with.
+
+Assuming that all the available information is given by an element $x$ from some abstract metric space $\cX$, and that $u$ belongs to some Banach space $V$ (of potentially infinite dimension, and with associated norm $\Vert\cdot\Vert$), our goal is thus to build a mapping $A:\cX\to V$ such that $A(x)$ approximates $u$ at best in the sense that $\Vert u - A(x)\Vert$ is as small as possible. Ideally, this has to hold for all possible configurations of the system. As we explain later on through mathematical formulas, building such an optimal map is not feasible in practice, so one is inevitably led to consider suboptimal maps $A$. In fact, it is often possible to resort to different techniques to build different reconstruction maps, \asmodif{each of them with its own virtues and drawbacks}{it is generally difficult to rigorously compare their respective quality}. This lead us to propose an approach based on ensemble super-learning in which the different reconstruction mappings do not directly compete against each other (see, e.g., \cite{Breiman1996, LPH2007, PL2010} for general references on super-learning). Instead, we make them collaborate with each other to enhance their respective strengths, and cope for their weaknesses.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Pollution as a guiding example}
+There are numerous applications in which one is confronted with the above state estimation problem. As a guiding example, we consider throught the paper the real-time reconstruction of urban pollution fields. Beyond the relevance of such a task to limit environmental and health risks in the city, pollution state estimation is an excellent example where collaborative, super-learning methods are required. This is because the problem accumulates several difficulties that make the reconstruction challenging for most common reconstruction methods. Among the issues, we may mention:
+
+
+% Although the topic of modeling and estimating air pollution is by far not new, there is a growing need to develop novel algorithms with enhanced reliability and which efficiently incorporate all sources of information. This paper focuses on the real time estimation of pollution maps at the scale of large urban areas. An accumulation of several difficulties makes this 
+% a challenging task, and motivates us to use hybrid approaches mixing data-driven and physics-based descriptions of the system:
+
+%There are three sources of emissions contributing to air pollution at a city scale:
+%\begin{itemize}
+%\item Traffic
+%\item House heating and industrial activities
+%\item Pollutants arriving to the city with the wind
+%\end{itemize}
+
+% We blend physical PDE models with heterogenous sources of data such as traffic data, and pointwise measurements of pollutant concentrations, in order to build implementable algorithms which are provably optimal according to certain performance criteria. 
+
+\begin{itemize}
+\item \emph{Scarcity of reliable measurements:} The amount of reliable sensor devices measuring pollutant concentrations is often limited, and the measurements are usually taken at fixed locations. As a result, validating and estimating the quality of different approaches in space is difficult, and one can only do partial validations.  
+\item \emph{Difficulties of a purely physics-based modeling:} An accurate modeling of pollution transport and dispersion through physical PDE models is at present very difficult for the following reasons:
+\begin{itemize}
+\item Computations involve large spatial domains.
+\item Using increasingly fine models involves an increasing amount of parameters. These must, in turn, be calibrated with available data. However, in a context of measurement scarcity, parameter estimation tasks are generally not well-posed, and it is not clear how to do this task reliably.
+\item A calibration of the model to adjust the parameters requires many model evaluations. Given the large computational domain, this may turn out to be extremely time consuming, and even prohibitive (for example, for a 3D Navier-Stokes modeling in a whole city).
+\item Difficult validation: Assuming that the parameters have been set, the model must be validated on a representative grid of spatial points (and times). But given that the number of sensor stations is rather limited, very exhaustive validations are out of reach.
+\end{itemize}
+\item \emph{Difficulties for a purely data-driven modeling:} The above difficulties raise the question as to whether purely data-driven methods may not be a better choice to address the problem. However, since pollution strongly involves local spatial effects, it does not seem clear how such an approach could work without an extensive spatial sampling.
+\item \emph{Heterogeneous data:} In addition to the pollutant measurements, other sources of relevant information are available such as traffic estimations in each street. This data is valuable because it is available in real time, and on the whole urban area. Although it would be possible to combine it with pollutant concentration data with purely data-driven strategies, fusing it with a physics-based model enhances the interpretability of the whole process.
+\end{itemize}
+The above obstructions advocate for collaborative strategies combining physics-driven and data-driven approaches such as the one that we develop in this paper.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Contributions and layout of the paper}
+\paragraph{Contributions:} Our main contributions are (i) the construction of a very general ensemble super-learning method for real-time state estimation, and (ii) the application to a non trivial example for urban pollution reconstruction. In our numerical experiments, we work with the inner city of Paris, which is a surface covering around $140\,\textrm{km}^2$. The pollutant that we consider is $\textrm{NO}_2$, mainly produced by vehicle emissions. We use real data from sensor measurements \footnote{Data has been extracted from Airparif database that can be found in  \url{https://data-airparif-asso.opendata.arcgis.com}.}, and traffic data from Google Maps. Compared to previous contributions and other existing reconstruction methods (see, e.g., \cite{MSM2009, TMPPB2013}), the use of such traffic data is rather novel. It gives a rough estimation of the spatial density of street traffic. This level of detail is in contrast to many existing approaches which only use time averages of traffic data. Another distinctive point of our approach is the use of graph descriptions of the city instead of working on a spatial domain of $\bR^2$ or $\bR^3$. This allows us to cope with large spatial domains, and also to define physical models through \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this paper, we work with simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators. %Despite the fact that we focus on urban air pollution, the main ideas of the strategy are general, in the sense that they can be taken as guidelines to adress other problems that can be modeled via quantum graphs.
+
+
+% In order to cope with the large amount of data, and with the large spatial domain, we model the problem with \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this work, we consider simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators.
+
+% some of the main novelties and specificities of the proposed approach are the following:
+% \begin{itemize}
+% \item We incorporate spatially detailed \emph{online} traffic data. In our case, this data comes from Google Maps, and it gives a rough estimation of the  density of street traffic. This level of detail is in contrast to many existing approaches which use time averages of traffic data.
+% \item In order to cope with the large amount of data, and with the large spatial domain, we model the problem with \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this work, we consider simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators.
+% \item We incorporate the real Google traffic data to the PDE model by projecting its values to the quantum graph, and we add this information as a source term. This requires to map the traffic estimates to pollutant emissions via certain parameters.
+% \item We take into account the fact that physical PDE models are not perfect descriptions of reality by searching for the most suitable range where the involved PDE parameters can vary in order to describe at best the observed levels of pollution. This requires solving a parameter estimation problem prior to the state estimation problem. The parameters involved in the traffic density-to-emissions mapping are included in this step, as well as other quantities such as diffusion and reaction coefficients.
+% \end{itemize}
+
+\paragraph{Organization of the paper:} In Section \ref{sec:problem-setting} we introduce the mathematical setting for the problem of pollution state estimation on a metric graph. It also presents our guiding numerical example of the Parisian area, and the available data. Section \ref{sec:rigorous} presents the ensemble super-learning method that we propose. Section \ref{sec:concrete-methods} explains the different reconstruction methods that we have used for our numerical experiments which are summarized in Section \ref{sec:numerical-tests}. 
+%\om{[OM: Add perhaps the discussion from appendix B]}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Problem setting and available data}
+\label{sec:problem-setting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Main goal}
+\label{sec:loose}
+We want to estimate the spatial distribution of the concentration of a certain pollutant at the scale of a city. Since this can concern large areas, we choose to model the city as a graph $\G$ instead of a spatial domain in $\bR^2$ or $\bR^3$. Thus the pollutant concentrantion that we seek to approximate is a function $u:\G\to \bR$.
+
+Mathematically, $\G=(\V, \E)$ is an \emph{undirected metric graph} where $\V=\{\vv_i\}$ is the set of vertices, and $\E=\{\ee_i=(\vv_1^i, \vv_2^i) \}$ is the set of edges. We use the notation $n(\V) = |\V|$ and $n(\E)=|\E|$ for the number of edges and vertices respectively. In Appendix \ref{sec:metric-graphs}, we give a summary of relevant notions on metric graphs for the paper. What is important to keep in mind for subsequent developments is that a function in a metric graph (such as our target function $u$) is not only defined on its vertices, but also at all intermediate points on the edges as well. On the edges, the points are parametrized by local coordinates $r_\ee$ for all $\ee\in \E$. Also, it is possible to define classical function spaces $(V, \Vert \cdot \Vert)$ on the graph $\G$ such as the space of continuous functions $\cC(\G)$, of square-integrable functions $L^2(\G)$ or $H^1(\G)$ (see Appendix \ref{sec:metric-graphs} for the precise definitions).
+
+We assume that, from the unknown pollution field $u$, we are only given partial information which we will denote as $x$ (or $x_u$ whenever we will need to emphasize the connection between $x$ and $u$). The data $x$ belongs to a metric space $\cX$, and it may contain several types of information about $u$ that can be of different nature (e.g., local sensor measurements and indirect information such as traffic or weather conditions). Assuming that $u$ belongs to a function space $V$ on the graph $\G$, our goal is to build a mapping
+\begin{align*}
+A: \cX &\to V \\
+x &\mapsto A(x)
+\end{align*}
+such that, given $x_u\in \cX$, $A(x_u)$ approximates at best the true (unknown) $u$.
+
+Note that, in  principle, the process of pollution is time dependent but we do not exploit this directly in our approach. Our mapping $A$ should be thought as an algorithm to provide a real-time reconstruction of the pollution field given the obervations $x$. In the rest of this section, we describe the input data $x\in \cX$, and we introduce the test case that we use for our numerical experiments. We will then present our ensemble super-learning strategy in Section \ref{sec:rigorous}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Available data}
+\label{sec:data}
+% We distinguish two types of input data:
+% \begin{itemize}
+% \item Instantaneous data
+% \item Data-base from the past.
+% \end{itemize}
+There is plenty of data of different nature that can be used as input information to reconstruct a pollution field $u\in V$. We have worked with the following:
+\begin{itemize}
+\item \textbf{Pollution data at fixed locations:} Very often, one has access to data observations collected by sensors located at $m$ fixed positions. In the following, we denote the nodes of observation by
+$$
+\vv^\obs\coloneqq \{\vv^\obs_1,\dots,\vv_m^\obs\}.
+$$
+They are associated to geographical locations
+$$
+r^\obs \coloneqq\{r_1^\obs, \dots, r_m^\obs\} \in (\bR^2)^m \sim \bR^{2m}
+$$ in the metric graph $\G$. As information, we are given a vector $z\in \bR^m$ of measurement observations where
+$$
+z_i = u(r_i^\obs) + \eta_i, \quad i=1,\dots, m,
+$$
+and $\eta_i$ is a noise term. Note that, in general, the sensors are not located exactly at one of the points of the metric graph. We thus take the nodes that are closest to the sensors to define $\vv^\obs$ and $r^\obs$ (see Section \ref{sec:traffic-preprocess}).
+\item \textbf{A traffic image:} Traffic is one of the most important sources of city air pollution, and one main goal in our work is to examine the potential of incorporating information of this type for state estimation tasks. There is an increasing number of available sources that give access to traffic data. In our case, we work with traffic information extracted from Google Maps images. We transform this information into a field $q:\G\to \bR$ by a procedure which we describe next (see Section \ref{sec:traffic-preprocess}), and we assume that $q\in V$.
+\item \textbf{Global temperature} $T\in \bR$.
+\item \textbf{Global direction of the wind} $w\in \bR^2$.
+\end{itemize}
+Our input data is therefore
+$$
+x = (z, r^\obs, q, T, w) \in \cX \coloneqq \bR^m \times \bR^{2m} \times V \times \bR\times \bR^2.
+$$
+Note that concentration measurements from other pollutants are usually also available. They could be incorporated as an additional input information. We have not worked with them in this work but they could easily be added to the strategy that we next develop.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{The case of Paris}
+\label{sec:paris-test-case}
+
+As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with a graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
+
+\begin{figure}[h]
+\centering
+\includegraphics[scale=0.5]{histogram-degree}
+\caption{Histogram of the degrees of the nodes of $\G$. \om{[Update this if we worked with a smaller portion of Paris. Add perhaps other statistics?]}}
+\label{fig:degree-histogram}
+\end{figure}
+
+We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \ascomment{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m)} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{AvailableStations_InPeriod.pdf}
+\includegraphics[width=0.8\textwidth]{stations-graph-crop.pdf}
+\caption{Google Map of Paris, and its associated metric graph from Open Street Maps. Blue points: exact position of the stations. Red points: Projection of the station locations to the nearest vertex in the graph. \om{[Is the figure correct? Didn't we work in a smaller portion of Paris? TO-DO: Update this pictures if necessary.]}}
+\label{fig:paris-stations}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Pre-processing of traffic data}
+\label{sec:traffic-preprocess}
+We work with traffic information extracted from Google Maps images. On the one hand, the information is very rich because it is available in real time, and for the whole city (see Figure \ref{fig:traffic-raw-data}). On the other hand, the data is only partial: it comes in the form of four colors, and each color represents a certain traffic intensity. Therefore we only get an estimation about how many cars are currently on the street. In addition, the estimates are relative in the sense that the exact mapping between the colors and the number of cars are unknown. We only know that, e.g., red is more congested than green. We use this information to build estimates about the online traffic emissions by implementing the following pipeline:
+\begin{itemize}
+      \item \textbf{Raw data:} Using the Google Maps Platform\footnote{Google Maps Platform: \url{https://mapsplatform.google.com/}, \url{https://developers.google.com/maps/documentation/javascript/trafficlayer}}, we can download the traffic information in the form of an \textit{image} (see Figure \ref{fig:traffic-raw-data}). The colored pixels are the streets where cars are circulating. There are four different colors, and they give a rough estimate of the traffic intensity. We list them in increasing order of intensity as
+      $$
+      \texttt{colors} = \{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}.
+      $$
+      We can see in Figure \ref{fig:traffic-raw-data} that the colored traffic areas are arranged following what looks like a street network. Note however that the information at this stage is not given in a graph, but on an image with pixels.  A careful examination reveals that in fact the color locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
+      \item \textbf{Projection on graph:} For each image pixel, we can derive its geographical coordinate location, and find the closest edge from the street graph and consequently project the colored pixels presenting traffic to the closest edge. This way, we can build a function $q:\G\to \bR$ in the metric graph about the traffic level. For every edge $\ee\in \E$, the information is so detailed that the local traffic $r_\ee \to q_{|\ee}$ can be defined as a function varying with the coordinate $r_\ee$ of the edge. For the sake of simplicity, we work with constant values per edge: for each edge $\ee\in \E$, and each color $\texttt{c}\in \texttt{colors}$, \asmodif{we count the number of pixels with the corresponding color
+      $$
+      q_\ee(\texttt{c}) = \text{Number of pixels projected to $\ee$ with color $\texttt{c}$}.
+      $$
+      }{}
+      %$$
+      %r_\ee(\texttt{c}) = \frac{\text{Number of pixels projected to $\ee$ with color $\texttt{c}$}}{\text{Number of pixels projected to $\ee$}}
+      %\; \in [0, 1].
+      %$$
+      %We next fix positive weights $w_{\texttt{c}}\geq 0$ such that
+      %$$
+      %\sum_{\texttt{c} \in \texttt{colors}} w_{\texttt{c}} = 1,
+      %$$
+      %\om{[Perhaps the weights do not sum up to one if we build a mapping to emissions, no?]} and compute the weighted average
+      %$$
+      %q_\ee = \sum_{\texttt{c} \in \texttt{colors}} w_{\texttt{c}} r_\ee(\texttt{c})
+      %$$
+      In this way, for each color, we have a piecewise constant function on the edges of the form
+      \begin{equation}
+      q(r,c)=\sum_{\ee\in \E} q_\ee \mathds{1}_\ee(r).
+      \label{eq:q}
+      \end{equation}
+      %An illustration of $q$ given weights $w_\texttt{c}$ is given in Figure \ref{fig:traffic-cars-on-edge}.
+      \item \textbf{Traffic intensity-to-emissions mapping:} \asmodif{To transform the above data into a meaningful physical quantity, like and estimated average of cars emissions, one has to choose for this mapping a model that can be fixed beforehand, using expert knowledge, or let it be inferred directly from data which can be achieved by learning a simple linear model or a non linear one like a neural network)}{}.
+      
+      
+      %A simple linear model could be to associate a learnable weight parameter associated to  map the traffic intensity to the emissions. We estimate their optimal values in a pre-processing step. \om{[Maybe we need to update the above discussion.]}
+      % \item \textbf{Final traffic data:} For our state estimation purposes, we collect traffic data every hour at times $t_n,\, n\in \{0, \dots, N\}$. Therefore we have time-dependent traffic fields $\{q(t_n, x) \}_{n=0}^N$.
+\end{itemize}
+% \begin{figure}
+% \includegraphics[width=0.5\textwidth]{traffic-screenshot-2020-12-28-19-08-53}
+% \includegraphics[width=\textwidth]{{number_of_cars}}
+% \end{figure}
+
+
+\begin{figure}
+      \centering
+      \begin{subfigure}[b]{0.45\textwidth}
+          \centering
+          \includegraphics[width=\textwidth]{traffic-screenshot-2020-12-29-17-00-01}
+          \caption{Raw data from Google Maps: image with four colors.}
+          \label{fig:traffic-raw-data}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.45\textwidth}
+          \centering
+          \hspace*{-1.9cm}\includegraphics[height=0.25\textheight]{{number_of_cars}}
+          \vspace*{-1.5cm}
+          \caption{$q(x)$: Projection of the data to $\G$, and weighted average (see \eqref{eq:q}). }
+          \label{fig:traffic-cars-on-edge}
+      \end{subfigure}
+      \caption{Treatment of traffic data. \om{[Update these images.]}}
+      \label{fig:traffic-preprocess}
+ \end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{An Ensemble Super-Learning Method for State Estimation}
+\label{sec:rigorous}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Reconstruction benchmarks}
+Our approach to reconstruct an unknown pollution field $u\in V$ from the partial data $x_u\in \cX$ is based on a supervised learning strategy involving super-learners. We thus assume that we have a database of $K$ observations
+$$
+X_K = \{x_1,\dots, x_K\} \subset \cX,
+$$
+each $x_k$ corresponding to partial observations of an unknown pollution field $u_k$ that took place in the past. Our goal is to use the database to build a reconstruction map
+\begin{align*}
+A: \cX &\to V \\
+x &\mapsto A(x)
+\end{align*}
+such that, for every $x_u\in \cX$, $A(x_u)$ approximates at best the corresponding $u$.
+
+% Note that, since the information $x$ is incomplete, there may be infinitely many $u\in V$ that satisfy  
+There are several ways to quantify the quality of $A$ to reconstruct pollution fields. Ideally, for a given $x_u$, one would like to build $A$ such that the error
+$$
+e(u, A) = \Vert u - A(x_u)\Vert
+$$
+is as small as possible. Assuming that all possible physical configurations of $u$ belong to a compact set $\cM \subseteq V$, one possible way to define the performance of a mapping $A$ is to consider the worst case reconstruction error among all possible physical states, that is,
+\begin{align}
+e_\infty(A) \coloneqq \max_{u \in \cM} e(u, A).
+\end{align}
+Alternatively, one can consider the average error,
+$$
+e_\av(A) \coloneqq \int_V e(u, A) \pi(u).
+$$
+where $\pi \in \cP(V)$ is a probability distribution with support on $\cM$.
+
+Given the above definitions, the best reconstruction mapping is defined as
+\begin{equation}
+\label{eq:best-A}
+\min_{A: \cX \to V} e_\star(A), \quad \star = \{\infty, \av\}
+\end{equation}
+Unfortunately, in practice it is not possible to find the best $A$ because:
+\begin{itemize}
+\item The set $\cM$ is unknown. Our only information comes from $X_K$ which is connected to a finite set of configurations $u_1, \dots, u_K$ from $\cM$, and it also contains partial information.
+\item For every $u\in \cM$, we cannot evaluate the error $e(u, A)$ given that we do not have access to $u$ (so we cannot evaluate $u(r)$ for all $r\in \G$ as the norm $\Vert u - A(x_u)\Vert$ would require).
+\item  The above points make it impossible to compute the wort-case error $e_\infty(A)$. The average error $e_\av(A)$ cannot be computed either because, in addition to all the previous points, $\pi$ is also unknown.
+\end{itemize}
+Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, we inevitably have to build sub-optimal mappings. One difficulty that arises is that it is not possible to compare their performance rigorously according to our above quality criteria. Due to this, we propose to develop an approach in which different reconstruction mappings do not compete with each other. Instead, we make them collaborate with each other in a super-learner approach. The strategy relies on nested $n$-fold cross-validation techniques requiring to divide the data base in three disjoint subsets
+$$
+X_K = X^{\train}_1 \cup X^{\train}_2 \cup X^\val
+$$
+where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction mappings, and $X^{\val}$ will serve for out-of-sample validation.
+
+% Due to these difficulties, and in the absence of further information, one resorts to $n$-fold cross-validation techniques. The error $e(u, A)$ is usually replaced by a distance function in $\bR^m$ of the form
+% $$
+% \tilde e(x, A) \coloneqq \dist(z, A(x)(r^\obs) ),
+% $$
+% and the worst-case or average errors are redifined as
+% $$
+% \tilde e_\infty (A, X_K) \coloneqq \max_{x\in X_K} \tilde e(x, A),
+% \qquad
+% \tilde e_\av (A, X_K) \coloneqq \frac 1 K \sum_{x\in X_K} \tilde e(x, A).
+% $$
+% The best reconstruction mapping is then
+% $$
+% \min_{A: \cX \to V} \tilde e_\star(A, X_K), \quad \star = \{\infty, \av\}.
+% $$
+
+% \om{[Not sure this is the version we want to present.]}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Validation set-up}
+%\om{[OM to AS: This was a full section before but it seems a bit short. Shall we move it to the section on numerical results for example?]}
+
+To validate the results we can only rely on the available (few) sensors (at most $13$ \verify{13?}) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a double Leave-One-Out procedure on the stations:
+\begin{itemize}
+    \item For each station we split the data in a part containing the station, that will be used for testing, and another part without the station used for training. This means that we have to train in total $13$ \verify{13?} different set of models associated with the different data splits.
+    \item For each training set we perform another Leave-One-Out to train each model under different circumstances avoiding this way the possibility of over-fitting.
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Linear and nonlinear mappings}
+\label{sec:mappings}
+There are several families of reconstruction mappings $A$ that one can consider. In this section, we give a high-level overview of the possibilities by discussing  linear and nonlinear mappings, and their connections to physical models and/or statistical learning. In section \ref{sec:concrete-methods}, we present concrete mappings that we have considered for our numerical experiments.
+
+\paragraph{Linear mappings:} If $A: \cX\to V$ is a linear mapping, $A(x)$ belongs to a linear $n$-dimensional space $V_n = \vspan\{v_1,\dots, v_n\} \subset V$, and there exist linear functionals $\ell_i \in \cX'$ such that
+$$
+A(x) = \sum_{i=1}^n \ell_i(x) v_i, \quad \forall x \in \cX.
+$$
+In practice, to find a good quality $A$, the $\ell_i$ are searched in a parameterized family
+$$
+L = \{\ell(\cdot , \theta) \in \cX' \cond \theta \in \Theta\}
+$$
+where the parameters $\theta$ belong to a compact set $\Theta \subset \bR^p$. The basis functions of $V_n$ can also be searched in a parameterized family such as, e.g., reproducing kernel functions. Alternatively, they can be selected from a finite collection of available functions that are pertinent for the problem. In our application, this can be done with reduced order modeling of parameterized PDEs describing pollution fields in the graph $\G$ (see Section \ref{sec:PDE}).
+
+The most usual approach to find the parameters is to resort to cross-validation, in which we search for \om{[Here we do not use the full $z$ but a subset]}
+\begin{equation}
+\label{eq:fit-linear}
+\min_{ \substack{\theta_1,\dots, \theta_n \in \Theta \\ \gamma_1,\dots, \gamma_n \in \Gamma}}
+\sum_{ \substack{x\in X^\train_1 \\ x=(z, r^\obs, q, T, w)}}
+% \sum_{z\in Z^\train}
+\Vert z - \sum_{i=1}^n \ell(x, \theta_i) v(r^\obs, \gamma_i) \Vert^2_2,
+\end{equation}
+where $\Vert \cdot \Vert_2$ denotes the Euclidean norm. This norm can of course be replaced by any other lower semi-continuous loss function. From the optimal parameters $\theta_i^*$ and $\gamma_i^*$ of \eqref{eq:fit-linear}, we define
+$$
+A(x)(r) = \sum_{i=1}^n \ell(x, \theta_i^*) v(r, \gamma^*_i).
+$$
+Note that when using reduced modeling techniques, there is no optimization over the $\gamma_i$ since the $v_i$ are selected beforehand with specific techniques. A classical linear reconstruction map which we consider in our work is the so-called PBDW method (Parametrized-Background Data-Weak approach, see \cite{MPPY2015, BCDDPW2017, Mula2023}).
+
+\paragraph{Nonlinear mappings:} In this case, $A$ is searched in a family of parametrized mappings of the form
+$$
+\cF \coloneqq \{ D(\theta): \cX \to V   \cond \theta \in \Theta  \},
+$$
+where the decoder function $D:\cX\to V$ is not necessarily linear. A common choice is to take $D$ as neural-network $\cN\cN$ with a given architecture, and trainable parameters $\theta \in \Theta\subseteq \bR^n$. By computing
+$$
+\theta^* \in \argmin_{\theta \in \Theta}
+\sum_{x\in X^\train_1}
+%\sum_{z\in Z^\train}
+\Vert z - \cN\cN(\theta)(r^\obs) \Vert^2_2,
+$$
+we then set
+$$
+A = \cN\cN(\theta^*).
+$$
+Note that the input and output spaces of the neural network are not finite dimensional spaces like in the classical definition of neural networks. Instead, our neural network should be understood as a neural operator. In section \ref{sec:concrete-methods} we provide a concrete example for our application.
+
+Another option as a nonlinear map are nonlinear extensions of the PBDW approach (see \cite{CDMN2022,CDMS2022}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Super-Learning as a collaborative approach}
+\label{sec:super-learning}
+
+One practical way to approximate the best mapping from \eqref{eq:best-A} is to combine a set of $p$ available mappings (learners) $A_1, \dots, A_p$ in order to build a super-learner
+\begin{align}
+\cS: \rF^p &\to \rF \\
+( A_1, \dots, A_p) &\mapsto \cS(A_1, \dots, A_p),
+\end{align}
+where $\rF = \cF(\cX, V)$ denotes the set of functions from $\cX$ to $V$.
+
+Similarly to Section \ref{sec:mappings}, we can again build linear and nonlinear super-learners. The most simple possibility is to consider a linear combination of the learners (usually called aggregation in statistics),
+$$
+\cS(A_1, \dots, A_p) = \sum_{i=1}^p \theta_i A_i,
+$$
+and we then search for the best coefficients $\theta_1, \dots, \theta_p$ 
+\ascomment{[Do we name also $\theta$ to the SL parameters?]} with a leave-one-out procedure. We can alternatively introduce a non linear mapping (for example, a neural network) that also depends on parameters $\theta$ to be learnt and that transforms the individual learners outputs into a single prediction. Defining the vector
+$$
+c(x, r) = ( A_1(x)(r), \dots, A_p(x)(r) )^T \in \bR^p, \quad \forall (x,r)\in \cX\times \G,
+$$
+we define
+$$
+\cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\theta^*)( c(x,r) ). 
+$$
+where $\theta^*$ is found by an $n$-fold leave-one out,
+$$
+\theta^* \in \argmin_{\theta \in \Theta}
+\sum_{x\in X^\train_2}
+%\sum_{z\in Z^\train}
+\Vert z -  \mathcal{NN} (\theta^*)( c(x,r^\obs) ) \Vert^2_2.
+$$
+Note that here we use the second training set $X^\train_2$ instead of the first one which is used to train each learner. This is done in order to avoid over-fitting.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/todo.jpeg}
+    \caption{Scheme of different superlearner strategies.}
+    \label{fig:superlearners}
+\end{figure}
+
+\asmodif{To Agus: expand and explain more precisely. In each "transition" there is a model to learn.}{
+Finally, another way to build a super-learner is the following. Assuming that we only use the measurement observations as input data, we consider mappings $A_j: \cZ \to V$. We can then concatenate the mappings in a sequential manner, and each learner is trained to correct the errors produced by the previous ones, hence}
+\begin{align*}
+\cS_j(A_1, \dots, A_j)(z) &= A_j(z-\cS_{j-1}(A_1,\dots, A_{j-1})(z)(r^\obs)), \quad 1<j \leq p,\\
+\cS_1(A_1) &= A_1.
+\end{align*}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Reconstruction methods for our numerical experiments}
+\label{sec:concrete-methods}
+We have implemented several methods of state estimation by leveraging the different information sources: pollution measurements, traffic, wind intensity, and temperature. Some of the models do not make use all the available information $x\in \cX$, but only a portion of it. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Spatial average}
+The first, and simplest reconstruction mapping $A$ is a spatial average of the measurement observations. This will be taken as our baseline to compare against other more sophisticated reconstructions.
+
+Given the vector of sensor measurements $z$, the pollution prediction for all spatial points is the average of the observed values:
+
+$$
+A(x)(r) = \frac{1}{m} \sum_{i=1}^m z_i, \quad \forall r\in \G.
+$$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Graph Features \om{[To Do: Streamline]}}
+
+As the traffic information $q$ is supported on the edges of the street graph of the city of Paris one could extract meaningful information about the vicinity of some target point $x$ by doing some kind of convolution on the graph. This leads us naturally to the idea of Graph Convolution by which one can do meaningfull feature extraction for our problem.
+
+In our case, we performed the following steps:
+\begin{enumerate}
+    \item Given a point $r$ estimate the pollution value $\tilde u(r)=u(P_{\G}r)$ as the pollution of the nearest node $P_{\G}r$ of the graph $\G$.
+    \item Collect the traffic information of edges of vicinity of order $k=1\dots K$ ($\mathcal{N}^{k}=\{e_{ij}: d_{\G}(v_i, v_j) = k \}$) and sum the contributions by traffic component: $\mathcal{T}=\otimes_{k=1\dots K}\sum_{e \in \mathcal{N}^{k}} t(e)$ then $\mathcal{T} \in \R^{4K}$
+    \item (Optionally) add other sources of information like wind or temperature.
+    \item Learn a model able to map the summarized information to the pollution values observed during training. This can be just a linear model (in which case the learned parameters will be the $4K$ or $4K+2$ parameters) or another non linear model like a Neural Network (\cref{fig:graph_features}).
+\end{enumerate}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/EmissionsPerNodeLinear.png}
+    \includegraphics[width=\linewidth]{figures/EmissionsPerNodeExtraVarsLinear.png}
+    \includegraphics[width=\linewidth]{figures/EmissionsPerNodeNonLinear.png}
+    \caption{Scheme of linear (up) and non linear (down) learnable maps from graph features to nodes emissions. \ascomment{To modify or erase if it doesn't help to the clarification.}}
+    \label{fig:graph_features}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Physical PDEs: Elliptic Operator on Quantum graph}
+\label{sec:PDE}
+\om{[Olga to Agustin: It is not clear how we use the PDE to build a mapping $A$. We should explain this better.]}
+\ascomment{In the experiments at the end we never used. By searching to create the right mapping for the source term we arrived to the graph nn and k-neighbours approach and nested learners}
+
+Another way of modelling pollutant dispersion is through the construction of a \emph{quantum graph}. For this, we endow our metric graph $\G$ with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem.
+
+% We next define a \emph{quantum graph} by assigning a differential operator (often called Hamiltonian) with appropriate vertex conditions. In our case, the operators that we consider in this work are relatively simple and based on elliptic/parabolic operators. 
+% This will allow us to model diffusion effects in urban air pollution. Of course, one could consider more refined models which may incorporate additional effects such as convection.
+
+\textbf{Elliptic equation:} One can first model pollution with a time-independent elliptic operator equation. For any point $r\in \G$, the pollutant concentration is modelled through a function $u: \G \to \bR$ solution to
+\begin{align}
+\label{eq:strong-form-elliptic}
+- \frac{\dd}{\dr} \cdot \left(a(r) \frac{\dd}{\dr} u(t, r)\right)+h(r)u(r) &= q(r),\quad \forall r\in  \G
+\end{align}
+which we choose to complement with ``Newmann-Kirchoff'' conditions on the vertices, that is,
+\begin{equation}
+\label{eq:newmann-kirchoff}
+\sum_{\ee\in \E(v)}\frac{\dd u}{\dr}\Big\vert_\ee (v) = 0,\quad \forall v \in \V.
+\end{equation}
+Here, the derivatives are assumed to be taken in the directions away from the vertex (i.e., into the edge), which we will call outgoing directions. The function $a$ is a diffusion coefficient, and we assume $a\in L^\infty(\G)$. The function $h$ is an absorption coefficient, supposed in $L^\infty(\G)$. The function $q$ is a source term and assumed to be in $L^2(\G)$. In the modeling of urban air pollution, $q$ accounts for all possible pollution sources. These essentially come from traffic emissions, local heating, pollution from industries in the city and particles coming from outside the city. In this work, we concentrate on traffic which is among the most important ones, and is challenging to incorporate in real time. We use the traffic data from Google Maps to map it into traffic emissions following the procedure from in Section \ref{sec:traffic-preprocess}. This mapping yields the source term $q$ from equation \eqref{eq:q} which we now use as a source term in \eqref{eq:strong-form-elliptic}. \asmodif{Original section changed: leave a linear model? Readapt this paragraph [Agus]}{Note that $q$ depends on the parameters $\{w_\texttt{c}\}_{\texttt{c}\in \texttt{colors}}$ and we need to calibrate them. For this, we solve a parameter estimation problem in a pre-processing step and we  we search for the best parameter values that match at best observations taken during a certain time interval. We omit explaining the full details of this parameter estimation to keep the presentation concise.}
+
+%In fact the other terms are assumed to be constant in space. We first solve the equation with traffic data as the source term, then add a constant correction
+
+
+The operator \eqref{eq:strong-form-elliptic} is defined for functions $u\in L^2(\G)$ such that $u_{|\ee}\in H^2(\ee)$ for all $\ee \in \E$. Since $u_{|\ee} \in H^2(\ee) \Rightarrow u_{|\ee} \in \cC^1(\bar \ee)$, the Neumann-Kirchoff conditions \eqref{eq:newmann-kirchoff} are well defined in the classical sense. However, for later discretization purposes, it will be convenient to introduce a weak form of \eqref{eq:strong-form-elliptic}, which only requires that $u \in H^1(\G)$. Multiplying \eqref{eq:strong-form-elliptic} by a sufficiently smooth test function $v\in \cC^\infty(\G)$, and using the Kirchoff-Neumann boundary conditions, it follows that the corresponding weak formulation of the problem is to find $u\in H^1(\G)$ such that
+\begin{equation}
+\label{eq:weak-form-elliptic}
+\mathfrak{b}(u, v) = \mathfrak{f}(v), \quad \forall v \in H^1(\G)
+\end{equation}
+where $\mathfrak{b}$ and $\mathfrak{f}$ are respectively a symmetric bilinear form and a linear form defined as
+\begin{align}
+\mathfrak{b} : H^1(\G)\times H^1(\G) &\to \bR \\
+(u, v) &\mapsto \mathfrak{b}(u, v)\coloneqq \sum_{\ee \in \E}
+\left\lbrace
+\int_\ee a(r)\frac{\dd u}{\dr}(r) \frac{\dd v}{\dr}(r) \dr + \int_\ee h(r) u(r)v(r)\dr
+\right\rbrace
+\end{align}
+and
+\begin{align}
+\mathfrak{f}: H^1(\G) &\to \bR \\
+v &\mapsto \mathfrak{f}(v) \coloneqq \sum_{\ee\in \E} \int_{\ee} q(r) v(r)\dr.
+\end{align}
+If $a(r)\geq a_0 >0$ and $h(r)\geq r_0 > 0$ for $r\in \G$ a.e., then $\mathfrak{b}$ is continuous and coercive in $H^1(\G)$ with coercivity constant $\gamma_0 = \min(a_0, r_0)$, and continuity constant $\gamma_1 = \max(\Vert a \Vert_{L^\infty(\G)}, \Vert r \Vert_{L^\infty(\G)})$. By the Lax-Milgram theorem, problem \eqref{eq:weak-form-elliptic} admits a unique solution $u\in H^1(\G)$.
+
+
+\textbf{Discretization:} In our numerical tests, we discretize the equation with $\bP_1$ finite elements. The main guidelines are as follows (see \cite{AB2018} for further details and a complete analysis).
+
+We define the set of hat functions $\{\varphi_\vv\}_{\vv\in \V}$ where for each vertex $\vv\in \V$,
+$$
+\varphi_\vv( \vv') = \delta_{\vv, \vv'}
+$$
+and for each edge $\ee \in \E$,
+\begin{equation}
+\forall x_\ee \in [0, \ell_\ee],\quad
+\varphi_\vv(x_\ee)=
+\begin{cases}
+1-\frac{x_\ee}{\ell_\ee}, \quad &\text{ if } \ee \in \E(\vv), \\
+0 , \quad &\text{ if } \ee \not\in \E(\vv). \\
+\end{cases}
+\end{equation}
+Defining the $\bP_1$ finite element space $W = \vspan\{\varphi_\vv\}_{\vv\in \V} \subset H^1(\G)$, we seach for the Galerkin solution $\hat u = \sum_{\vv\in \V} c_\vv \varphi_\vv \in W$ such that
+$$
+\mathfrak{b}(\hat u, \hat v) = \mathfrak{f} (\hat v), \quad \forall \hat v\in W.
+$$
+Gathering the expansion coefficients of the solution in the vector $\textbf{c} = \{c_\vv\}_{\vv\in \V}$, they satisfy the linear system of equations
+$$
+\bB\textbf{c} = \textbf{f}
+$$
+with
+\begin{equation}
+\begin{cases}
+\bB = (b_{\vv, \vv'})_{(\vv,\vv'\in \V \times \V)}, \quad &b_{\vv, \vv'} \coloneqq \mathfrak{b}(\varphi_\vv, \varphi_{\vv'}) \\
+\textbf{f} = (f_\vv)_{\vv\in \V}, \quad &f_\vv \coloneqq \mathfrak{f}(\varphi_\vv)
+\end{cases}
+\end{equation}
+The Galerkin approach ensure that the above system is invertible. Solving it yields the coefficients $\textbf{c}$ that are required for the finite element solution $\hat u$.
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Numerical results \om{[Agustin]}}
+\label{sec:numerical-tests}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+\section{Metric graphs}
+\label{sec:metric-graphs}
+To be completely rigorous, we recall several notions about graphs that are necessary for our developments. The presentation is based on the book \cite{BK2013} which provides a comprehensive introduction to quantum graphs, and on the paper \cite{AB2018} which develops finite element discretizations of elliptic operators in quantum graphs. We sometimes narrow down the generality of certain notions for the purposes of the present paper.
+
+A \emph{combinatorial graph} $\G = (\V, \E)$ is a collection of a finite number of vertices and of edges connecting pairs of vertices. We denote by $\V=\{\vv_i\}$ the set of vertices and by $\E=\{\ee_i=(\vv_1^i, \vv_2^i) \}$ the set of edges. We will use the notation $V = |\V|$ and $E=|\E|$ for the number of edges and vertices respectively. We restrict our attention to \emph{undirected} graphs where no orientation is assigned to the edges. %Otherwise, the graph is \emph{directed}.
+
+Two vertices $\vv$ and $\ww$ are called \emph{adjacent}, or \emph{neighboring} (denoted $\vv\sim \ww$) if there exists and edge $\ee=(\vv,\ww)\in \E$ connecting them. For each vertex $\vv\in \V$, we denote $\V(\vv)$ the set of neighboring vertices to $\vv$, and $\E(\vv)$ the set of edges emanating from $\vv$. The \emph{degree} of $\vv\in \V$ is defined as $d_\vv = | \V(\vv)| = |\E(\vv)|$.
+
+We will work with \emph{connected} graphs where any two vertices $\vv, \ww\in\V$, with $\vv\neq \ww$, are connected by at least one path $(\vv, \vv_1), (\vv_2, \vv_3),\dots, (\vv_k, \ww)$ made by consecutive adjacent edges in $\E$. A connected graph becomes a \emph{metric graph} if we endow it with a metric, namely, if:
+\begin{enumerate}
+      \item to each edge $\ee\in\E$, we assign a length $\ell_\ee \in \bR$
+      \item to each edge we assign a coordinate $x_\ee \in [0, \ell_\ee]$ which increases in a specified direction along the edge.
+\end{enumerate}
+In a metric graph, the edges are differentiable curves with no loops. Very often however they are defined as simple straight lines joining the two vertices. Regardless of the choice of the edge curves, the points in a metric graph are thus not only its vertices but also all intermediate points on the edges as well, and they are parametrized by the local coordinates $x_\ee$.
+
+As the name suggests, any metric graph can be equipped with a natural metric as follows. For two vertices $\vv,\,\ww\in \V$, the distance $\rho(\vv,\ww)$ is defined as the length of the shortest path connecting them. This notion of distance between vertices can easily be extended in a natural way to any two points possibly lying on different edges.
+
+We next proceed to introduce function spaces on a metric graph $\G$ and linear differential operators. When we speak about functions $f:r\in \G\mapsto f(r)$ defined on the metric graph $\G$, we consider them as defined along the edges and the vertices (rather than at the vertices only as is often done in discrete models). The coordinate $r$ should be understood as a global coordinate which is locally represented by $x_\ee$ for each edge $\ee\in \E$. Note that the global coordinates can be embedded into $\bR^d$ for some $d\in \bN$. In our work, we leverage this possibility in order to endow the street graph which work with with with real geographical coordinates.
+
+One can naturally define the space of continuous functions $\cC(\G)$, and the presence of the coordinate $r$ enables to define in the natural way the Lebesgue measure. With this measure, we can define standard function spaces on $\G$ such as Sobolev spaces. We next recall relevant spaces for the present work.
+
+%[Matthieu] Maybe we should introduce the domain of these functions
+%\[
+%D=\V \cup \bigcup_{\ee\in \E} [0,\ell_\ee],
+%\]
+%with continuity properties $0_{(\vv_1,\vv_2)}=\vv_1$ and $(\ell_{(\vv_1,\vv_2)})_{(\vv_1,\vv_2)}=\vv_2$.
+
+The space
+$$
+L^2(\G) = \oplus_{\ee\in \E} L^2(\ee)
+$$
+is the space of all square-integrable measurable functions $u$ on the edges of $\G$, i.e.,
+\begin{equation}
+      \Vert u \Vert^2_{L^2(\G)} \coloneqq \sum_{\ee\in \E} \Vert u_{|\ee} \Vert^2_{L^2(\ee)} <\infty.
+\end{equation}
+This is a Hilbert space when endowed with the inner product
+$$
+\<u, v \>_{L^2(\G)}
+\coloneqq \int_\G u(x)v(x)\dr
+=\sum_{\ee\in \E} \< u_{|\ee} , v_{|\ee}\>_{L^2(\ee)}.
+$$
+
+The space 
+$$
+H^1(\G) =  \cC(\G)\cap\oplus_{e\in \E} H^1(e)
+$$
+is the space of all continuous functions $u\in \cC(\G)$ such that $u_{|\ee} \in H^1(\ee)$ for each edge $\ee\in \E$, i.e.,
+\begin{equation}
+      \Vert u \Vert^2_{H^1(\G)} \coloneqq \sum_{\ee\in \E} \Vert u_{|\ee} \Vert^2_{H^1(\ee)} <\infty.
+\end{equation}
+We remind that
+$$
+\Vert u \Vert^2_{H^1(\ee)} \coloneqq \int_\ee \left( \frac{\dd u}{\dr} \right)^2 \dr + \int_\ee u^2\dr,\quad \forall \ee \in \G,
+$$
+which implies
+$$
+\Vert u \Vert^2_{H^1(\G)} \coloneqq \int_\G \left( \frac{\dd u}{\dr} \right)^2 \dr + \int_\G u^2\dr
+$$
+The restriction to $\cC(\G)$ in the definition of $H^1(\G)$ stems from the fact that functions in $H^1(\ee)$ are continuous (because they are one dimensional), which automatically implies that functions in $H^1(\G)$ must be continuous on the edges.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+\section{How bad is it to work with leave-one out? \om{[TO DO: Olga]}}
+Assuming that we have chosen an approximation space $V_n$ for the reconstruction map $A:\bR^m \to V_n$, given the vector $z$ of observations, we propose to work with the recovery map
+\begin{equation}
+\label{eq:bestfit}
+A(z) = \hat v(z) \;\in\; \argmin_{v \in V_n} \; || z - \ell(v) ||_Z ,
+\end{equation}
+where $\Vert \cdot \Vert_Z$ is a norm in $\bR^m$. The minimizers of \eqref{eq:bestfit} will usually exist in practice because $V_n$ is often chosen as a compact set. However, if minimizers do not exist, we may consider near-minimizers, and the development below would apply with minor adjustments.
+
+In practice, we use $|| z - \ell(v) ||_Z$ as an estimate for the error $\Vert u - \hat v(z) \Vert$ but the next development reveals the strong limitations of this. The development is done under the very general structural assumptions introduced in \cite{CDMS2023}:
+
+\begin{itemize}
+\item The $\ell_i$ are Lipschitz continuous on $V$, that is,
+\begin{equation}
+\label{eq:struct1}
+\Vert \ell(u) - \ell(\tilde u) \Vert_Z \leq \alpha_Z \Vert u - \tilde u \Vert_V, \quad \forall v, \tilde v \in V,
+\end{equation}
+where
+$$
+\alpha_Z \coloneqq \sup_{v, \tilde v \in V}
+\frac{ \Vert \ell(v) - \ell(\tilde v) \Vert_Z }{ \Vert v - \tilde v \Vert_V} \; <+\infty .
+$$
+\item The approximation class $V_n$ has an inverse stability property in the sense that
+\begin{equation}
+      \label{eq:struct2}
+\Vert v - \tilde v \Vert_V
+\leq
+\mu_Z \Vert \ell(v) - \ell(\tilde v) \Vert_Z,
+\end{equation}
+with
+$$
+\mu_Z = \sup_{v, \tilde v \in V_n}
+\frac{ \Vert v - \tilde v \Vert_V }{ \Vert \ell(v) - \ell(\tilde v) \Vert_Z}.
+$$
+Note that we always have $\alpha_Z\mu_Z \geq 1$. Also, as explained in \cite{CDMS2023}, $\mu_Z\geq 1$, and it is necessary to have $n\leq m$ to guarantee that $\mu_Z$ is finite.
+\end{itemize}
+Under these assumptions, it is proven in \cite{} that the approximation error is
+bounded by
+$$
+\Vert u - \hat v(z) \Vert \leq (1+2\alpha_Z \mu_Z) \inf_{v\in V_n} \Vert u - v \Vert + 2 \beta_Z \mu_Z \Vert \eta \Vert_p
+$$
+where
+$$
+\beta_Z = \max_{z\in \bR^m} \frac{\Vert z \Vert_Z}{\Vert z \Vert_p}.
+$$
+
+As already brought up, the quantity  $\Vert z - \ell(\hat v(z)) \Vert_Z$ is often used in practice as an indicator of the true error $\Vert u - \hat v(z) \Vert_V$. The next bound reveals the limitations of doing this. We can bound from above the error $\Vert u - \hat v(z) \Vert_V$  by $\Vert z - \ell(\hat v(z)) \Vert_Z$ as
+\begin{align}
+\Vert u - \hat v(z) \Vert_V \leq (1+\mu_Z\alpha_Z) \min_{v\in V_n} || u - v || + \mu_Z \min_{v\in V_n} \Vert z - \ell(v) \Vert_Z.
+\end{align}
+and from below as
+\begin{align}
+\Vert u - \hat v(z) \Vert_V \leq -(1+\mu_Z\alpha_Z) \min_{v\in V_n} || u - v || + \mu_Z \min_{v\in V_n} \Vert z - \ell(v) \Vert_Z.
+\end{align}
+\begin{proof}
+For any $v\in V_n$, and using the triangle inequality,
+\begin{align}
+\Vert u - \hat v(z) \Vert_V
+&\leq \Vert u - v \Vert  + \Vert v - \hat v(z) \Vert \\
+&\leq \Vert u - v \Vert  + \mu_Z \Vert \ell(v) - \ell(\hat v(z)) \Vert \\
+&\leq (1+\mu_Z C)\Vert u - w \Vert  + \mu_Z \Vert z - \ell(\hat v(z)) \Vert
+\end{align}
+Therefore
+\begin{align}
+\Vert u - \hat v(z) \Vert_V
+&\leq (1+\mu_Z C) \inf_{v\in V_n} \Vert u - v \Vert 
++ \inf_{v\in V_n} \mu_Z \Vert z - \ell(v) \Vert,
+\end{align}
+which yields the upper bound. The lower can be obtained by applying the reverse triangle inequality.
+\end{proof}
+The bounds reveal that, if $V_n$ is a bad approximation space for $u$, $\inf_{v\in V_n} \Vert u - v \Vert$ will be large and $\Vert z - \ell(\hat v(z)) \Vert_Z$ will be a bad estimate for $\Vert u - \hat v(z) \Vert_V$. In addition, even if $V_n$ is a good model, the stability constant $\mu_Z$ may be large, in which case the estimate is also inaccurate. Note that $\mu_Z \to 1$ as the number of observations $m\to \infty$ so adding measurements always helps. In cases where the number $m$ of observations is limited, since $n\leq m$, the approximation power of $V_n$ may not be very high, thus degrading the quality.
+
+
+
+
+% \newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \section{Old Notes: Introduction}
+
+% This paper deals with the theory of super-learning for the task of inverse state and parameter estimation of physical processes. When addressing this task, one can often formulate different inversion methods involving different physical models, and different approximation spaces. The question thus arises as to how to discover the best inversion method or, slightly less ambitiously, how to combine all the methods to build an output that is as good as or better than any available single method. This can be done with ensemble techniques such as aggregation, super-learning or stacked generalization.
+
+% In this paper, we propose a general abstract framework of ensemble state estimation. The concrete setting is the following. Consider an unknown function $u$ which is the state of a physical system. The function belongs to a Banach space $V$ which should be thought as a very high dimensional, or infinite dimensional space. Our task to estimate $u$ from $m$ observations of the form
+% $$
+% z_i \coloneqq \ell_i(u) + \eta_i,\quad i=1,\dots, m.
+% $$
+% The $\ell_i:V\to \bR$ are measurement functionals, and $\eta_i$ is additive noise. In the following, we use the compact notation
+% $$
+% z = \ell(u) + \eta.
+% $$
+% The functionals often correspond to the response of a physical measurement device but they can have a different interpretation depending on the application. Their behavior can be linear (in which case the $\ell_i$ are linear functionals from $V'$, the dual of $V$) or nonlinear. Depending on the situation, the form of the $\ell_i$ may explicitely be known. In our final application, some $\ell_i$ will be unknown but this will not prevent computations.
+
+% Without any addition prior assumption, this problem is severely ill-posed because in general there are infinitely many $v\in V$ such that $\ell(v)+\eta_i = z_i$. Therefore we assume that the set of all possible states of the system belongs to a compact subset $\cM\subset V$. This set is partially known  through a collection of observations of $J$ states
+% $$
+% z^{(j)} = \ell(u^{(j)}) + \eta^{(j)}, \quad j =1,\dots, J.
+% $$
+% These observations form a database
+% $$
+% D = \{ z^{(j)} \}_{j=1}^J
+% $$
+
+% So we want to reconstruct $u$ from its observations, and from the observation database $D$. Note that this type of recovery problem arises in numerous applications such a the monitoring of epidemies, climate, air pollution, or neutron population in a nuclear reactor core. Given the complexity of the physics involved in these processes, we often have several physical models that can be used for state estimation. One can also consider more learning-based methods that do not necessarily involve physics in the reconstruction process. 
+
+% Given that we only have partial knowledge of the system, one cannot compare the quality of an inversion method with respect to other methods in a reliable way. The comparison is particularly difficult in scenarios where the number $m$ of observations is very limited. Instead of making all these models ``compete'' against each other, we consider ensemble methods to cope for each models' individual weaknesses, and enhance their strengths.
+
+% The paper is organized as follows: \om{TO DO}
+
+
+
+% \section{Collaborative approaches: Ensemble state estimation}
+
+% \om{Nested cross-validation}
+
+% \subsection{Abstract formulation}
+% Suppose we have a database $D$ of observations. We can use the database to build a state estimation algorithm
+% $$
+% \cA: \bR^m \to V_n(D)
+% $$
+% where $V_n(D)$ is an approximation space from $V$ that we build using $D$. The reconstruction algorithm $A$ is such that, given the observations $z$, $A(z)$ approximates $u$ in the sense that the error
+% $$
+% e(t, A) \coloneqq \Vert \cA(z) - u \Vert_V
+% $$
+% is expected to be small. In actual practice, such an error cannot be evaluated, and one resorts to $n$-fold cross-validation techniques. We will come back to this point later on.
+
+% We define a learner as a mapping
+% \begin{align}
+% \cL : Z &\to \cF(\bR^m, V) \\
+% D &\mapsto \cL(D) = (\cA: \bR^m \to V_n(D))
+% \end{align}
+% where $\cF(\bR^m, V)$ denotes the space of functions from $\bR^m$ to $V$. Note that, with this notation, we have that
+% $$
+% \cL \in \rL \coloneqq \cF(Z , \cF(\bR^m, V))
+% $$
+
+% For a given database $D$, $\cL(D)$ is a reconstruction map
+% \begin{align}
+% \cA:\bR^m &\to V_n(D) \\
+% z &\mapsto A(z) 
+% \end{align}
+% where the approximation space $V_n(D)$ has been built using using the database $D$.
+
+% One possible way to define the performance of a learner is to consider the worst case reconstruction error among all possible physical states, that is
+% \begin{align}
+% e_\infty(\cL) \coloneqq \max_{u \in \cM} || u - \cL(D)(z) ||.
+% \end{align}
+% Alternatively, one can consider the average error,
+% $$
+% e_\av(\cL) \coloneqq \int_V || u - \cL(D)(z) || \pi(u).
+% $$
+% where $\pi \in \cP(V)$ is a probability distribution with support on $\cM$.
+
+% Given the above definitions, the best learner is defined as
+% $$
+% \min_{\cL: D \to \cF(\bR^m, V)} e_\star(\cL), \quad \star = \{\infty, \av\}
+% $$
+% Unfortunately, in practice it is not possible to find the best learner because, as we remarked, we only have limited observations, and the error $|| u - \cL(D)(z) ||$ cannot be evaluated. One practical way to make approximate the best learner is therefor to combine a set of available learners $\cL_1, \dots, \cL_p$ with corresponding algorithms $\cA_1, \dots, \cA_p$ and build a super-learner
+% \begin{align}
+% \cS: \rL^p &\to \rL \\
+% ( \cL_1, \dots, \cL_p) &\mapsto \cS(\cL_1, \dots, \cL_p)
+% \end{align}
+% A simple possibility is to consider a linear combination of the learners (usually called aggregation),
+% $$
+% \cS(\cL_1, \dots, \cL_p) = \sum_{i=1}^p \theta_i \cL_i  
+% $$
+% and we then search for the best coefficients $\theta_1, \dots, \theta_p$. But one can also introduce a non linear mapping (for example a neural network) that also depends on parameters $\theta$ to be learned and that transforms the individual learners outputs into a single prediction:
+% $$
+% \cS(\cL_1, \dots, \cL_p) =  \mathcal{NN}_{\theta}( \cL_i ). 
+% $$
+
+% Another way is to combine the learners in a sequential manner in a way such that each of them is trained to correct the errors produced by the previous ones.
+% $$
+% \cS_j(\cL_1, \dots, \cL_j) = \cL_j(D)(z-\cL_{j-1}(D)). 
+% $$
+
+
+
+% \section{Ensemble state estimation}
+% \subsection{Abstract formulation}
+% Suppose we have a database $D$ of observations. We can use the database to build a state estimation algorithm
+% $$
+% \cA: \bR^m \to V_n(D)
+% $$
+% where $V_n(D)$ is an approximation space from $V$ that we build using $D$. The reconstruction algorithm $A$ is such that, given the observations $z$, $A(z)$ approximates $u$ in the sense that the error
+% $$
+% e(t, A) \coloneqq \Vert \cA(z) - u \Vert_V
+% $$
+% is expected to be small. In actual practice, such an error cannot be evaluated, and one resorts to $n$-fold cross-validation techniques. We will come back to this point later on.
+
+% We define a learner as a mapping
+% \begin{align}
+% \cL : Z &\to \cF(\bR^m, V) \\
+% D &\mapsto \cL(D) = (\cA: \bR^m \to V_n(D))
+% \end{align}
+% where $\cF(\bR^m, V)$ denotes the space of functions from $\bR^m$ to $V$. Note that, with this notation, we have that
+% $$
+% \cL \in \rL \coloneqq \cF(Z , \cF(\bR^m, V))
+% $$
+
+% For a given database $D$, $\cL(D)$ is a reconstruction map
+% \begin{align}
+% \cA:\bR^m &\to V_n(D) \\
+% z &\mapsto A(z) 
+% \end{align}
+% where the approximation space $V_n(D)$ has been built using using the database $D$.
+
+% One possible way to define the performance of a learner is to consider the worst case reconstruction error among all possible physical states, that is
+% \begin{align}
+% e_\infty(\cL) \coloneqq \max_{u \in \cM} || u - \cL(D)(z) ||.
+% \end{align}
+% Alternatively, one can consider the average error,
+% $$
+% e_\av(\cL) \coloneqq \int_V || u - \cL(D)(z) || \pi(u).
+% $$
+% where $\pi \in \cP(V)$ is a probability distribution with support on $\cM$.
+
+% Given the above definitions, the best learner is defined as
+% $$
+% \min_{\cL: D \to \cF(\bR^m, V)} e_\star(\cL), \quad \star = \{\infty, \av\}
+% $$
+% Unfortunately, in practice it is not possible to find the best learner because, as we remarked, we only have limited observations, and the error $|| u - \cL(D)(z) ||$ cannot be evaluated. One practical way to make approximate the best learner is therefor to combine a set of available learners $\cL_1, \dots, \cL_p$ with corresponding algorithms $\cA_1, \dots, \cA_p$ and build a super-learner
+% \begin{align}
+% \cS: \rL^p &\to \rL \\
+% ( \cL_1, \dots, \cL_p) &\mapsto \cS(\cL_1, \dots, \cL_p)
+% \end{align}
+% A simple possibility is to consider a linear combination of the learners (usually called aggregation),
+% $$
+% \cS(\cL_1, \dots, \cL_p) = \sum_{i=1}^p c_i \cL_i  
+% $$
+% and we then search for the best coefficients $c_1, \dots, c_p$.
+
+
+
+
+% \subsection{Practical implementation}
+% When $V_n$ is a linear subspace, computing \eqref{eq:bestfit} consists simply in a least squares computation. However, when $V_n$ is nonlinear, the optimization step in \eqref{eq:bestfit} may become numerically expensive. One may thus consider building a metamodel for $\hat v(z)$. A typical strategy is the following. Consider the parameter dependent function
+% \begin{align}
+% f: \bR^m \times \Theta &\to V \\
+% (z, \theta) \mapsto f(z, \theta).
+% \end{align}
+% We define
+% $$
+% \tilde v(z) = f(z, \theta^*)
+% $$
+% where the parameters are optimized on a training phase using a database
+% \begin{align}
+% \min_{\theta \in \Theta} \sum_{i=1}^N || z^{(i)} - \ell(f(z^{(i)}, \theta)) \Vert^2_Z
+% \end{align}
+% To avoid overfitting, we replace $|| z - \ell(f(z, \theta)) \Vert^2_Z$ by a leave-one out operation (or, more generally, a $k$-fold), and we consider
+% \begin{align}
+% \min_{\theta \in \Theta} \sum_{i=1}^N \sum_{j=1}^m || z^{(i)}_j - \ell(f(z_{j^C}^{(i)}, \theta)) \Vert^2_Z.
+% \end{align}
+% It is argued that the leave-one out technique helps to avoid overfitting.
+% The mathematical justification of this operation is as follows.
+
+
+
+
+
+
+
+% Bibliography
+\bibliographystyle{unsrt}
+\bibliography{literature}
+
+\end{document}
