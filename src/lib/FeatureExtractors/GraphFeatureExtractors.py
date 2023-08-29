@@ -7,6 +7,10 @@ from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from src.lib.FeatureExtractors.FeatureExtractorsBase import FeatureExtractor
 
 
+def get_graph_node_positions(graph):
+    return np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+
+
 class FEGraphNeighboringTraffic(FeatureExtractor):
     def __init__(self, name="", k_neighbours=1, **kwargs):
         assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
@@ -32,7 +36,7 @@ class FEGraphNeighboringTraffic(FeatureExtractor):
             raise Exception("Each edge in Graph should have edge attribute 'lanes'")
         self.position2node_index = dict()
         self.nodes = list(graph.nodes)
-        self.node_positions = np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+        self.node_positions = get_graph_node_positions(graph)
         return graph
 
     def update_position2node_index(self, target_positions: pd.DataFrame, re_update=False):

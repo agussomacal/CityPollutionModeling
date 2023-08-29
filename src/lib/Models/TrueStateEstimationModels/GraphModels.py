@@ -13,6 +13,7 @@ from PerplexityLab.miscellaneous import filter_dict, timeit
 from src.experiments.config_experiments import screenshot_period
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES, load_background
 from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEConvolutionFixedPixels, WaterColor, GreenAreaColor
+from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions
 from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
@@ -104,7 +105,7 @@ class GraphModelBase(BaseModel):
         self.position2node_index = dict()
         self.node2index = {node: i for i, node in enumerate(graph.nodes)}
         self.nodes = list(graph.nodes)
-        self.node_positions = np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+        self.node_positions = get_graph_node_positions(graph)
         return {"graph": graph}
 
     def state_estimation_core(self, emissions, **kwargs):

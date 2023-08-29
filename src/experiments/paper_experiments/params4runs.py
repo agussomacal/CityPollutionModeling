@@ -7,6 +7,8 @@ import seaborn as sns
 import src.config as config
 from PerplexityLab.LaTexReports import RunsInfo2Latex
 from PerplexityLab.miscellaneous import if_true_str
+from src.lib.DataProcessing.SeleniumScreenshots import window_size, zoom
+from src.lib.DataProcessing.TrafficProcessing import image_shape
 
 sns.set_theme()
 
@@ -18,6 +20,7 @@ path2latex_figures = runsinfo.latex_folder.joinpath("figures")
 recalculate_traffic_by_pixel = False
 proportion_of_past_times = 0.8
 screenshot_period = 15
+# shuffle times
 shuffle = False
 simulation = False
 max_num_stations = 100
@@ -28,6 +31,19 @@ seed = 42
 # stations that are inside Paris so traffic information is all around
 # stations2test = ['OPERA', 'HAUS', 'BONAP', 'CELES',  'ELYS', 'PA07', 'PA13', 'PA18']
 stations2test = ['OPERA', 'BONAP', 'ELYS', 'PA07', 'PA13', 'PA18', 'BASCH', 'PA12', ]
+
+runsinfo.append_info(
+    filtergraph=filter_graph,
+    shuffletimes=shuffle,
+    screenshotperiod=screenshot_period,
+    screenshotwidth=window_size['width'],
+    screenshotheight=window_size['height'],
+    zoom=zoom,
+    imagex=image_shape[0],
+    imagey=image_shape[1],
+    numstationstest=len(stations2test),
+    stationstest=", ".join(stations2test),
+)
 
 RAM = psutil.virtual_memory().total / 1000000000
 server = RAM > 50

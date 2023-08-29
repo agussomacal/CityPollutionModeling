@@ -27,6 +27,7 @@ from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_dat
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background
+from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions
 from src.lib.Models.BaseModel import BaseModel, split_by_station, ModelsAggregator
 from src.lib.Modules import Bounds
 
@@ -374,7 +375,7 @@ if __name__ == "__main__":
         img = load_background(screenshot_period)
         mask = np.zeros(np.shape(img)[:2])
 
-        node_positions = np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+        node_positions = get_graph_node_positions(graph)
         position2node_index = [int(np.argmin(cdist(node_positions, np.array([tp])), axis=0)) for tp in
                                station_coordinates.values.T]
         for n, ix in enumerate(position2node_index):

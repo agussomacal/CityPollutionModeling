@@ -10,6 +10,7 @@ imageio
 tqdm
 pathos
 makefun
+eco2ai
 joblib
 python-benedict
 scikit-learn

@@ -30,11 +30,14 @@ TRAFFIC_COLORS = {
 }
 road_color = (255, 255, 255)
 
+image_shape = (800, 1000)
 
-def load_image(filepath, shape=(800, 1000)):
+
+def load_image(filepath, shape=image_shape):
     image = imread(filepath)
     sx, sy, _ = np.shape(image)
-    return image[(sx // 2 - shape[0] // 2):(sx // 2 + 400), (sy // 2 - 500):(sy // 2 + 500), :-1]
+    return image[(sx // 2 - shape[0] // 2):(sx // 2 + shape[0] // 2),
+           (sy // 2 - shape[1] // 2):(sy // 2 + shape[1] // 2), :-1]
 
 
 def load_background(screenshot_period, zoom=13):

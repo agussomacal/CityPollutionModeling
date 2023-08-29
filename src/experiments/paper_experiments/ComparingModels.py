@@ -19,6 +19,7 @@ from src.experiments.config_experiments import shuffle, filter_graph
 from src.experiments.paper_experiments.PreProcess import graph, \
     station_coordinates
 from src.experiments.paper_experiments.params4runs import runsinfo
+from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions
 from src.lib.Models.BaseModel import ModelsSequenciator, \
     medianse, NONE_OPTIM_METHOD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel
@@ -37,7 +38,7 @@ if __name__ == "__main__":
     )
     copy_main_script_version(__file__, data_manager.path)
 
-    node_positions = np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
+    node_positions = get_graph_node_positions(graph)
     min_dist_node_station = max(
         [min(cdist(node_positions, np.array([tp])), axis=0) for tp in map(tuple, station_coordinates.values.T)])
     # Linear approximation of distance: distance between Arc du Triumph and Vincennes 9,84km

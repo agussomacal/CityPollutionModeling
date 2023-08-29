@@ -96,7 +96,7 @@
 
 % package to open file containing variables
 \usepackage{datatool, filecontents}
-\DTLsetseparator{,}% Set the separator between the columns.
+\DTLsetseparator{;}% Set the separator between the columns.
 \DTLloadrawdb[noheader, keys={thekey,thevalue}]{runsinfo}{runsinfo.csv}
 % % import data
 % % Loads mydata.dat with column headers 'thekey' and 'thevalue'
@@ -478,38 +478,52 @@ Note that concentration measurements from other pollutants are usually also avai
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{The case of Paris}
-\label{sec:paris-test-case}
+\subsection{Paris graph}
+\label{sec:paris-graph}
 
-As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with a graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
+As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. \asmodif{We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with the graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The full graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges but we work with the biggest connected component of the subgraph that remains after filtering out all the edges whose associated streets have never been colored with traffic iformation. After this operation the actual graph used has $n(\V)=\perplexityinsert{numnodesfilter}$ vertices and $n(\E)=\perplexityinsert{numedgesfilter}$}{}. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
 
 \begin{figure}[h]
 \centering
-\includegraphics[scale=0.5]{histogram-degree}
-\caption{Histogram of the degrees of the nodes of $\G$. \om{[Update this if we worked with a smaller portion of Paris. Add perhaps other statistics?]}}
+\includegraphics[scale=0.5]{Ghistdegree.pdf}
+\caption{Histogram of the degrees of the nodes of $\G$.}
 \label{fig:degree-histogram}
 \end{figure}
 
-We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \ascomment{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m)} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m)}{} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+
 
 \begin{figure}
-\centering
-\includegraphics[width=0.8\textwidth]{AvailableStations_InPeriod.pdf}
-\includegraphics[width=0.8\textwidth]{stations-graph-crop.pdf}
-\caption{Google Map of Paris, and its associated metric graph from Open Street Maps. Blue points: exact position of the stations. Red points: Projection of the station locations to the nearest vertex in the graph. \om{[Is the figure correct? Didn't we work in a smaller portion of Paris? TO-DO: Update this pictures if necessary.]}}
-\label{fig:paris-stations}
-\end{figure}
+      \centering
+      \begin{subfigure}[b]{0.48\textwidth}
+          \centering
+          \includegraphics[width=\textwidth]{AvailableStations_InPeriod.pdf}
+          \caption{Cropped Google Map screenshot of Paris and the $m=\perplexityinsert{numstations}$ available stations in the study: red points represent the projection of the station locations to the nearest vertex in the graph while the blue crosses correspond to the exact position of the stations.}
+          \label{fig:paris-stations}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+          \centering
+          \includegraphics[width=\textwidth]{GoogleMapsAndOpenStreetMap.pdf}
+          \caption{The associated metric graph from Open Street Maps: in yellow the edges kept after filtering the roads that never had google traffic activation.}
+          \label{fig:paris-graph}
+      \end{subfigure}
+      \caption{Available stations in Paris and street graph.}
+      \label{fig:stations-graph}
+ \end{figure}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Pre-processing of traffic data}
 \label{sec:traffic-preprocess}
+\asmodif{
 We work with traffic information extracted from Google Maps images. On the one hand, the information is very rich because it is available in real time, and for the whole city (see Figure \ref{fig:traffic-raw-data}). On the other hand, the data is only partial: it comes in the form of four colors, and each color represents a certain traffic intensity. Therefore we only get an estimation about how many cars are currently on the street. In addition, the estimates are relative in the sense that the exact mapping between the colors and the number of cars are unknown. We only know that, e.g., red is more congested than green. We use this information to build estimates about the online traffic emissions by implementing the following pipeline:
+}{}
 \begin{itemize}
-      \item \textbf{Raw data:} Using the Google Maps Platform\footnote{Google Maps Platform: \url{https://mapsplatform.google.com/}, \url{https://developers.google.com/maps/documentation/javascript/trafficlayer}}, we can download the traffic information in the form of an \textit{image} (see Figure \ref{fig:traffic-raw-data}). The colored pixels are the streets where cars are circulating. There are four different colors, and they give a rough estimate of the traffic intensity. We list them in increasing order of intensity as
-      $$
-      \texttt{colors} = \{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}.
-      $$
-      We can see in Figure \ref{fig:traffic-raw-data} that the colored traffic areas are arranged following what looks like a street network. Note however that the information at this stage is not given in a graph, but on an image with pixels.  A careful examination reveals that in fact the color locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
+      \item \textbf{Raw data:} \asmodif{we made a script using Selenium python library to automatically take screenshots of Paris\footnote{We tried in a first attempt to use the Google Maps Platform but as it required payment after one week of use we decided to code our own pipeline.} every $\perplexityinsert{screenshotperiod}$ minutes over an area of $\perplexityinsert{screenshotwidth} \times \perplexityinsert{screenshotheight}$ pixels with zoom $\perplexityinsert{zoom}$. An example of the raw  \textit{image} can be seen in \cref{fig:traffic-raw-data}. Note that city landmarks could not be removed before taking the screenshot neither by substracting a background image as each screenshot has slight variations rendering this approach impractical. Another issue is the absence of traffic data in the inner streets of the city. 
+      }{}
+      \item \textbf{Crop and extract colors:} \asmodif{for each image we first crop it to shape $\perplexityinsert{imagex} \times \perplexityinsert{imagey}$ to eliminate elements in the border that appear in the raw image like toolbars, minimap, etc. As the four colors associated with the four levels of traffic ($\{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}$ \footnote{The RGB values of each color are: $\texttt{green}=\perplexityinsert{green}$, $\texttt{orange}=\perplexityinsert{yellow}$, $\texttt{red}=\perplexityinsert{red}$, $\texttt{dark-red}=\perplexityinsert{darkred}$.} in increasing order of traffic intensity) are clearly separated from the rest of the colors in a screenshot, we can track over images and extract the pixels that at some point had been colored with traffic color. This pixel locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
+}{}
       \item \textbf{Projection on graph:} For each image pixel, we can derive its geographical coordinate location, and find the closest edge from the street graph and consequently project the colored pixels presenting traffic to the closest edge. This way, we can build a function $q:\G\to \bR$ in the metric graph about the traffic level. For every edge $\ee\in \E$, the information is so detailed that the local traffic $r_\ee \to q_{|\ee}$ can be defined as a function varying with the coordinate $r_\ee$ of the edge. For the sake of simplicity, we work with constant values per edge: for each edge $\ee\in \E$, and each color $\texttt{c}\in \texttt{colors}$, \asmodif{we count the number of pixels with the corresponding color
       $$
       q_\ee(\texttt{c}) = \text{Number of pixels projected to $\ee$ with color $\texttt{c}$}.
@@ -529,11 +543,11 @@ We work with traffic information extracted from Google Maps images. On the one h
       %$$
       In this way, for each color, we have a piecewise constant function on the edges of the form
       \begin{equation}
-      q(r,c)=\sum_{\ee\in \E} q_\ee \mathds{1}_\ee(r).
+      q(r,c)=\sum_{\ee\in \E} q_\ee(c) \mathds{1}_\ee(r).
       \label{eq:q}
       \end{equation}
       %An illustration of $q$ given weights $w_\texttt{c}$ is given in Figure \ref{fig:traffic-cars-on-edge}.
-      \item \textbf{Traffic intensity-to-emissions mapping:} \asmodif{To transform the above data into a meaningful physical quantity, like and estimated average of cars emissions, one has to choose for this mapping a model that can be fixed beforehand, using expert knowledge, or let it be inferred directly from data which can be achieved by learning a simple linear model or a non linear one like a neural network)}{}.
+      \item \textbf{Traffic intensity-to-emissions mapping:} \asmodif{To transform the above data into a meaningful physical quantity, like and estimated average of cars emissions, one has to choose for this mapping a model that can be fixed beforehand, using expert knowledge, or let it be inferred directly from data which can be achieved by learning a simple linear model or a non linear one like a neural network}{}.
       
       
       %A simple linear model could be to associate a learnable weight parameter associated to  map the traffic intensity to the emissions. We estimate their optimal values in a pre-processing step. \om{[Maybe we need to update the above discussion.]}
@@ -547,23 +561,29 @@ We work with traffic information extracted from Google Maps images. On the one h
 
 \begin{figure}
       \centering
-      \begin{subfigure}[b]{0.45\textwidth}
+      \begin{subfigure}[b]{0.6\textwidth}
           \centering
-          \includegraphics[width=\textwidth]{traffic-screenshot-2020-12-29-17-00-01}
-          \caption{Raw data from Google Maps: image with four colors.}
+          \includegraphics[width=\textwidth]{TrafficScreenshot.png}
+          \caption{Raw data from Google Maps: the image contains the city, the main landmarks and some street pixels colored with one of the four colors of traffic.}
           \label{fig:traffic-raw-data}
       \end{subfigure}
       \hfill
       \begin{subfigure}[b]{0.45\textwidth}
           \centering
-          \hspace*{-1.9cm}\includegraphics[height=0.25\textheight]{{number_of_cars}}
-          \vspace*{-1.5cm}
-          \caption{$q(x)$: Projection of the data to $\G$, and weighted average (see \eqref{eq:q}). }
-          \label{fig:traffic-cars-on-edge}
+          \includegraphics[width=\textwidth]{green.pdf}
+          \caption{Green traffic pixels. }
+          \label{fig:green-traffic}
       \end{subfigure}
-      \caption{Treatment of traffic data. \om{[Update these images.]}}
+      \begin{subfigure}[b]{0.45\textwidth}
+          \centering
+          \includegraphics[width=\textwidth]{red.pdf}
+          \caption{Red traffic pixels. }
+          \label{fig:red-traffic}
+      \end{subfigure}
+      \caption{Treatment of traffic data.}
       \label{fig:traffic-preprocess}
  \end{figure}
+ 
 
 
 
@@ -638,14 +658,13 @@ where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction map
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Validation set-up}
-%\om{[OM to AS: This was a full section before but it seems a bit short. Shall we move it to the section on numerical results for example?]}
 
-To validate the results we can only rely on the available (few) sensors (at most $13$ \verify{13?}) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a double Leave-One-Out procedure on the stations:
+To validate the results we can only rely on the available (few) sensors (at most $\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a double Leave-One-Out procedure on the stations:
 \begin{itemize}
-    \item For each station we split the data in a part containing the station, that will be used for testing, and another part without the station used for training. This means that we have to train in total $13$ \verify{13?} different set of models associated with the different data splits.
+    \item For each station we split the data in a part containing the station, that will be used for testing, and another part without the station used for training. This means that we have to train in total $\perplexityinsert{numstations}$ different set of models associated with the different data splits.
     \item For each training set we perform another Leave-One-Out to train each model under different circumstances avoiding this way the possibility of over-fitting.
 \end{itemize}
-
+As some stations are too near the border of the image, the available traffic information is not enough to add meaningfull information, for this reason even though we use all stations as information the leave one out for tsting is only performed on the $\perplexityinsert{numstationstest}$ stations \footnote{\perplexityinsert{stationstest}.}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Linear and nonlinear mappings}

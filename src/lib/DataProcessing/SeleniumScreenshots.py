@@ -18,6 +18,7 @@ CoordsTuple = namedtuple("Coords", "latitude longitude")
 center_of_paris = CoordsTuple(latitude=48.8580073, longitude=2.3342828)
 
 window_size = {'width': 1253, 'height': 1253}
+zoom = 13
 
 
 def do_screenshot(driver, folder, lat, long, zoom, traffic=True):
@@ -108,14 +109,14 @@ if __name__ == "__main__":
 
     # # take background to substract image afterwards
     do_screenshot(driver, folder=selenium_test_dir, lat=center_of_paris.latitude, long=center_of_paris.longitude,
-                  zoom=13,
+                  zoom=zoom,
                   traffic=False)
     while True:
         if time.gmtime().tm_min % screenshot_period == 0:
             print(f"Taking screenshots: {time.gmtime()}")
             do_screenshot(driver, folder=selenium_test_dir, lat=center_of_paris.latitude,
                           long=center_of_paris.longitude,
-                          zoom=13)
+                          zoom=zoom)
             for st in station_coordinates.itertuples():
                 station_traffic_dir = Path.joinpath(selenium_test_dir, st.Nom_Station)
                 station_traffic_dir.mkdir(parents=True, exist_ok=True)
