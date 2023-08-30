@@ -43,6 +43,7 @@ runsinfo.append_info(
     imagey=image_shape[1],
     numstationstest=len(stations2test),
     stationstest=", ".join(stations2test),
+    percentagetraintime=int(100*proportion_of_past_times),
 )
 
 RAM = psutil.virtual_memory().total / 1000000000

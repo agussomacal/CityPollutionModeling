@@ -136,6 +136,10 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
     traffic_past = pollution_past.loc[traffic_past.index.intersection(available_times), :]
     traffic_future = pollution_future.loc[traffic_future.index.intersection(available_times), :]
     times_future = pollution_future.index
+    runsinfo.append_info(
+        numstations=int(len(station_coordinates.columns)),
+        numberoftraintimes=len(times_future),
+    )
 
 with data_manager.track_emissions("PreprocessGraph"):
     import warnings
@@ -358,7 +362,6 @@ if __name__ == "__main__":
     # Linear approximation of distance: distance between Arc du Triumph and Vincennes 9,84km
     ratio = 9840 / cdist([[48.87551413370949, 2.2944611276838867]], [[48.835641353886075, 2.414628350744604]])[0][0]
     runsinfo.append_info(
-        numstations=int(len(station_coordinates.columns)),
         MinDistNodeStation=int(np.max(np.sqrt(np.sum((station_coordinates - vertex_stations) ** 2, axis=0))) * ratio),
     )
     with save_fig([data_manager.path, path2latex_figures], "AvailableStations_InPeriod.pdf", dpi=300):

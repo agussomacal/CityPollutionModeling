@@ -295,6 +295,7 @@
 
 \newcommand{\rkhs}{\ensuremath{\texttt{rkhs}}}
 
+\newcommand{\test}{\text{test}}
 \newcommand{\train}{\text{train}}
 \newcommand{\val}{\text{val}}
 
@@ -595,11 +596,11 @@ We work with traffic information extracted from Google Maps images. On the one h
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Reconstruction benchmarks}
-Our approach to reconstruct an unknown pollution field $u\in V$ from the partial data $x_u\in \cX$ is based on a supervised learning strategy involving super-learners. We thus assume that we have a database of $K$ observations
+Our approach to reconstruct an unknown pollution field $u\in V$ from the partial data $x_u\in \cX$ is based on a supervised learning strategy involving super-learners. We thus assume that we have a database of $T$ observations, one for each time,
 $$
-X_K = \{x_1,\dots, x_K\} \subset \cX,
+X_T = \{x_1,\dots, x_T\} \subset \cX,
 $$
-each $x_k$ corresponding to partial observations of an unknown pollution field $u_k$ that took place in the past. Our goal is to use the database to build a reconstruction map
+each $x_T$ corresponding to partial observations of an unknown pollution field $u_k$ that took place in the past. Our goal is to use the database to build a reconstruction map
 \begin{align*}
 A: \cX &\to V \\
 x &\mapsto A(x)
@@ -628,15 +629,22 @@ Given the above definitions, the best reconstruction mapping is defined as
 \end{equation}
 Unfortunately, in practice it is not possible to find the best $A$ because:
 \begin{itemize}
-\item The set $\cM$ is unknown. Our only information comes from $X_K$ which is connected to a finite set of configurations $u_1, \dots, u_K$ from $\cM$, and it also contains partial information.
+\item The set $\cM$ is unknown. Our only information comes from $X_T$ which is connected to a finite set of configurations $u_1, \dots, u_T$ from $\cM$, and it also contains partial information.
 \item For every $u\in \cM$, we cannot evaluate the error $e(u, A)$ given that we do not have access to $u$ (so we cannot evaluate $u(r)$ for all $r\in \G$ as the norm $\Vert u - A(x_u)\Vert$ would require).
 \item  The above points make it impossible to compute the wort-case error $e_\infty(A)$. The average error $e_\av(A)$ cannot be computed either because, in addition to all the previous points, $\pi$ is also unknown.
 \end{itemize}
-Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, we inevitably have to build sub-optimal mappings. One difficulty that arises is that it is not possible to compare their performance rigorously according to our above quality criteria. Due to this, we propose to develop an approach in which different reconstruction mappings do not compete with each other. Instead, we make them collaborate with each other in a super-learner approach. The strategy relies on nested $n$-fold cross-validation techniques requiring to divide the data base in three disjoint subsets
-$$
-X_K = X^{\train}_1 \cup X^{\train}_2 \cup X^\val
-$$
-where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction mappings, and $X^{\val}$ will serve for out-of-sample validation.
+\asmodif{
+Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, we inevitably have to build sub-optimal mappings as it is not possible to compare their performance rigorously according to our above quality criteria. Due to this, we propose to use nested $n$-fold cross-validation techniques which will be explained in the following section.
+}{}
+
+
+
+
+%disjoint subsets
+%$$
+%X_T = X^{\train}_1 \cup X^{\train}_2 \cup X^\val
+%$$
+%where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction mappings, and $X^{\val}$ will serve for out-of-sample validation. \asmodif{The double split in train is needed for the super-learning approach as the first split is used to train individual models whie the second to train the colaborative combination.}{}
 
 % Due to these difficulties, and in the absence of further information, one resorts to $n$-fold cross-validation techniques. The error $e(u, A)$ is usually replaced by a distance function in $\bR^m$ of the form
 % $$
@@ -644,13 +652,13 @@ where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction map
 % $$
 % and the worst-case or average errors are redifined as
 % $$
-% \tilde e_\infty (A, X_K) \coloneqq \max_{x\in X_K} \tilde e(x, A),
+% \tilde e_\infty (A, X_T) \coloneqq \max_{x\in X_T} \tilde e(x, A),
 % \qquad
-% \tilde e_\av (A, X_K) \coloneqq \frac 1 K \sum_{x\in X_K} \tilde e(x, A).
+% \tilde e_\av (A, X_T) \coloneqq \frac 1 T \sum_{x\in X_T} \tilde e(x, A).
 % $$
 % The best reconstruction mapping is then
 % $$
-% \min_{A: \cX \to V} \tilde e_\star(A, X_K), \quad \star = \{\infty, \av\}.
+% \min_{A: \cX \to V} \tilde e_\star(A, X_T), \quad \star = \{\infty, \av\}.
 % $$
 
 % \om{[Not sure this is the version we want to present.]}
@@ -658,13 +666,31 @@ where $X^{\train}_1$ and $X^{\train}_2$ will be used to train reconstruction map
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Validation set-up}
+\asmodif{
+To validate the results we can only rely on the available (few) sensors (at most $\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a tripple Leave-One-Out procedure on the stations: one for testing, one for training super-learners and the final one for trainig each individual model.
+\begin{enumerate}
+	\item \textbf{Test split}: The first split is performed both in time and space. We take the first $\perplexityinsert{percentagetraintime}\%$ of the available times ($\perplexityinsert{numberoftraintimes}$ hours) for training $T_{\train}$ and the rest for testing $T_{\test}$. The Leave-One-Out is done on the station locations $r^\obs$ and associated pollution measurements $z$. As some stations are too near the border of the image, the available traffic information is not enough to add meaningfull information, for this reason even though we use all stations as information, we only take $\perplexityinsert{numstationstest}$\footnote{Stations away from borders are: \perplexityinsert{stationstest}.} for perfoming the testing Leave-One-Out. This means that we have to train in total $\perplexityinsert{numstationstest}$ different set of models associated with the different testing data splits $s\in S$, $\#S=\perplexityinsert{numstationstest}$, $I_s=\{i \in_{i \neq s} \{1, \dots m\}\}$
+\begin{align}
+	Y^{\test}_s(t) &= (z_s(t), r^\obs_s) \in \bR \times \bR^{2} \, \forall t \in T_{\test} \\
+	X^{\train}_s(t) &= (z_{I_s}(t), r^\obs_{I_s}, q, T, w) \in \bR^{m-1} \times \bR^{2(m-1)} \times V \times \bR\times \bR^2 \, \forall t \in T_{\train}.	
+\end{align}
+	So the test error will be calculated as follws:
+	$$e(u,A) \approx e^{\test}_{LOO}(Y^{\test}_s, A) = \frac{1}{\#T_{\test}}\sum_{t\in T_{\test}}\left(z_s-A(X^{\train}_s)(r^\obs_s)\right)^2$$
+    \item \textbf{Super-learner train split}: For each training set we perform another Leave-One-Out to train each super-learner $(Y^{SL}_s, X^{SL}_s)$ both in $X^{\train}_s$.
+    \item \textbf{Individual models train split}: For each training super-learner set we perform eone more Leave-One-Out to train each individual model under different circumstances avoiding this way the possibility of over-fitting: $(Y^{M}_s, X^{M}_s)$ both in $X^{SL}_s$.
+\end{enumerate}
+}{}
 
-To validate the results we can only rely on the available (few) sensors (at most $\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a double Leave-One-Out procedure on the stations:
-\begin{itemize}
-    \item For each station we split the data in a part containing the station, that will be used for testing, and another part without the station used for training. This means that we have to train in total $\perplexityinsert{numstations}$ different set of models associated with the different data splits.
-    \item For each training set we perform another Leave-One-Out to train each model under different circumstances avoiding this way the possibility of over-fitting.
-\end{itemize}
-As some stations are too near the border of the image, the available traffic information is not enough to add meaningfull information, for this reason even though we use all stations as information the leave one out for tsting is only performed on the $\perplexityinsert{numstationstest}$ stations \footnote{\perplexityinsert{stationstest}.}.
+\ascomment{[Systematic way of writing this successive subdivisions and minimization errors.]}
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/LOOdiagram.jpeg}
+    \caption{Scheme of Leave-One-Out tripple split to avoid over-fitting stations and have a fair comparison between models.}
+    \label{fig:loodiagram}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Linear and nonlinear mappings}
@@ -679,15 +705,15 @@ In practice, to find a good quality $A$, the $\ell_i$ are searched in a paramete
 $$
 L = \{\ell(\cdot , \theta) \in \cX' \cond \theta \in \Theta\}
 $$
-where the parameters $\theta$ belong to a compact set $\Theta \subset \bR^p$. The basis functions of $V_n$ can also be searched in a parameterized family such as, e.g., reproducing kernel functions. Alternatively, they can be selected from a finite collection of available functions that are pertinent for the problem. In our application, this can be done with reduced order modeling of parameterized PDEs describing pollution fields in the graph $\G$ (see Section \ref{sec:PDE}).
+where the parameters $\theta$ belong to a compact set $\Theta \subset \bR^p$. The basis functions of $V_n$ can also be searched in a parameterized family such as, e.g., reproducing kernel functions. Alternatively, they can be selected from a finite collection of available functions that are pertinent for the problem. In our application, this can be done with reduced order modeling of parameterized PDEs describing pollution fields in the graph $\G$ (see Section \ref{sec:PDE}). \ascomment{For the moment we did not use ROM.}
 
-The most usual approach to find the parameters is to resort to cross-validation, in which we search for \om{[Here we do not use the full $z$ but a subset]}
+The most usual approach to find the parameters is to resort to cross-validation, in which we search for
+\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?}
 \begin{equation}
 \label{eq:fit-linear}
 \min_{ \substack{\theta_1,\dots, \theta_n \in \Theta \\ \gamma_1,\dots, \gamma_n \in \Gamma}}
-\sum_{ \substack{x\in X^\train_1 \\ x=(z, r^\obs, q, T, w)}}
-% \sum_{z\in Z^\train}
-\Vert z - \sum_{i=1}^n \ell(x, \theta_i) v(r^\obs, \gamma_i) \Vert^2_2,
+\sum_{ \substack{x\in X^{M} \\ (z, r)\in Y^{M}}}
+\Vert z - \sum_{i=1}^n \ell(x, \theta_i) v(r, \gamma_i) \Vert^2_2,
 \end{equation}
 where $\Vert \cdot \Vert_2$ denotes the Euclidean norm. This norm can of course be replaced by any other lower semi-continuous loss function. From the optimal parameters $\theta_i^*$ and $\gamma_i^*$ of \eqref{eq:fit-linear}, we define
 $$
@@ -700,11 +726,11 @@ $$
 \cF \coloneqq \{ D(\theta): \cX \to V   \cond \theta \in \Theta  \},
 $$
 where the decoder function $D:\cX\to V$ is not necessarily linear. A common choice is to take $D$ as neural-network $\cN\cN$ with a given architecture, and trainable parameters $\theta \in \Theta\subseteq \bR^n$. By computing
+\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?}
 $$
 \theta^* \in \argmin_{\theta \in \Theta}
-\sum_{x\in X^\train_1}
-%\sum_{z\in Z^\train}
-\Vert z - \cN\cN(\theta)(r^\obs) \Vert^2_2,
+\sum_{\substack{x\in X^{M} \\ (z, r)\in Y^{M}}}
+\Vert z - \cN\cN(\theta)(r, x) \Vert^2_2,
 $$
 we then set
 $$
@@ -739,13 +765,13 @@ $$
 \cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\theta^*)( c(x,r) ). 
 $$
 where $\theta^*$ is found by an $n$-fold leave-one out,
+\asmodif{
 $$
-\theta^* \in \argmin_{\theta \in \Theta}
-\sum_{x\in X^\train_2}
-%\sum_{z\in Z^\train}
-\Vert z -  \mathcal{NN} (\theta^*)( c(x,r^\obs) ) \Vert^2_2.
+\theta^* \in \underset{\theta \in \Theta}{\argmin}
+\sum_{\substack{x\in X^{SL} \\ (z, r)\in Y^{SL}}}
+\Vert z -  \mathcal{NN} (\theta^*)( c(x,r) ) \Vert^2_2.
 $$
-Note that here we use the second training set $X^\train_2$ instead of the first one which is used to train each learner. This is done in order to avoid over-fitting.
+Note that here we use the first training set $X^{SL}$ instead of the second one which is used to train each learner.}{} This is done in order to avoid over-fitting.
 
 \begin{figure}
     \centering
