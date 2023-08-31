@@ -1,6 +1,7 @@
 import os.path
 import random
 import time
+from datetime import datetime
 from itertools import chain
 from pathlib import Path
 from typing import List
@@ -345,15 +346,14 @@ print(f"CO2 {data_manager.CO2kg}kg")
 print(f"Electricity consumption {data_manager.electricity_consumption_kWh}kWh")
 
 if __name__ == "__main__":
-    import contextily
+    # import contextily
+    # import geopandas
     import osmnx
-    import geopandas
     import shutil
-    from matplotlib.colors import colorConverter
     import matplotlib.pyplot as plt
     import matplotlib as mpl
 
-    # ----- insight on the data -----
+    # ----- Available stations -----
     node_positions = get_graph_node_positions(graph)
     vertex_stations = pd.DataFrame(np.squeeze([node_positions[np.argmin(cdist(node_positions, np.array([tp])), axis=0)]
                                                for tp in map(tuple, station_coordinates.values.T)]),
@@ -369,9 +369,9 @@ if __name__ == "__main__":
         plot_stations(vertex_stations, latitudes, longitudes, color="red", marker="o", size=7)
         plot_stations(station_coordinates, latitudes, longitudes, color="blue", marker="x", size=7, label=False)
 
+    # ---------- Graph and cropping ---------- #
     original_graph = osm_graph(path=city_dir, filename="ParisGraph", south=lat_bounds.lower, north=lat_bounds.upper,
                                west=long_bounds.lower, east=long_bounds.upper)
-    # TODO: remove in server
     # to_remove = random.sample(list(graph.edges()), k=int(0.2 * graph.number_of_edges()))
     # graph.remove_edges_from(to_remove)
     # runsinfo.append_info(
@@ -395,6 +395,60 @@ if __name__ == "__main__":
         # ax.imshow(load_background(screenshot_period), alpha=0.5)
         fig.set_facecolor("white")
 
+    # ---------- correlation distance ---------- #
+    distance_between_stations = pd.DataFrame(
+        cdist(station_coordinates.values.T * ratio, station_coordinates.values.T * ratio),
+        columns=station_coordinates.columns, index=station_coordinates.columns)
+    pollution = get_pollution(date_start=datetime(2022, 1, 1, 0), date_end=datetime.now())
+    pollution = pollution[station_coordinates.columns]
+    triu = np.triu_indices(len(distance_between_stations), 1)
+    with save_fig([data_manager.path, path2latex_figures], "StationsCorrelationVSDistance.pdf", dpi=300):
+        plt.scatter(distance_between_stations.values[triu], pollution.corr().values[triu])
+        plt.xlabel("Distance (m)")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and distance between stations")
+        plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    # ---------- correlation and resistors distance ---------- #
+    graph = nx.Graph(graph).to_undirected()
+    nx.set_edge_attributes(graph,
+                           {(u, v): data["length"] for u, v, data in graph.edges.data()},#/data["lanes"]
+                           'weight')
+    print(min(nx.get_edge_attributes(graph, "weight").values()))
+    with save_fig([data_manager.path], "ResistorDistanceHistogram.pdf", dpi=300):
+        sns.histplot(nx.get_edge_attributes(graph, "weight").values())
+        plt.xlabel("Weight distance")
+        plt.ylabel("Counts")
+        plt.title("Weight histogram")
+        # plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    vertex_stations_index = pd.Series(np.squeeze([np.argmin(cdist(get_graph_node_positions(graph),
+                                                                  np.array([tp])), axis=0)
+                                                  for tp in map(tuple, station_coordinates.values.T)]),
+                                      index=station_coordinates.columns).T
+    distance = pd.DataFrame(0, columns=vertex_stations_index.index, index=vertex_stations_index.index)
+    for i in range(len(vertex_stations_index)):
+        for j in range(i+1, len(vertex_stations_index)):
+            distance.iloc[i, j] = distance.iloc[j, i] = (
+                nx.resistance_distance(graph, list(graph.nodes)[vertex_stations_index.values[i]],
+                                       list(graph.nodes)[vertex_stations_index.values[j]],
+                                       weight="weight", invert_weight=True))
+    triu = np.triu_indices(len(distance_between_stations), 1)
+    with save_fig([data_manager.path, path2latex_figures], "StationsCorrelationVSResistorDistance.pdf", dpi=300):
+        plt.scatter(distance.values[triu], pollution.corr().values[triu])
+        plt.xlabel("Resistor distance")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and resistor distance between stations")
+        # plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    with save_fig([data_manager.path], "ResistorDistanceVSStationsDistance.pdf", dpi=300):
+        plt.scatter(distance_between_stations.loc[distance.index, distance.columns].values[triu], distance.values[triu])
+        plt.ylabel("Resistor distance")
+        plt.xlabel("Euclidean distance")
+        plt.title("Resistor distance vs Euclidean")
+        # plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    # ---------- Histogram of degree ---------- #
     with save_fig([data_manager.path, path2latex_figures], "Ghistdegree.pdf"):
         degree_sequence = sorted((d for n, d in graph.degree()), reverse=True)
 
@@ -408,12 +462,14 @@ if __name__ == "__main__":
         ax.set_xlabel("Degree")
         ax.set_ylabel("# of Nodes")
 
+    # ---------- Example screenshot ---------- #
     image_path = f"{traffic_screenshots_folder(screenshot_period)}/Screenshot_48.8580073_2.3342828_13_2022_12_8_10_45.png"
     shutil.copyfile(
         image_path,
         f"{path2latex_figures}/TrafficScreenshot.png"
     )
 
+    # ---------- Projection of colors in graph ---------- #
     runsinfo.append_info(
         green=TRAFFIC_COLORS["green"],
         yellow=TRAFFIC_COLORS["yellow"],

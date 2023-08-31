@@ -334,11 +334,11 @@ Some abstract.
 \section*{Remaining things to do}
 \begin{itemize}
 \item Add a bit more citations.
-\item Update some data about the graph in section \ref{sec:problem-setting} 
-\item Explain the concrete methods (section \ref{sec:concrete-methods})
+\item Update some data about the graph in section \ref{sec:problem-setting}  \ascomment{Done and it is linked to the expreiments so if we change them the paper is automatically updated.}
+\item Explain the concrete methods (section \ref{sec:concrete-methods}) \ascomment{Not in numerical experiments better?}
 \item section \ref{sec:numerical-tests} on numerical results
 \item abstract and conclusion
-\item streamline notation for leave-one-out
+\item streamline notation for leave-one-out \ascomment{I wrote an attempt.}
 \end{itemize}
 
 % \section*{Structure of the paper}
@@ -403,7 +403,7 @@ The above obstructions advocate for collaborative strategies combining physics-d
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Contributions and layout of the paper}
-\paragraph{Contributions:} Our main contributions are (i) the construction of a very general ensemble super-learning method for real-time state estimation, and (ii) the application to a non trivial example for urban pollution reconstruction. In our numerical experiments, we work with the inner city of Paris, which is a surface covering around $140\,\textrm{km}^2$. The pollutant that we consider is $\textrm{NO}_2$, mainly produced by vehicle emissions. We use real data from sensor measurements \footnote{Data has been extracted from Airparif database that can be found in  \url{https://data-airparif-asso.opendata.arcgis.com}.}, and traffic data from Google Maps. Compared to previous contributions and other existing reconstruction methods (see, e.g., \cite{MSM2009, TMPPB2013}), the use of such traffic data is rather novel. It gives a rough estimation of the spatial density of street traffic. This level of detail is in contrast to many existing approaches which only use time averages of traffic data. Another distinctive point of our approach is the use of graph descriptions of the city instead of working on a spatial domain of $\bR^2$ or $\bR^3$. This allows us to cope with large spatial domains, and also to define physical models through \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this paper, we work with simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators. %Despite the fact that we focus on urban air pollution, the main ideas of the strategy are general, in the sense that they can be taken as guidelines to adress other problems that can be modeled via quantum graphs.
+\paragraph{Contributions:} Our main contributions are (i) the construction of a very general ensemble super-learning method for real-time state estimation, (ii) the application to a non trivial example for urban pollution reconstruction and \asmodif{(iii) the construction of a dataset comprised of traffic Google Maps Screenshots that can be used for future studies and developements}. In our numerical experiments, we work with the inner city of Paris, which is a surface covering around $140\,\textrm{km}^2$. The pollutant that we consider is $\textrm{NO}_2$, mainly produced by vehicle emissions. We use real data from sensor measurements \footnote{Data has been extracted from Airparif database that can be found in  \url{https://data-airparif-asso.opendata.arcgis.com}.}, and traffic data from Google Maps. Compared to previous contributions and other existing reconstruction methods (see, e.g., \cite{MSM2009, TMPPB2013}), the use of such traffic data is rather novel. It gives a rough estimation of the spatial density of street traffic. This level of detail is in contrast to many existing approaches which only use time averages of traffic data. Another distinctive point of our approach is the use of graph descriptions of the city instead of working on a spatial domain of $\bR^2$ or $\bR^3$. This allows us to cope with large spatial domains, and also to define physical models through \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this paper, we work with simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators. %Despite the fact that we focus on urban air pollution, the main ideas of the strategy are general, in the sense that they can be taken as guidelines to adress other problems that can be modeled via quantum graphs.
 
 
 % In order to cope with the large amount of data, and with the large spatial domain, we model the problem with \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this work, we consider simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators.
@@ -482,16 +482,27 @@ Note that concentration measurements from other pollutants are usually also avai
 \subsection{Paris graph}
 \label{sec:paris-graph}
 
-As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. \asmodif{We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with the graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The full graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges but we work with the biggest connected component of the subgraph that remains after filtering out all the edges whose associated streets have never been colored with traffic iformation. After this operation the actual graph used has $n(\V)=\perplexityinsert{numnodesfilter}$ vertices and $n(\E)=\perplexityinsert{numedgesfilter}$}{}. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
+As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. \asmodif{We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with the graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The full graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges but we work with the biggest connected component of the subgraph that remains after filtering out all the edges whose associated streets have never been colored with traffic iformation. After this operation the actual graph used has $n(\V)=\perplexityinsert{numnodesfilter}$ vertices and $n(\E)=\perplexityinsert{numedgesfilter}$ edges}{}. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
 
-\begin{figure}[h]
-\centering
-\includegraphics[scale=0.5]{Ghistdegree.pdf}
-\caption{Histogram of the degrees of the nodes of $\G$.}
-\label{fig:degree-histogram}
-\end{figure}
+\begin{figure}
+      \centering
+      \begin{subfigure}[b]{0.48\textwidth}
+          \centering
+          \includegraphics[width=\textwidth]{StationsCorrelationVSDistance.pdf}
+          \caption{Correlation between stations as a function of the distance. The vertical slashed red line marks the maximal separation between vertex and station ($\perplexityinsert{MinDistNodeStation}$m) which still lays in the zone of high correlation.}
+          \label{fig:correlation}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+          \centering
+			\includegraphics[width=\textwidth]{Ghistdegree.pdf}
+			\caption{Histogram of the degrees of the nodes of $\G$.}
+          \label{fig:degree-histogram}
+      \end{subfigure}
+      \label{fig:stations-nodes}
+ \end{figure}
 
-We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m)}{} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m, see \cref{fig:correlation})}{} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
 
 
 \begin{figure}
@@ -506,7 +517,7 @@ We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in th
       \begin{subfigure}[b]{0.48\textwidth}
           \centering
           \includegraphics[width=\textwidth]{GoogleMapsAndOpenStreetMap.pdf}
-          \caption{The associated metric graph from Open Street Maps: in yellow the edges kept after filtering the roads that never had google traffic activation.}
+          \caption{The associated metric graph from Open Street Maps: in yellow the edges kept after filtering the roads that never had google traffic activation (red).}
           \label{fig:paris-graph}
       \end{subfigure}
       \caption{Available stations in Paris and street graph.}
@@ -751,42 +762,52 @@ One practical way to approximate the best mapping from \eqref{eq:best-A} is to c
 \end{align}
 where $\rF = \cF(\cX, V)$ denotes the set of functions from $\cX$ to $V$.
 
-Similarly to Section \ref{sec:mappings}, we can again build linear and nonlinear super-learners. The most simple possibility is to consider a linear combination of the learners (usually called aggregation in statistics),
+Similarly to Section \ref{sec:mappings}, we can again build linear and nonlinear super-learners. The most simple possibility is to consider a linear combination (usually called aggregation in statistics),
 $$
-\cS(A_1, \dots, A_p) = \sum_{i=1}^p \theta_i A_i,
+\cS(A_1, \dots, A_p) = \sum_{i=1}^p \sigma_i A_i,
 $$
-and we then search for the best coefficients $\theta_1, \dots, \theta_p$ 
-\ascomment{[Do we name also $\theta$ to the SL parameters?]} with a leave-one-out procedure. We can alternatively introduce a non linear mapping (for example, a neural network) that also depends on parameters $\theta$ to be learnt and that transforms the individual learners outputs into a single prediction. Defining the vector
+and we then search for the best coefficients $\sigma_1, \dots, \sigma_p$ with a leave-one-out procedure. We can alternatively introduce a non linear mapping (for example, a neural network) that also depends on parameters $\sigma$ to be learnt and that transforms the individual learners outputs into a single prediction. Defining the vector
 $$
 c(x, r) = ( A_1(x)(r), \dots, A_p(x)(r) )^T \in \bR^p, \quad \forall (x,r)\in \cX\times \G,
 $$
 we define
 $$
-\cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\theta^*)( c(x,r) ). 
+\cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\sigma^*)( c(x,r) ). 
 $$
-where $\theta^*$ is found by an $n$-fold leave-one out,
+where $\sigma^*$ is found by an $n$-fold leave-one out,
 \asmodif{
 $$
-\theta^* \in \underset{\theta \in \Theta}{\argmin}
+\sigma^* \in \underset{\sigma \in \Sigma}{\argmin}
 \sum_{\substack{x\in X^{SL} \\ (z, r)\in Y^{SL}}}
-\Vert z -  \mathcal{NN} (\theta^*)( c(x,r) ) \Vert^2_2.
+\Vert z -  \mathcal{NN} (\sigma^*)( c(x,r) ) \Vert^2_2.
 $$
 Note that here we use the first training set $X^{SL}$ instead of the second one which is used to train each learner.}{} This is done in order to avoid over-fitting.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/todo.jpeg}
-    \caption{Scheme of different superlearner strategies.}
-    \label{fig:superlearners}
-\end{figure}
+%\begin{figure}
+%    \centering
+%    \includegraphics[width=\linewidth]{figures/todo.jpeg}
+%    \caption{Scheme of different superlearner strategies.}
+%    \label{fig:superlearners}
+%\end{figure}
 
-\asmodif{To Agus: expand and explain more precisely. In each "transition" there is a model to learn.}{
-Finally, another way to build a super-learner is the following. Assuming that we only use the measurement observations as input data, we consider mappings $A_j: \cZ \to V$. We can then concatenate the mappings in a sequential manner, and each learner is trained to correct the errors produced by the previous ones, hence}
-\begin{align*}
-\cS_j(A_1, \dots, A_j)(z) &= A_j(z-\cS_{j-1}(A_1,\dots, A_{j-1})(z)(r^\obs)), \quad 1<j \leq p,\\
-\cS_1(A_1) &= A_1.
-\end{align*}
-
+\asmodif{
+Finally, another way to build a super-learner is by sequentially composing individual models $A_j$ together with transition functions $P_j$ and train them to correct the errors of previous ones so that 
+$$
+S_j(A_1, \dots, A_j) = P_j(\sigma_j^*) \circ A_j(\theta_j^*) \circ \dots \circ P_1(\sigma_1^*) \circ A_1(\theta_1^*)
+$$
+and $S=S_p$. At each step $j$ the target of each submodel is to correct the residuals $\tilde z_j=z - \cS_{j-1}(r, x)$ of previous steps, so $(z, r)\in Y^{M} \mapsto (\tilde z_j^{Y^{M}}, r) \in \tilde Y^{M}$. At the same time the information received from the pollution part of the input $x$ is also replaced by the last residual $x = (z, r^\obs, q, T, w) \in X^{M} \mapsto x_j^M = (\tilde z_j^{X^{M}}, r^\obs, q, T, w) \in \tilde X^{M}$ so the minimization problem in this step becomes
+$$
+\theta_j^* \in \underset{\theta_j \in \Theta_j}{\argmin}
+\sum_{x_j^M, \tilde z_j^{Y^{M}}, r}
+\Vert \tilde z_j^{Y^{M}} - A_j(\theta_j)(r, x_j^M)) \Vert^2_2.
+$$
+The transition maps $P_j$ are also trained to correct the residuals $\hat z_j=z - A_j(\theta_j^*)\circ\cS_{j-1}(r, x)$ of previous steps, so $(z, r)\in Y^{SL} \mapsto (\hat z_j^{Y^{SL}}, r) \in \hat Y^{SL}$ and $x = (z, r^\obs, q, T, w) \in X^{SL} \mapsto x_j^{SL} = (\tilde z_j^{X^{SL}}, r^\obs, q, T, w)  \in \hat X^{SL}$ so the minimization problem in this step becomes
+$$
+\sigma_j^* \in \underset{\sigma_j \in \Sigma_j}{\argmin}
+\sum_{\hat z_j^{X^{SL}}, \hat z_j^{Y^{SL}}, r}
+\Vert \hat z_j^{Y^{SL}} - P_j(\sigma_j)(\hat z_j^{X^{SL}}) \Vert^2_2.
+$$
+}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -833,7 +854,7 @@ In our case, we performed the following steps:
 \subsection{Physical PDEs: Elliptic Operator on Quantum graph}
 \label{sec:PDE}
 \om{[Olga to Agustin: It is not clear how we use the PDE to build a mapping $A$. We should explain this better.]}
-\ascomment{In the experiments at the end we never used. By searching to create the right mapping for the source term we arrived to the graph nn and k-neighbours approach and nested learners}
+\ascomment{In the experiments at the end we never used. By searching to create the right mapping for the source term we arrived to the graph nn and k-neighbours approach and nested learners. In any case, the PDE gives the solution on each node of the graph then it gives also in the positions r that are queried.}
 
 Another way of modelling pollutant dispersion is through the construction of a \emph{quantum graph}. For this, we endow our metric graph $\G$ with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem.
 
@@ -850,8 +871,8 @@ which we choose to complement with ``Newmann-Kirchoff'' conditions on the vertic
 \label{eq:newmann-kirchoff}
 \sum_{\ee\in \E(v)}\frac{\dd u}{\dr}\Big\vert_\ee (v) = 0,\quad \forall v \in \V.
 \end{equation}
-Here, the derivatives are assumed to be taken in the directions away from the vertex (i.e., into the edge), which we will call outgoing directions. The function $a$ is a diffusion coefficient, and we assume $a\in L^\infty(\G)$. The function $h$ is an absorption coefficient, supposed in $L^\infty(\G)$. The function $q$ is a source term and assumed to be in $L^2(\G)$. In the modeling of urban air pollution, $q$ accounts for all possible pollution sources. These essentially come from traffic emissions, local heating, pollution from industries in the city and particles coming from outside the city. In this work, we concentrate on traffic which is among the most important ones, and is challenging to incorporate in real time. We use the traffic data from Google Maps to map it into traffic emissions following the procedure from in Section \ref{sec:traffic-preprocess}. This mapping yields the source term $q$ from equation \eqref{eq:q} which we now use as a source term in \eqref{eq:strong-form-elliptic}. \asmodif{Original section changed: leave a linear model? Readapt this paragraph [Agus]}{Note that $q$ depends on the parameters $\{w_\texttt{c}\}_{\texttt{c}\in \texttt{colors}}$ and we need to calibrate them. For this, we solve a parameter estimation problem in a pre-processing step and we  we search for the best parameter values that match at best observations taken during a certain time interval. We omit explaining the full details of this parameter estimation to keep the presentation concise.}
-
+Here, the derivatives are assumed to be taken in the directions away from the vertex (i.e., into the edge), which we will call outgoing directions. The function $a$ is a diffusion coefficient, and we assume $a\in L^\infty(\G)$. The function $h$ is an absorption coefficient, supposed in $L^\infty(\G)$. The function $q$ is a source term and assumed to be in $L^2(\G)$. In the modeling of urban air pollution, $q$ accounts for all possible pollution sources. These essentially come from traffic emissions, local heating, pollution from industries in the city and particles coming from outside the city. In this work, we concentrate on traffic which is among the most important ones, and is challenging to incorporate in real time. We use the traffic data from Google Maps to map it into traffic emissions following the procedure from in Section \ref{sec:traffic-preprocess}. This mapping yields the source term $q$ which we now use as a source term in \eqref{eq:strong-form-elliptic}. 
+%\asmodif{Original section changed: leave a linear model? Readapt this paragraph [Agus]}{Note that $q$ depends on the parameters $\{w_\texttt{c}\}_{\texttt{c}\in \texttt{colors}}$ and we need to calibrate them. For this, we solve a parameter estimation problem in a pre-processing step and we  we search for the best parameter values that match at best observations taken during a certain time interval. We omit explaining the full details of this parameter estimation to keep the presentation concise.}
 %In fact the other terms are assumed to be constant in space. We first solve the equation with traffic data as the source term, then add a constant correction
 
 
@@ -1253,6 +1274,6 @@ The bounds reveal that, if $V_n$ is a bad approximation space for $u$, $\inf_{v\
 
 % Bibliography
 \bibliographystyle{unsrt}
-\bibliography{literature}
+\bibliography{literature.bib}
 
 \end{document}
