@@ -21,6 +21,10 @@ window_size = {'width': 1253, 'height': 1253}
 zoom = 13
 
 
+def get_filename_from_date(zoom, lat, long, t):
+    return f"Screenshot_{lat}_{long}_{zoom}_{t.tm_year}_{t.tm_mon}_{t.tm_mday}_{t.tm_hour}_{t.tm_min}"
+
+
 def do_screenshot(driver, folder, lat, long, zoom, traffic=True):
     t = time.gmtime()
     try:
@@ -36,7 +40,7 @@ def do_screenshot(driver, folder, lat, long, zoom, traffic=True):
                  "/html/body/div[3]/div[9]/div[23]/div[1]/div[2]/div[5]/div/div/span[5]/div/span[2]/button/span/span"))).click()
 
         # save screenshot in specified location
-        filename = f"Screenshot_{lat}_{long}_{zoom}_{t.tm_year}_{t.tm_mon}_{t.tm_mday}_{t.tm_hour}_{t.tm_min}" if traffic else f"Background_{lat}_{long}_{zoom}"
+        filename = get_filename_from_date(zoom, lat, long, t) if traffic else f"Background_{lat}_{long}_{zoom}"
         driver.save_screenshot(f'{folder}/{filename}.png')
     except:
         print(f"Aborted screenshot for: {folder} and {t.tm_mday} {t.tm_hour}:{t.tm_min}")
@@ -48,7 +52,7 @@ def get_info_from_name(fname):
     minute = minute.split(".")[0]
     year, month, day, hour, minute = list(map(int, [year, month, day, hour, minute]))
     return name, CoordsTuple(latitude=lat, longitude=long), \
-           int(zoom), datetime(*list(map(int, [year, month, day, hour, minute])))
+        int(zoom), datetime(*list(map(int, [year, month, day, hour, minute])))
 
 
 def traffic_screenshots_folder(screenshot_period):

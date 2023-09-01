@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
 
+from PerplexityLab.miscellaneous import if_exist_load_else_do
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from src.lib.FeatureExtractors.FeatureExtractorsBase import FeatureExtractor
 
@@ -74,3 +75,27 @@ class FEGraphNeighboringTraffic(FeatureExtractor):
                 # it can happen that no neighbouring edges have been with traffic so dc=0
                 traffic_by_node[:, j, level] /= max((1, dc))
         return traffic_by_node
+
+
+@if_exist_load_else_do(file_format="joblib", description=None)
+def get_traffic_by_node(k_neighbours, times, traffic_by_edge, graph, nodes):
+    traffic_by_node = np.zeros((len(times), len(nodes), len(TRAFFIC_VALUES) * k_neighbours))
+    traffic_by_edge_normalization = {e: max((1, df.sum(axis=1).max())) for e, df in traffic_by_edge.items()}
+
+    for j, node in enumerate(nodes):
+        depth = {node: 0}
+        depth_count = [0] * k_neighbours
+        for edge in nx.bfs_tree(graph, source=node, depth_limit=1).edges():
+            if edge[1] not in depth:
+                depth[edge[1]] = depth[edge[0]] + 1
+            if edge in traffic_by_edge:
+                area = graph.edges[edge]["lanes"] * graph.edges[edge]["length"]
+                depth_count[min((depth[edge[0]], depth[edge[1]]))] += area
+                level = np.arange(len(TRAFFIC_VALUES), dtype=int) + depth[edge[0]] * len(TRAFFIC_VALUES)
+                traffic_by_node[:, j, level] += traffic_by_edge[edge].loc[times, :] / traffic_by_edge_normalization[
+                    edge] * area
+        for d, dc in enumerate(depth_count):
+            level = np.arange(len(TRAFFIC_VALUES), dtype=int) + d * len(TRAFFIC_VALUES)
+            # it can happen that no neighbouring edges have been with traffic so dc=0
+            traffic_by_node[:, j, level] /= max((1, dc))
+    return traffic_by_node

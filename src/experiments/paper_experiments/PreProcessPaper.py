@@ -17,7 +17,7 @@ from sklearn.pipeline import Pipeline
 
 from PerplexityLab.DataManager import DataManager
 from PerplexityLab.miscellaneous import timeit, if_true_str, filter_dict
-from PerplexityLab.visualization import save_fig, perplex_plot
+from PerplexityLab.visualization import save_fig, perplex_plot, one_line_iterator
 from src.config import results_dir, city_dir
 from src.experiments.paper_experiments.params4runs import screenshot_period, recalculate_traffic_by_pixel, \
     nrows2load_traffic_data, proportion_of_past_times, shuffle, chunksize, stations2test, simulation, max_num_stations, \
@@ -25,7 +25,8 @@ from src.experiments.paper_experiments.params4runs import screenshot_period, rec
 from src.lib.DataProcessing.OtherVariablesPreprocess import process_windGuru_data
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
-from src.lib.DataProcessing.SeleniumScreenshots import traffic_screenshots_folder
+from src.lib.DataProcessing.SeleniumScreenshots import traffic_screenshots_folder, get_filename_from_date, \
+    center_of_paris
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background, load_image, filter_image_by_colors, TRAFFIC_VALUES, TRAFFIC_COLORS
@@ -125,9 +126,10 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
     # TODO check version of osmnx: AttributeError: module 'osmnx' has no attribute 'nearest_edges'
     wind = process_windGuru_data("WindVelocity")
     temperature = process_windGuru_data("Temperature")
-
+    # filtering times where some station has NaN
+    available_times = pollution_past.index[~pollution_past.isna().T.any()].union(
+        pollution_future.index[~pollution_future.isna().T.any()])
     # filter times where wind and temperature also exist.
-    available_times = pollution_past.index.union(pollution_future.index)
     available_times = temperature[~temperature.isna()].index.intersection(
         wind[~wind.isna().values].index.intersection(available_times))
     print("Available times after filtering Temperature and Wind NaNs", len(available_times))
@@ -342,6 +344,38 @@ def plot_pollution_map(fig, ax, station, trained_model, time, cmap='RdGy', num_p
     # ax.colorbar()
 
 
+def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes):
+    data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
+                                                observed_pollution=pollution_future.loc[[time], :],
+                                                traffic=traffic_future.loc[[time], :])
+    node_positions = get_graph_node_positions(graph)[nodes_indexes]
+    data_known["target_positions"] = pd.DataFrame(node_positions, columns=["long", "lat"]).T
+    estimation = trained_model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
+                                                distance_between_stations_pixels=distance_between_stations_pixels,
+                                                graph=graph, traffic_by_edge=traffic_by_edge,
+                                                temperature=temperature, wind=wind, longitudes=longitudes,
+                                                latitudes=latitudes)
+    return pd.concat(
+        (pd.DataFrame(node_positions, columns=["long", "lat"]), pd.DataFrame(estimation, columns=["pollution"])),
+        axis=1)
+
+
+@perplex_plot()
+@one_line_iterator
+def plot_pollution_map_in_graph(fig, ax, station, trained_model, time=None, nodes_indexes=None, cmap='RdGy', zoom=13,
+                                center_of_city=center_of_paris, s=20, alpha=0.5):
+    img = load_image(
+        f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
+    # img = load_background(screenshot_period)
+    ax.imshow(img, extent=[0, 1, 0, 1], alpha=1-alpha)
+    estimation = estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes=nodes_indexes)
+    sc = ax.scatter(x=(estimation["long"] - long_bounds.lower) / (long_bounds.upper - long_bounds.lower),
+                    y=(estimation["lat"] - lat_bounds.lower) / (lat_bounds.upper - lat_bounds.lower),
+                    c=estimation["pollution"], cmap=cmap,
+                    s=s, alpha=alpha)
+    plt.colorbar(sc, ax=ax)
+
+
 print(f"CO2 {data_manager.CO2kg}kg")
 print(f"Electricity consumption {data_manager.electricity_consumption_kWh}kWh")
 
@@ -359,8 +393,10 @@ if __name__ == "__main__":
                                                for tp in map(tuple, station_coordinates.values.T)]),
                                    columns=["long", "lat"],
                                    index=station_coordinates.columns).T
-    # Linear approximation of distance: distance between Arc du Triumph and Vincennes 9,84km
+    # Linear approximation of distance: distance between Arc du Triumph and Vincennes 9,84km or
+    # 0.1266096365565058 lat long
     ratio = 9840 / cdist([[48.87551413370949, 2.2944611276838867]], [[48.835641353886075, 2.414628350744604]])[0][0]
+
     runsinfo.append_info(
         MinDistNodeStation=int(np.max(np.sqrt(np.sum((station_coordinates - vertex_stations) ** 2, axis=0))) * ratio),
     )
@@ -409,10 +445,28 @@ if __name__ == "__main__":
         plt.title("Correlation and distance between stations")
         plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
 
+    with save_fig([data_manager.path], "StationsCorrelationVSDistancelog.pdf", dpi=300):
+        plt.scatter(distance_between_stations.values[triu], pollution.corr().values[triu])
+        plt.xlabel("Distance (m)")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and distance between stations")
+        plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+        plt.xscale("log")
+        # plt.yscale("log")
+
+    # ---------- correlation distance ---------- #
+    with save_fig([data_manager.path], "StationsCorrelationVSDistanceWithoutSnaphotmean.pdf", dpi=300):
+        plt.scatter(distance_between_stations.values[triu],
+                    (pollution.T - pollution.mean(axis=1)).T.corr().values[triu])
+        plt.xlabel("Distance (m)")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and distance between stations")
+        plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
     # ---------- correlation and resistors distance ---------- #
     graph = nx.Graph(graph).to_undirected()
     nx.set_edge_attributes(graph,
-                           {(u, v): data["length"] for u, v, data in graph.edges.data()},#/data["lanes"]
+                           {(u, v): data["length"] for u, v, data in graph.edges.data()},  # /data["lanes"]
                            'weight')
     print(min(nx.get_edge_attributes(graph, "weight").values()))
     with save_fig([data_manager.path], "ResistorDistanceHistogram.pdf", dpi=300):
@@ -428,7 +482,7 @@ if __name__ == "__main__":
                                       index=station_coordinates.columns).T
     distance = pd.DataFrame(0, columns=vertex_stations_index.index, index=vertex_stations_index.index)
     for i in range(len(vertex_stations_index)):
-        for j in range(i+1, len(vertex_stations_index)):
+        for j in range(i + 1, len(vertex_stations_index)):
             distance.iloc[i, j] = distance.iloc[j, i] = (
                 nx.resistance_distance(graph, list(graph.nodes)[vertex_stations_index.values[i]],
                                        list(graph.nodes)[vertex_stations_index.values[j]],
@@ -439,7 +493,14 @@ if __name__ == "__main__":
         plt.xlabel("Resistor distance")
         plt.ylabel("Correlation")
         plt.title("Correlation and resistor distance between stations")
-        # plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    with save_fig([data_manager.path], "StationsCorrelationVSResistorDistancelog.pdf", dpi=300):
+        plt.scatter(distance.values[triu], pollution.corr().values[triu])
+        plt.xlabel("Resistor distance")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and resistor distance between stations")
+        plt.xscale("log")
+        plt.yscale("log")
 
     with save_fig([data_manager.path], "ResistorDistanceVSStationsDistance.pdf", dpi=300):
         plt.scatter(distance_between_stations.loc[distance.index, distance.columns].values[triu], distance.values[triu])
@@ -447,6 +508,12 @@ if __name__ == "__main__":
         plt.xlabel("Euclidean distance")
         plt.title("Resistor distance vs Euclidean")
         # plt.axvline(runsinfo["MinDistNodeStation"], linestyle="--", c="r")
+
+    with save_fig([data_manager.path], "StationsCorrelationVSResistorDistanceWithoutSnaphotmean.pdf", dpi=300):
+        plt.scatter(distance.values[triu], (pollution.T - pollution.mean(axis=1)).T.corr().values[triu])
+        plt.xlabel("Resistor distance")
+        plt.ylabel("Correlation")
+        plt.title("Correlation and resistor distance between stations")
 
     # ---------- Histogram of degree ---------- #
     with save_fig([data_manager.path, path2latex_figures], "Ghistdegree.pdf"):

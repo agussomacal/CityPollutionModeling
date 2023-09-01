@@ -46,8 +46,10 @@ def exponential_kernel(x, y, alpha, beta):
 # ================ ================ ================ #
 class KernelModel(BaseModel):
 
-    def __init__(self, kernel_function, distrust=0, name="", loss=mse, optim_method=GRAD, verbose=False, **kwargs):
-        super().__init__(name=name, loss=loss, optim_method=optim_method, distrust=distrust, verbose=verbose, **kwargs)
+    def __init__(self, kernel_function, distrust=0, name="", loss=mse, optim_method=GRAD, verbose=False,
+                 niter=1000, **kwargs):
+        super().__init__(name=name, loss=loss, optim_method=optim_method, distrust=distrust, verbose=verbose,
+                         niter=niter, **kwargs)
         self.kernel_function = kernel_function
         self.kernel_func_param_names = inspect.getfullargspec(kernel_function).args[2:]
         self.observed_locations = None
@@ -61,12 +63,13 @@ class KernelModel(BaseModel):
                          **kwargs) -> np.ndarray:
         self.calculate_K_matrix(observed_stations)
         k_matrix = self.k_matrix.loc[observed_stations.columns, observed_stations.columns]
-        k_matrix[np.diag_indices(len(k_matrix))] += self.distrust
+        k_matrix.values[np.diag_indices(len(k_matrix))] += self.distrust
         # print(self, ": ", np.linalg.cond(K))
 
         umean = zmean = 0  # np.mean(observed_values)
-        b = np.linalg.lstsq(k_matrix, observed_pollution - zmean, rcond=None)[0]
+        b = np.linalg.lstsq(k_matrix, (observed_pollution - zmean).T, rcond=None)[0].T
         prediction = umean + b @ self.kernel_eval(observed_stations, target_positions)
+        # TODO: what to do when observed_stations has nans?
         return prediction
 
     def calculate_K_matrix(self, observed_stations):
@@ -79,11 +82,11 @@ class KernelModel(BaseModel):
             self.observed_locations = observed_stations
         else:
             new_stations = list(set(observed_stations.columns).difference(self.observed_locations.columns))
-            self.observed_locations.append(observed_stations[new_stations], axis=1)
+            self.observed_locations = pd.concat((self.observed_locations, observed_stations[new_stations]), axis=1)
         # TODO: only calculate the distances between the new positions and the new+old.
         self.k_matrix = pd.DataFrame(
             self.kernel_function(self.observed_locations.values.T, self.observed_locations.values.T,
-                                 filter_dict(self.kernel_func_param_names, **self.params)),
+                                 **filter_dict(self.kernel_func_param_names, self.params)),
             columns=self.observed_locations.columns, index=self.observed_locations.columns)
 
     def kernel_eval(self, observed_stations, target_positions) -> np.ndarray:
@@ -100,8 +103,8 @@ class KernelModel(BaseModel):
 #               Specific kernel models               #
 # ================ ================ ================ #
 class GaussianKernelModel(KernelModel):
-    def __init__(self, sigma, beta, distrust=0, name="", loss=mse, optim_method="lsq", verbose=False):
-        super().__init__(name=name, kernel_function=gaussian_kernel, loss=loss,
+    def __init__(self, sigma, beta, distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False):
+        super().__init__(name=name, kernel_function=gaussian_kernel, loss=loss, niter=niter,
                          optim_method=optim_method, sigma=sigma, beta=beta, distrust=distrust, verbose=verbose)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
@@ -124,8 +127,9 @@ class GaussianKernelModel(KernelModel):
 
 
 class ExponentialKernelModel(KernelModel):
-    def __init__(self, alpha=None, beta=None, distrust=0, name="", loss=mse, optim_method="lsq", verbose=False):
-        super().__init__(name=name, kernel_function=exponential_kernel, loss=loss,
+    def __init__(self, alpha=None, beta=None, distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000,
+                 verbose=False):
+        super().__init__(name=name, kernel_function=exponential_kernel, loss=loss, niter=niter,
                          optim_method=optim_method, alpha=alpha, beta=beta, distrust=distrust, verbose=verbose)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
