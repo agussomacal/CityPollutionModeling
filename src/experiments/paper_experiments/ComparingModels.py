@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import datetime
 from functools import partial
 
 import numpy as np
@@ -15,8 +16,9 @@ from PerplexityLab.LabPipeline import LabPipeline
 from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
 from PerplexityLab.visualization import generic_plot
 from src.experiments.paper_experiments.PreProcessPaper import train_test_model, train_test_averagers, stations2test, \
-    plot_pollution_map_in_graph, times_future, graph
+    plot_pollution_map_in_graph, times_future, graph, pollution_past
 from src.experiments.paper_experiments.params4runs import path2latex_figures
+from src.lib.FeatureExtractors.GraphFeatureExtractors import label_prop, diffusion_eq
 from src.lib.Models.BaseModel import ModelsSequenciator, \
     medianse, NONE_OPTIM_METHOD, mse, GRAD
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel
@@ -28,7 +30,7 @@ if __name__ == "__main__":
     k_neighbours = 10
     # experiment_name = f"MapExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
     #                   f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
-    experiment_name = "Paper"
+    experiment_name = "Paper2"
 
     data_manager = DataManager(
         path=config.results_dir,
@@ -62,68 +64,68 @@ if __name__ == "__main__":
                 Pipeline([("Lss", LassoCV(selection="cyclic"))])
             ]
         ),
-        ModelsSequenciator(
-            name="LR",
-            models=[
-                SnapshotMeanModel(summary_statistic="mean"),
-                GraphEmissionsNeigEdgeModel(
-                    extra_regressors=[],
-                    k_neighbours=k_neighbours,
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-                    model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-                    niter=2, verbose=True,
-                    optim_method=NONE_OPTIM_METHOD,
-                    loss=medianse)
-            ],
-            transition_model=[
-                Pipeline([("LR", LinearRegression())]),
-                Pipeline([("Lss", LassoCV(selection="cyclic"))])
-            ]
-        ),
-        ModelsSequenciator(
-            name="LR_Extra",
-            models=[
-                SnapshotMeanModel(summary_statistic="mean"),
-                GraphEmissionsNeigEdgeModel(
-                    extra_regressors=["temperature", "wind"],
-                    k_neighbours=k_neighbours,
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-                    model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-                    niter=2, verbose=True,
-                    optim_method=NONE_OPTIM_METHOD,
-                    loss=medianse)
-            ],
-            transition_model=[
-                Pipeline([("LR", LinearRegression())]),
-                Pipeline([("Lss", LassoCV(selection="cyclic"))])
-            ]
-        ),
-        ModelsSequenciator(
-            name="NN_Extra",
-            models=[
-                SnapshotMeanModel(summary_statistic="mean"),
-                GraphEmissionsNeigEdgeModel(
-                    extra_regressors=["temperature", "wind"],
-                    k_neighbours=k_neighbours,
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-                    model=Pipeline(
-                        steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=(20, 20,),
-                                                                                 activation="relu",  # 'relu',
-                                                                                 learning_rate_init=0.1,
-                                                                                 learning_rate="adaptive",
-                                                                                 early_stopping=True,
-                                                                                 solver="adam",
-                                                                                 max_iter=10000))]),
-                    niter=2, verbose=True,
-                    optim_method=NONE_OPTIM_METHOD,
-                    loss=medianse)
-            ],
-            transition_model=[
-                Pipeline([("LR", LinearRegression())]),
-                Pipeline([("Lss", LassoCV(selection="cyclic"))])
-            ]
-        ),
+        # ModelsSequenciator(
+        #     name="LR",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             extra_regressors=[],
+        #             k_neighbours=k_neighbours,
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
+        # ModelsSequenciator(
+        #     name="LR_Extra",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             extra_regressors=["temperature", "wind"],
+        #             k_neighbours=k_neighbours,
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
+        # ModelsSequenciator(
+        #     name="NN_Extra",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             extra_regressors=["temperature", "wind"],
+        #             k_neighbours=k_neighbours,
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+        #             model=Pipeline(
+        #                 steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=(20, 20,),
+        #                                                                          activation="relu",  # 'relu',
+        #                                                                          learning_rate_init=0.1,
+        #                                                                          learning_rate="adaptive",
+        #                                                                          early_stopping=True,
+        #                                                                          solver="adam",
+        #                                                                          max_iter=10000))]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
     ]
 
     lab = LabPipeline()
@@ -190,23 +192,38 @@ if __name__ == "__main__":
     plot_pollution_map_in_graph(
         data_manager=data_manager,
         folder=path2latex_figures,
-        time=times_future[4], station="OPERA",
+        time=times_future[4],
+        # diffusion_method=partial(diffusion_eq, path=data_manager.path, graph=graph, diffusion_coef=1,
+        #                          absorption_coef=0.01, recalculate=False),
+        # diffusion_method=partial(label_prop, graph=graph,
+        #                          edge_function=lambda data: 1.0 / data["length"],
+        #                          lamb=1, iter=10, p=0.5),
+        # diffusion_method=lambda f: label_prop(f=f + np.random.uniform(size=np.shape(f)), graph=graph,
+        #                                       edge_function=lambda data: 1.0 / data["length"],
+        #                                       lamb=1, iter=10, p=0.1),
+        diffusion_method=lambda f: f,
+        # time=times_future[4], Screenshot_48.8580073_2.3342828_13_2022_12_8_13_15
+        # time=pollution_past.index[11],
+        station="OPERA",
         plot_by=["model", "station"],
-        num_cores=10, models=name_models, model=["SnapshotMeanModelmean", "AvgKrigging"],
+        num_cores=1, models=name_models, model=[
+            # "SnapshotMeanModelmean", "AvgKrigging",
+            "GaussianKernelModel"
+        ],
         nodes_indexes=np.arange(len(graph)), s=10,
-        cmap=sns.color_palette("coolwarm", as_cmap=True), alpha=0.7, dpi=300,
+        cmap=sns.color_palette("autumn", as_cmap=True), alpha=0.7, dpi=300,
         format=".pdf")
 
-    plot_pollution_map_in_graph(
-        data_manager=data_manager,
-        folder=path2latex_figures,
-        time=times_future[4], station="OPERA",
-        plot_by=["model", "station"],
-        num_cores=10, models=name_models, model=["LR", "LR_Extra", "NN_Extra", "Ensamble"], s=10,
-        nodes_indexes=np.arange(len(graph)),
-        # nodes_indexes=np.random.choice(len(graph), size=2000, replace=False),
-        cmap=sns.color_palette("coolwarm", as_cmap=True), alpha=0.7, dpi=300,
-        format=".pdf")
+    # plot_pollution_map_in_graph(
+    #     data_manager=data_manager,
+    #     folder=path2latex_figures,
+    #     time=times_future[4], station="OPERA",
+    #     plot_by=["model", "station"],
+    #     num_cores=10, models=name_models, model=["LR", "LR_Extra", "NN_Extra", "Ensamble"], s=10,
+    #     nodes_indexes=np.arange(len(graph)),
+    #     # nodes_indexes=np.random.choice(len(graph), size=2000, replace=False),
+    #     cmap=sns.color_palette("coolwarm", as_cmap=True), alpha=0.7, dpi=300,
+    #     format=".pdf")
 
     generic_plot(
         data_manager=data_manager,

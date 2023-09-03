@@ -19,7 +19,8 @@ from tqdm import tqdm
 
 from PerplexityLab.miscellaneous import timeit, partial_filter
 from src.lib.Models.BaseModel import NONE_OPTIM_METHOD, mse
-from src.lib.Models.TrueStateEstimationModels.GraphModels import GraphModelBase, compute_adjacency
+from src.lib.Models.TrueStateEstimationModels.GraphModels import GraphModelBase
+from src.lib.FeatureExtractors.GraphFeatureExtractors import compute_adjacency
 
 tf.compat.v1.enable_eager_execution()
 

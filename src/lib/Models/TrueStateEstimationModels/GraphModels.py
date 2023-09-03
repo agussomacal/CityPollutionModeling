@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Union
 
 import networkx as nx
 import numpy as np
@@ -13,7 +13,8 @@ from PerplexityLab.miscellaneous import filter_dict, timeit
 from src.experiments.config_experiments import screenshot_period
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES, load_background
 from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEConvolutionFixedPixels, WaterColor, GreenAreaColor
-from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions
+from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions, compute_adjacency, \
+    compute_laplacian_matrix_from_graph
 from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
@@ -200,28 +201,6 @@ class GraphModelBase(BaseModel):
 
 # ================================================== #
 # -------- prepare_graph auxiliary functions ------- #
-
-# ------------- auxiliary functions ------------ #
-def compute_function_on_graph_edges(function, graph, edge_function: Callable):
-    nx.set_edge_attributes(graph,
-                           {(u, v): edge_function(data) for u, v, data in graph.edges.data()},
-                           'weight')
-    return function(graph, weight="weight")
-
-
-def compute_adjacency(graph, edge_function: Callable):
-    return compute_function_on_graph_edges(nx.adjacency_matrix, graph, edge_function)
-
-
-def compute_laplacian_matrix_from_graph(graph, edge_function: Callable):
-    # return (nx.laplacian_matrix(graph, weight="weight")).toarray()
-    return compute_function_on_graph_edges(nx.laplacian_matrix, graph, edge_function)
-
-
-def compute_degree_from_graph(graph, edge_function: Callable):
-    return compute_function_on_graph_edges(nx.degree, graph, edge_function)
-
-
 class GraphEmissionsNeigEdgeModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 

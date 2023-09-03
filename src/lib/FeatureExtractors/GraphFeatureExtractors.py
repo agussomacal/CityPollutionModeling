@@ -1,9 +1,14 @@
+from typing import Callable
+
 import networkx as nx
 import numpy as np
 import pandas as pd
+from scipy.sparse.linalg import gmres
 from scipy.spatial.distance import cdist
+from tqdm import tqdm
 
 from PerplexityLab.miscellaneous import if_exist_load_else_do
+from src.config import city_dir
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from src.lib.FeatureExtractors.FeatureExtractorsBase import FeatureExtractor
 
@@ -75,6 +80,88 @@ class FEGraphNeighboringTraffic(FeatureExtractor):
                 # it can happen that no neighbouring edges have been with traffic so dc=0
                 traffic_by_node[:, j, level] /= max((1, dc))
         return traffic_by_node
+
+
+# ------------- auxiliary functions ------------ #
+def compute_function_on_graph_edges(function, graph, edge_function: Callable):
+    nx.set_edge_attributes(graph,
+                           {(u, v): edge_function(data) for u, v, data in graph.edges.data()},
+                           'weight')
+    return function(graph, weight="weight")
+
+
+def compute_adjacency(graph, edge_function: Callable):
+    return compute_function_on_graph_edges(nx.adjacency_matrix, graph, edge_function)
+
+
+def compute_laplacian_matrix_from_graph(graph, edge_function: Callable):
+    # return (nx.laplacian_matrix(graph, weight="weight")).toarray()
+    return compute_function_on_graph_edges(nx.laplacian_matrix, graph, edge_function)
+
+
+def compute_degree_from_graph(graph, edge_function: Callable):
+    return compute_function_on_graph_edges(nx.degree, graph, edge_function)
+
+
+@if_exist_load_else_do(file_format="joblib", description=None)
+def get_eigenvectors_of_graph(graph, weight="length"):
+    """
+    returns:
+    eigenvals: in increasing order
+    eigenvects: in columns
+    """
+    L = nx.normalized_laplacian_matrix(graph, weight=weight)
+    eigvals, eigvects = np.linalg.eigh(L.toarray())
+    return eigvals, eigvects
+
+
+@if_exist_load_else_do(file_format="joblib", description=None)
+def get_HeqMatrices(graph):
+    graph = nx.Graph(graph).to_undirected()
+    Ms = -compute_laplacian_matrix_from_graph(graph, edge_function=lambda data: data["length"]) / 6
+    Ms[np.diag_indices(graph.number_of_nodes())] *= -2
+    # diffusion matrix Kd
+    Kd = compute_laplacian_matrix_from_graph(graph, edge_function=lambda data: 1.0 / data["length"])
+    return Ms, Kd
+
+
+# --------- diffusion models ---------- #
+def diffusion_eq(f, graph, diffusion_coef, absorption_coef, path, recalculate=False):
+    Ms, Kd = get_HeqMatrices(path=path, filename=f"GraphMatrices{graph.number_of_nodes()}", graph=graph,
+                             recalculate=recalculate)
+    if diffusion_coef == 0 and absorption_coef == 0:
+        return f / np.diagonal(Ms.toarray()) * (1 / 2)
+    else:
+        A = diffusion_coef * Kd + absorption_coef * Ms
+        return np.array([gmres(A, e, x0=e, maxiter=100)[0] for e in tqdm(f.T)]).T
+
+
+def label_prop(f, graph, edge_function, lamb=1, iter=10, p=0.5):
+    L = compute_laplacian_matrix_from_graph(nx.Graph(graph).to_undirected(), edge_function)
+    L.data[np.isnan(L.data)] = 0
+    A = compute_adjacency(nx.Graph(graph).to_undirected(), edge_function)
+    A.data[np.isnan(A.data)] = 0
+    d = np.reshape(np.ravel(A.sum(axis=0)), (-1, 1))
+    u = f.copy()
+    for i in range(iter):
+        # L = A * D ** (-lamb) * D.T ** (lamb - 1)
+        u = p * d ** (-lamb) * (L @ (d ** (lamb - 1) * u)) + (1 - p) * f
+    return u
+
+
+def eigen_filter(f, graph, threshold=0.9, recalculate_eigen=False):
+    # smoothing
+    eigvals, eigvects = get_eigenvectors_of_graph(
+        path=city_dir, recalculate=recalculate_eigen,
+        filename=f"Eigenvects_V{len(graph)}",
+        graph=nx.Graph(graph).to_undirected(), weight="length")
+    if isinstance(threshold, float):
+        coefs = f.T @ eigvects
+        energy = np.cumsum(coefs ** 2)
+        energy /= energy[-1]
+        return coefs[energy <= threshold] @ eigvects[:, energy <= threshold]
+    else:
+        return (f.T @ eigvects[:, :threshold]) @ eigvects[:, :threshold]
 
 
 @if_exist_load_else_do(file_format="joblib", description=None)
