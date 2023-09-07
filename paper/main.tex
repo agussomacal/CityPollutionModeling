@@ -807,7 +807,7 @@ $$
 \sum_{\hat z_j^{X^{SL}}, \hat z_j^{Y^{SL}}, r}
 \Vert \hat z_j^{Y^{SL}} - P_j(\sigma_j)(\hat z_j^{X^{SL}}) \Vert^2_2.
 $$
-}
+}{}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -819,6 +819,7 @@ We have implemented several methods of state estimation by leveraging the differ
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Spatial average}
+\label{sec:snapshotmean}
 The first, and simplest reconstruction mapping $A$ is a spatial average of the measurement observations. This will be taken as our baseline to compare against other more sophisticated reconstructions.
 
 Given the vector of sensor measurements $z$, the pollution prediction for all spatial points is the average of the observed values:
@@ -829,6 +830,7 @@ $$
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Graph Features \om{[To Do: Streamline]}}
+\label{sec:grpah_features}
 
 As the traffic information $q$ is supported on the edges of the street graph of the city of Paris one could extract meaningful information about the vicinity of some target point $x$ by doing some kind of convolution on the graph. This leads us naturally to the idea of Graph Convolution by which one can do meaningfull feature extraction for our problem.
 
@@ -941,6 +943,25 @@ The Galerkin approach ensure that the above system is invertible. Solving it yie
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Numerical results \om{[Agustin]}}
 \label{sec:numerical-tests}
+
+
+Following the methodollogy and using the data explained in the previous sections we put in comparison the following methods:
+\begin{itemize}
+\item \textbf{\perplexityinsert{average}}: our baseline as described in \cref{sec:snapshotmean}.
+\item \textbf{\perplexityinsert{krigging}}:
+\item \textbf{\perplexityinsert{lm}}: We use a Super-learner approach by sequentially combining 
+	\begin{enumerate}
+	\item The baseline: \perplexityinsert{average}.
+	\item A Graph Feature extractor using traffic information from neighbouring edges up to distance $\perplexityinsert{kneighbours}$, as described in \cref{sec:grpah_features}, with a learnable linear transformation (applying first a z-score normalization and then fitting a Lasso \cite{}) trained to correct the residuals of the previous method in the concatenation.
+	\end{enumerate}
+	As transition functions for the ssequential supeer-learner we used a linear regression for the first transition and a Lasso for the second.
+	
+ we first perform a \perplexityinsert{average} our baseline as described in \cref{sec:snapshotmean}.
+\item \textbf{\perplexityinsert{lmextra}}:
+\item \textbf{\perplexityinsert{nn}}:
+\item \textbf{\perplexityinsert{ensemble}}:
+\end{itemize}
+
 
 
 \begin{figure}

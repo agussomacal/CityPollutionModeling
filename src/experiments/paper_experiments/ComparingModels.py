@@ -17,7 +17,7 @@ from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
 from PerplexityLab.visualization import generic_plot
 from src.experiments.paper_experiments.PreProcessPaper import train_test_model, train_test_averagers, stations2test, \
     plot_pollution_map_in_graph, times_future, graph, pollution_past
-from src.experiments.paper_experiments.params4runs import path2latex_figures
+from src.experiments.paper_experiments.params4runs import path2latex_figures, runsinfo
 from src.lib.FeatureExtractors.GraphFeatureExtractors import label_prop, diffusion_eq
 from src.lib.Models.BaseModel import ModelsSequenciator, \
     medianse, NONE_OPTIM_METHOD, mse, GRAD
@@ -28,6 +28,19 @@ from src.lib.Modules import Optim
 
 if __name__ == "__main__":
     k_neighbours = 10
+    hidden_layer_sizes = (20, 20,)
+    activation = "relu"
+    learning_rate_init = 0.1
+    learning_rate = "adaptive"
+    early_stopping = True
+    solver = "adam"
+    max_iter = 10000
+    runsinfo.append_info(
+        kneighbours=k_neighbours,
+        hiddenlayers=hidden_layer_sizes,
+        activation=activation,
+        solver=solver
+    )
     # experiment_name = f"MapExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
     #                   f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
     experiment_name = "Paper2"
@@ -64,68 +77,68 @@ if __name__ == "__main__":
                 Pipeline([("Lss", LassoCV(selection="cyclic"))])
             ]
         ),
-        # ModelsSequenciator(
-        #     name="LR",
-        #     models=[
-        #         SnapshotMeanModel(summary_statistic="mean"),
-        #         GraphEmissionsNeigEdgeModel(
-        #             extra_regressors=[],
-        #             k_neighbours=k_neighbours,
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-        #             niter=2, verbose=True,
-        #             optim_method=NONE_OPTIM_METHOD,
-        #             loss=medianse)
-        #     ],
-        #     transition_model=[
-        #         Pipeline([("LR", LinearRegression())]),
-        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
-        #     ]
-        # ),
-        # ModelsSequenciator(
-        #     name="LR_Extra",
-        #     models=[
-        #         SnapshotMeanModel(summary_statistic="mean"),
-        #         GraphEmissionsNeigEdgeModel(
-        #             extra_regressors=["temperature", "wind"],
-        #             k_neighbours=k_neighbours,
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-        #             niter=2, verbose=True,
-        #             optim_method=NONE_OPTIM_METHOD,
-        #             loss=medianse)
-        #     ],
-        #     transition_model=[
-        #         Pipeline([("LR", LinearRegression())]),
-        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
-        #     ]
-        # ),
-        # ModelsSequenciator(
-        #     name="NN_Extra",
-        #     models=[
-        #         SnapshotMeanModel(summary_statistic="mean"),
-        #         GraphEmissionsNeigEdgeModel(
-        #             extra_regressors=["temperature", "wind"],
-        #             k_neighbours=k_neighbours,
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-        #             model=Pipeline(
-        #                 steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=(20, 20,),
-        #                                                                          activation="relu",  # 'relu',
-        #                                                                          learning_rate_init=0.1,
-        #                                                                          learning_rate="adaptive",
-        #                                                                          early_stopping=True,
-        #                                                                          solver="adam",
-        #                                                                          max_iter=10000))]),
-        #             niter=2, verbose=True,
-        #             optim_method=NONE_OPTIM_METHOD,
-        #             loss=medianse)
-        #     ],
-        #     transition_model=[
-        #         Pipeline([("LR", LinearRegression())]),
-        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
-        #     ]
-        # ),
+        ModelsSequenciator(
+            name="LR",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    extra_regressors=[],
+                    k_neighbours=k_neighbours,
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
+        ModelsSequenciator(
+            name="LR_Extra",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    extra_regressors=["temperature", "wind"],
+                    k_neighbours=k_neighbours,
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
+        ModelsSequenciator(
+            name="NN_Extra",
+            models=[
+                SnapshotMeanModel(summary_statistic="mean"),
+                GraphEmissionsNeigEdgeModel(
+                    extra_regressors=["temperature", "wind"],
+                    k_neighbours=k_neighbours,
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+                    model=Pipeline(
+                        steps=[("zscore", StandardScaler()), ("NN", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+                                                                                 activation=activation,  # 'relu',
+                                                                                 learning_rate_init=learning_rate_init,
+                                                                                 learning_rate=learning_rate,
+                                                                                 early_stopping=early_stopping,
+                                                                                 solver=solver,
+                                                                                 max_iter=max_iter))]),
+                    niter=2, verbose=True,
+                    optim_method=NONE_OPTIM_METHOD,
+                    loss=medianse)
+            ],
+            transition_model=[
+                Pipeline([("LR", LinearRegression())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
     ]
 
     lab = LabPipeline()
