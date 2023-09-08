@@ -106,14 +106,6 @@
 %                End Perplexity inserter                   %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-% Math environments for theorems, lemmas, etc.
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\newcommand{\verify}[1]{{\color{blue} Verify: #1}}
-\newcommand{\ascomment}[1]{{\color{teal} Agus: #1}}
-\newcommand{\asmodif}[2]{{\color{teal} #1} {\sout{#2}}}
-
-
 % Math environments for theorems, lemmas, etc.
 %%%%%%%%%%%%%%%%%%%%%%%%%
 \newtheorem{theorem}{Theorem}[section]
@@ -311,9 +303,10 @@
 
 
 % Comments
+\newcommand{\verify}[1]{{\color{blue} Verify: #1}}
+\newcommand{\ascomment}[1]{{\color{teal} Agus: #1}}
+\newcommand{\asmodif}[2]{{\color{teal} #1} {\sout{#2}}}
 \newcommand{\om}[1]{\textcolor{blue}{#1}}
-% \newcommand{\om}[1]{#1}
-
 
 
 
@@ -367,12 +360,12 @@ Some abstract.
 \subsection{Background and motivation}
 Data-driven estimations are becoming increasingly relevant and widespread as the volume of available data increases, and numerical algorithms develop to exploit them more efficiently. However, given a set of data, fundamental challenges arise related to building numerical methods that optimally exploit these data in a sense to be specified depending on each application. The present paper addresses some principal computational aspects connected to this question when trying to numerically capture a function $u$ which is a state of a physical process for which we have at hand heterogeneous sources of data coming from direct partial observations (from direct sensor measurements of $u$ or from quantities related to the physical process), and the knowledge that the fundamental mechanisms of the process can be modeled with physical laws. These laws are usually expressed in the form of Partial Differential Equations (PDEs), and increasing the complexity of the physical description usually translates into an increasing number of variables, and parameters to deal with.
 
-Assuming that all the available information is given by an element $x$ from some abstract metric space $\cX$, and that $u$ belongs to some Banach space $V$ (of potentially infinite dimension, and with associated norm $\Vert\cdot\Vert$), our goal is thus to build a mapping $A:\cX\to V$ such that $A(x)$ approximates $u$ at best in the sense that $\Vert u - A(x)\Vert$ is as small as possible. Ideally, this has to hold for all possible configurations of the system. As we explain later on through mathematical formulas, building such an optimal map is not feasible in practice, so one is inevitably led to consider suboptimal maps $A$. In fact, it is often possible to resort to different techniques to build different reconstruction maps, \asmodif{each of them with its own virtues and drawbacks}{it is generally difficult to rigorously compare their respective quality}. This lead us to propose an approach based on ensemble super-learning in which the different reconstruction mappings do not directly compete against each other (see, e.g., \cite{Breiman1996, LPH2007, PL2010} for general references on super-learning). Instead, we make them collaborate with each other to enhance their respective strengths, and cope for their weaknesses.
+Assuming that all the available information is given by an element $x$ from some abstract metric space $\cX$, and that $u$ belongs to some Banach space $V$ (of potentially infinite dimension, and with associated norm $\Vert\cdot\Vert$), our goal is thus to build a mapping $A:\cX\to V$ such that $A(x)$ approximates $u$ at best in the sense that $\Vert u - A(x)\Vert$ is as small as possible. Ideally, this has to hold for all possible configurations of the system. As we explain later on through mathematical formulas, building such an optimal map is not feasible in practice, so one is inevitably led to consider suboptimal maps $A$. In fact, it is often possible to resort to different techniques to build different reconstruction maps, each of them with its own virtues and drawbacks. This lead us to propose an approach based on ensemble super-learning in which the different reconstruction mappings do not directly compete against each other (see, e.g., \cite{Breiman1996, LPH2007, PL2010} for general references on super-learning). Instead, we make them collaborate with each other to enhance their respective strengths, and cope for their weaknesses.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Pollution as a guiding example}
-There are numerous applications in which one is confronted with the above state estimation problem. As a guiding example, we consider throught the paper the real-time reconstruction of urban pollution fields. Beyond the relevance of such a task to limit environmental and health risks in the city, pollution state estimation is an excellent example where collaborative, super-learning methods are required. This is because the problem accumulates several difficulties that make the reconstruction challenging for most common reconstruction methods. Among the issues, we may mention:
+There are numerous applications in which one is confronted with the above state estimation problem. As a guiding example, we consider in this paper the real-time reconstruction of urban pollution fields. Beyond the relevance of such a task to limit environmental and health risks in the city, pollution state estimation is an excellent example where collaborative, super-learning methods are required. This is because the problem accumulates several difficulties that make the reconstruction challenging for most common reconstruction methods. Among the issues, we may mention:
 
 
 % Although the topic of modeling and estimating air pollution is by far not new, there is a growing need to develop novel algorithms with enhanced reliability and which efficiently incorporate all sources of information. This paper focuses on the real time estimation of pollution maps at the scale of large urban areas. An accumulation of several difficulties makes this 
@@ -403,7 +396,7 @@ The above obstructions advocate for collaborative strategies combining physics-d
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Contributions and layout of the paper}
-\paragraph{Contributions:} Our main contributions are (i) the construction of a very general ensemble super-learning method for real-time state estimation, (ii) the application to a non trivial example for urban pollution reconstruction and \asmodif{(iii) the construction of a dataset comprised of traffic Google Maps Screenshots that can be used for future studies and developements}. In our numerical experiments, we work with the inner city of Paris, which is a surface covering around $140\,\textrm{km}^2$. The pollutant that we consider is $\textrm{NO}_2$, mainly produced by vehicle emissions. We use real data from sensor measurements \footnote{Data has been extracted from Airparif database that can be found in  \url{https://data-airparif-asso.opendata.arcgis.com}.}, and traffic data from Google Maps. Compared to previous contributions and other existing reconstruction methods (see, e.g., \cite{MSM2009, TMPPB2013}), the use of such traffic data is rather novel. It gives a rough estimation of the spatial density of street traffic. This level of detail is in contrast to many existing approaches which only use time averages of traffic data. Another distinctive point of our approach is the use of graph descriptions of the city instead of working on a spatial domain of $\bR^2$ or $\bR^3$. This allows us to cope with large spatial domains, and also to define physical models through \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this paper, we work with simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators. %Despite the fact that we focus on urban air pollution, the main ideas of the strategy are general, in the sense that they can be taken as guidelines to adress other problems that can be modeled via quantum graphs.
+\paragraph{Contributions:} Our main contributions are (i) the construction of a very general ensemble super-learning method for real-time state estimation, (ii) the application to a non trivial example for urban pollution reconstruction and \asmodif{(iii) the construction of a dataset comprised of traffic Google Maps Screenshots that can be used for future studies and developements. \om{OLGA: I am fearful to say this because of possible Google copyright problems, Can we just say that we provide a code that can be used for future studies?}}. In our numerical experiments, we work with the inner city of Paris, which is a surface covering around $140\,\textrm{km}^2$. The pollutant that we consider is $\textrm{NO}_2$, mainly produced by vehicle emissions. We use real data from sensor measurements \footnote{Data has been extracted from Airparif database that can be found in  \url{https://data-airparif-asso.opendata.arcgis.com}.}, and traffic data from Google Maps. Compared to previous contributions and other existing reconstruction methods (see, e.g., \cite{MSM2009, TMPPB2013}), the use of such traffic data is rather novel. It gives a rough estimation of the spatial density of street traffic. This level of detail is in contrast to many existing approaches which only use time averages of traffic data. Another distinctive point of our approach is the use of graph descriptions of the city instead of working on a spatial domain of $\bR^2$ or $\bR^3$. This allows us to cope with large spatial domains, and also to define physical models through \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this paper, we work with simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators. %Despite the fact that we focus on urban air pollution, the main ideas of the strategy are general, in the sense that they can be taken as guidelines to adress other problems that can be modeled via quantum graphs.
 
 
 % In order to cope with the large amount of data, and with the large spatial domain, we model the problem with \emph{quantum graphs}, i.e., metric graphs  endowed with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem. Of course, several physical models of different complexity could be considered. In this work, we consider simple elliptic operators but the model could be refined by considering, for instance, advection-diffusion operators.
@@ -436,7 +429,7 @@ We want to estimate the spatial distribution of the concentration of a certain p
 
 Mathematically, $\G=(\V, \E)$ is an \emph{undirected metric graph} where $\V=\{\vv_i\}$ is the set of vertices, and $\E=\{\ee_i=(\vv_1^i, \vv_2^i) \}$ is the set of edges. We use the notation $n(\V) = |\V|$ and $n(\E)=|\E|$ for the number of edges and vertices respectively. In Appendix \ref{sec:metric-graphs}, we give a summary of relevant notions on metric graphs for the paper. What is important to keep in mind for subsequent developments is that a function in a metric graph (such as our target function $u$) is not only defined on its vertices, but also at all intermediate points on the edges as well. On the edges, the points are parametrized by local coordinates $r_\ee$ for all $\ee\in \E$. Also, it is possible to define classical function spaces $(V, \Vert \cdot \Vert)$ on the graph $\G$ such as the space of continuous functions $\cC(\G)$, of square-integrable functions $L^2(\G)$ or $H^1(\G)$ (see Appendix \ref{sec:metric-graphs} for the precise definitions).
 
-We assume that, from the unknown pollution field $u$, we are only given partial information which we will denote as $x$ (or $x_u$ whenever we will need to emphasize the connection between $x$ and $u$). The data $x$ belongs to a metric space $\cX$, and it may contain several types of information about $u$ that can be of different nature (e.g., local sensor measurements and indirect information such as traffic or weather conditions). Assuming that $u$ belongs to a function space $V$ on the graph $\G$, our goal is to build a mapping
+We assume that, from the unknown pollution field $u$, we are only given partial information which we will denote as $x$ (or $x_u$ whenever we need to emphasize the connection between $x$ and $u$). The data $x$ belongs to a metric space $\cX$, and it may contain several types of information about $u$ that can be of different nature (e.g., local sensor measurements and indirect information such as traffic or weather conditions). Assuming that $u$ belongs to a function space $V$ on the graph $\G$, our goal is to build a mapping
 \begin{align*}
 A: \cX &\to V \\
 x &\mapsto A(x)
@@ -502,7 +495,7 @@ As a guiding example, we consider the reconstruction of pollution maps in the ci
       \label{fig:stations-nodes}
  \end{figure}
 
-We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m, see \cref{fig:correlation})}{} to the exact locations given the global scale of the graph. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close to the exact locations given the global scale of the graph \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m, see \cref{fig:correlation})}{}. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
 
 
 \begin{figure}
@@ -532,7 +525,7 @@ We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in th
 We work with traffic information extracted from Google Maps images. On the one hand, the information is very rich because it is available in real time, and for the whole city (see Figure \ref{fig:traffic-raw-data}). On the other hand, the data is only partial: it comes in the form of four colors, and each color represents a certain traffic intensity. Therefore we only get an estimation about how many cars are currently on the street. In addition, the estimates are relative in the sense that the exact mapping between the colors and the number of cars are unknown. We only know that, e.g., red is more congested than green. We use this information to build estimates about the online traffic emissions by implementing the following pipeline:
 }{}
 \begin{itemize}
-      \item \textbf{Raw data:} \asmodif{we made a script using Selenium python library to automatically take screenshots of Paris\footnote{We tried in a first attempt to use the Google Maps Platform but as it required payment after one week of use we decided to code our own pipeline.} every $\perplexityinsert{screenshotperiod}$ minutes over an area of $\perplexityinsert{screenshotwidth} \times \perplexityinsert{screenshotheight}$ pixels with zoom $\perplexityinsert{zoom}$. An example of the raw  \textit{image} can be seen in \cref{fig:traffic-raw-data}. Note that city landmarks could not be removed before taking the screenshot neither by substracting a background image as each screenshot has slight variations rendering this approach impractical. Another issue is the absence of traffic data in the inner streets of the city. 
+      \item \textbf{Raw data:} \asmodif{we made a script using the Selenium python library to automatically take screenshots of Paris\footnote{We tried in a first attempt to use the Google Maps Platform but as it required payment after one week of use we decided to code our own pipeline.} every $\perplexityinsert{screenshotperiod}$ minutes over an area of $\perplexityinsert{screenshotwidth} \times \perplexityinsert{screenshotheight}$ pixels with zoom $\perplexityinsert{zoom}$. An example of the raw  \textit{image} can be seen in \cref{fig:traffic-raw-data}. Note that city landmarks could not be removed before taking the screenshot neither by substracting a background image as each screenshot has slight variations rendering this approach impractical. Another issue is the absence of traffic data in the inner streets of the city. 
       }{}
       \item \textbf{Crop and extract colors:} \asmodif{for each image we first crop it to shape $\perplexityinsert{imagex} \times \perplexityinsert{imagey}$ to eliminate elements in the border that appear in the raw image like toolbars, minimap, etc. As the four colors associated with the four levels of traffic ($\{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}$ \footnote{The RGB values of each color are: $\texttt{green}=\perplexityinsert{green}$, $\texttt{orange}=\perplexityinsert{yellow}$, $\texttt{red}=\perplexityinsert{red}$, $\texttt{dark-red}=\perplexityinsert{darkred}$.} in increasing order of traffic intensity) are clearly separated from the rest of the colors in a screenshot, we can track over images and extract the pixels that at some point had been colored with traffic color. This pixel locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
 }{}
@@ -611,7 +604,7 @@ Our approach to reconstruct an unknown pollution field $u\in V$ from the partial
 $$
 X_T = \{x_1,\dots, x_T\} \subset \cX,
 $$
-each $x_T$ corresponding to partial observations of an unknown pollution field $u_k$ that took place in the past. Our goal is to use the database to build a reconstruction map
+each $x_k$ corresponding to partial observations of an unknown pollution field $u_k$ that took place in the past. Our goal is to use the database to build a reconstruction map
 \begin{align*}
 A: \cX &\to V \\
 x &\mapsto A(x)
@@ -677,10 +670,9 @@ Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Validation set-up}
-\asmodif{
-To validate the results we can only rely on the available (few) sensors (at most $\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a tripple Leave-One-Out procedure on the stations: one for testing, one for training super-learners and the final one for trainig each individual model (see \cref{fig:loodiagram} for a schematic view of the successive splitings).
+To validate the results we can only rely on the few available sensors ($m=\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a tripple Leave-One-Out procedure on the stations: one for testing, one for training super-learners and the final one for trainig each individual model (see \cref{fig:loodiagram} for a schematic view of the successive splitings).
 \begin{enumerate}
-	\item \textbf{Test split}: The first split is performed both in time and space. We take the first $\perplexityinsert{percentagetraintime}\%$ of the available times ($\perplexityinsert{numberoftraintimes}$ hours) for training $T_{\train}$ and the rest for testing $T_{\test}$. The Leave-One-Out is done on the station locations $r^\obs$ and associated pollution measurements $z$. As some stations are too near the border of the image, the available traffic information is not enough to add meaningfull information, for this reason even though we use all stations as information, we only take $\perplexityinsert{numstationstest}$\footnote{Stations away from borders are: \perplexityinsert{stationstest}.} for perfoming the testing Leave-One-Out. This means that we have to train in total $\perplexityinsert{numstationstest}$ different set of models associated with the different testing data splits $s\in S$, $\#S=\perplexityinsert{numstationstest}$, $I_s=\{i \in_{i \neq s} \{1, \dots m\}\}$
+	\item \textbf{Test split}: The first split is performed both in time and space. We take the first $\perplexityinsert{percentagetraintime}\%$ of the available times ($\perplexityinsert{numberoftraintimes}$ hours) for training $T_{\train}$ and the rest for testing $T_{\test}$. The Leave-One-Out is done on the station locations $r^\obs$ and associated pollution measurements $z$. As some stations are too close to the border of the image, the available traffic information is not enough to add meaningfull information. For this reason even though we use all stations as information, we only take $\perplexityinsert{numstationstest}$ for perfoming the testing Leave-One-Out\footnote{Stations away from borders are: \perplexityinsert{stationstest}.}. This means that we have to train in total $\perplexityinsert{numstationstest}$ different sets of models associated with the different testing data splits $s\in S$, $\#S=\perplexityinsert{numstationstest}$, $I_s=\{i \in_{i \neq s} \{1, \dots m\}\}$ \om{[The idea is good. Something in the notation is maybe off. Some notation below was not introduced.]}
 \begin{align}
 	Y^{\test}_s(t) &= (z_s(t), r^\obs_s) \in \bR \times \bR^{2} \, \forall t \in T_{\test} \\
 	X^{\train}_s(t) &= (z_{I_s}(t), r^\obs_{I_s}, q, T, w) \in \bR^{m-1} \times \bR^{2(m-1)} \times V \times \bR\times \bR^2 \, \forall t \in T_{\train}.	
@@ -690,7 +682,7 @@ To validate the results we can only rely on the available (few) sensors (at most
     \item \textbf{Super-learner train split}: For each training set we perform another Leave-One-Out to train each super-learner $(Y^{SL}_s, X^{SL}_s)$ both in $X^{\train}_s$.
     \item \textbf{Individual models train split}: For each training super-learner set we perform eone more Leave-One-Out to train each individual model under different circumstances avoiding this way the possibility of over-fitting: $(Y^{M}_s, X^{M}_s)$ both in $X^{SL}_s$.
 \end{enumerate}
-}{}
+
 
 \ascomment{[Systematic way of writing this successive subdivisions and minimization errors.]}
 
@@ -719,7 +711,7 @@ $$
 where the parameters $\theta$ belong to a compact set $\Theta \subset \bR^p$. The basis functions of $V_n$ can also be searched in a parameterized family such as, e.g., reproducing kernel functions. Alternatively, they can be selected from a finite collection of available functions that are pertinent for the problem. In our application, this can be done with reduced order modeling of parameterized PDEs describing pollution fields in the graph $\G$ (see Section \ref{sec:PDE}). \ascomment{For the moment we did not use ROM.}
 
 The most usual approach to find the parameters is to resort to cross-validation, in which we search for
-\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?}
+\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?} \om{[Which LOO do we use here?]}
 \begin{equation}
 \label{eq:fit-linear}
 \min_{ \substack{\theta_1,\dots, \theta_n \in \Theta \\ \gamma_1,\dots, \gamma_n \in \Gamma}}
@@ -737,7 +729,7 @@ $$
 \cF \coloneqq \{ D(\theta): \cX \to V   \cond \theta \in \Theta  \},
 $$
 where the decoder function $D:\cX\to V$ is not necessarily linear. A common choice is to take $D$ as neural-network $\cN\cN$ with a given architecture, and trainable parameters $\theta \in \Theta\subseteq \bR^n$. By computing
-\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?}
+\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?} \om{[What LOO to use?]}
 $$
 \theta^* \in \argmin_{\theta \in \Theta}
 \sum_{\substack{x\in X^{M} \\ (z, r)\in Y^{M}}}
@@ -791,7 +783,7 @@ Note that here we use the first training set $X^{SL}$ instead of the second one 
 %\end{figure}
 
 \asmodif{
-Finally, another way to build a super-learner is by sequentially composing individual models $A_j$ together with transition functions $P_j$ and train them to correct the errors of previous ones so that 
+Finally, another way to build a super-learner is by sequentially composing individual models $A_j$ together with transition functions $P_j$ and train them to correct the errors of previous ones so that \om{[It is $A_j(x)$ and not $A_j(\theta)$. I guess you mean to discuss the case when $A_j = \cN\cN(\theta)?$]}
 $$
 S_j(A_1, \dots, A_j) = P_j(\sigma_j^*) \circ A_j(\theta_j^*) \circ \dots \circ P_1(\sigma_1^*) \circ A_1(\theta_1^*)
 $$
