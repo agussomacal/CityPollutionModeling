@@ -940,34 +940,37 @@ The Galerkin approach ensure that the above system is invertible. Solving it yie
 Following the methodollogy and using the data explained in the previous sections we put in comparison the following methods:
 \begin{itemize}
 \item \textbf{\perplexityinsert{average}}: our baseline as described in \cref{sec:snapshotmean}.
-\item \textbf{\perplexityinsert{krigging}}:
+\item \textbf{\perplexityinsert{krigging}}: a kernel method with an exponential kernel. \ascomment{Given that the results are no good at all, do we leave it to show how bad is the typical baseline? In that case we should explain before.}
+\item \textbf{\perplexityinsert{avgkrigging}}: a kernel method with an exponential kernel after substracting the average of pollution on the stations along all past times. 
 \item \textbf{\perplexityinsert{lm}}: We use a Super-learner approach by sequentially combining 
 	\begin{enumerate}
 	\item The baseline: \perplexityinsert{average}.
-	\item A Graph Feature extractor using traffic information from neighbouring edges up to distance $\perplexityinsert{kneighbours}$, as described in \cref{sec:grpah_features}, with a learnable linear transformation (applying first a z-score normalization and then fitting a Lasso \cite{}) trained to correct the residuals of the previous method in the concatenation.
+	\item A Graph Feature extractor using traffic information from neighbouring edges up to distance $\perplexityinsert{kneighbours}$, as described in \cref{sec:grpah_features}, with a learnable linear transformation (applying first a z-score normalization and then fitting a Lasso \cite{lasso}) trained to correct the residuals of the previous method in the concatenation.
 	\end{enumerate}
-	As transition functions for the ssequential supeer-learner we used a linear regression for the first transition and a Lasso for the second.
-	
- we first perform a \perplexityinsert{average} our baseline as described in \cref{sec:snapshotmean}.
-\item \textbf{\perplexityinsert{lmextra}}:
-\item \textbf{\perplexityinsert{nn}}:
-\item \textbf{\perplexityinsert{ensemble}}:
+	As transition functions for the sequential super-learner we used a linear regression for the first transition and a Lasso for the second.
+\item \textbf{\perplexityinsert{lmextra}}: Same as the previous except that we add also two more features, to account for wind and temperature, together with the graph features.
+\item \textbf{\perplexityinsert{nn}}: same as previous but now we replace the linear model by a neural network (from Scikit-learn python library \cite{scikit-learn}) with \perplexityinsert{hiddenlayers} hidden layers with \perplexityinsert{neurons} neurons each, activation function \perplexityinsert{activation} and solver \perplexityinsert{solver}.        
+\item \textbf{\perplexityinsert{ensemble}}: Combining all the previous models using a Super-learner aggregator as described in \cref{sec:super-learning}.
 \end{itemize}
 
+We can see in \cref{fig:errorplots} the mean square error on the tested stations. Two things to observe, adding more information, if well managed, leads to some improvement and the same goes for passing from linear to non linear. However, the results show just a mild improvement in the predictions of pollution.
 
+\perplexityinsert{krigging} and \perplexityinsert{avgkrigging} perform usually bad except for the station in OPERA probably because of the presence of HAUS which gives us more correlated local information. \ascomment{in the plot of correlation as a function of distance is the first point with $0.87$}
+
+The \perplexityinsert{ensemble} method sometimes shows a mild improvement thanks to the combination but also it shows some catastrofic failures . In overal the three sequential methods \perplexityinsert{lm}, \perplexityinsert{lmextra} and \perplexityinsert{nn} are the ones that behave the better exept for the BONAP station which we believe it is due to the nearness to the river as it it the case for CELES. also there is problems in HAUS due to the presence of the opera icon in the Screenshot image taking out information about traffic just where the station is placed.
 
 \begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/plot_barplot_mse_vs_models_by_None.pdf}
-    \includegraphics[width=\linewidth]{figures/plot_barplot_mse_vs_station_by_models.pdf}
+    \includegraphics[width=0.9\linewidth]{figures/GoodStations.pdf}
+    \includegraphics[width=0.9\linewidth]{figures/BadStations.pdf}
     \caption{Error plots.}
     \label{fig:errorplots}
 \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{figures/plot_pollution_map_in_graph_modelLR_Extra_stationOPERA.pdf}
-    \includegraphics[width=\linewidth]{figures/plot_pollution_map_in_graph_modelNN_Extra_stationOPERA.pdf}
+    \includegraphics[width=0.9\linewidth]{figures/plot_pollution_map_in_graph_modelLR_Extra_stationOPERA.pdf}
+    \includegraphics[width=0.9\linewidth]{figures/plot_pollution_map_in_graph_modelNN_Extra_stationOPERA.pdf}
     \caption{Pollution maps.}
     \label{fig:pollutionmaps}
 \end{figure}

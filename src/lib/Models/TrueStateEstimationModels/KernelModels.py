@@ -134,7 +134,7 @@ class ExponentialKernelModel(KernelModel):
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
 
-        if self.params["sigma"] is None or self.params["beta"] is None:
+        if self.params["alpha"] is None or self.params["beta"] is None:
             correlation = observed_pollution.corr()
             indexes = np.triu_indices(len(correlation), k=0)
             log_cor = np.log(correlation.values[indexes])

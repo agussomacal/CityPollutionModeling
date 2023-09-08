@@ -30,7 +30,7 @@ seed = 42
 #                  'PA15L']
 # stations that are inside Paris so traffic information is all around
 # stations2test = ['OPERA', 'HAUS', 'BONAP', 'CELES',  'ELYS', 'PA07', 'PA13', 'PA18']
-stations2test = ['OPERA', 'BONAP', 'ELYS', 'PA07', 'PA13', 'PA18', 'BASCH', 'PA12', ]
+stations2test = ['OPERA', 'BONAP', 'ELYS', 'PA07', 'PA13', 'PA18', 'BASCH', 'PA12', 'CELES', 'HAUS']
 
 runsinfo.append_info(
     filtergraph=filter_graph,
