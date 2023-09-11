@@ -45,6 +45,9 @@ def loo(observed_stations, observed_pollution, traffic, stations2test=None, filt
 
 
 def pollution_agnostic(state_estimation4optim):
+    """
+    LOO for models that don't make use of pollution information (like traffic average).
+    """
     def decorated(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray, np.ndarray]:
         stations2test = kwargs.get("stations2test", observed_pollution.columns)
         order = [unknown_station_ix for unknown_station_ix in split_loo(observed_pollution) if

@@ -475,7 +475,7 @@ Note that concentration measurements from other pollutants are usually also avai
 \subsection{Paris graph}
 \label{sec:paris-graph}
 
-As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. \asmodif{We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with the graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The full graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges but we work with the biggest connected component of the subgraph that remains after filtering out all the edges whose associated streets have never been colored with traffic iformation. After this operation the actual graph used has $n(\V)=\perplexityinsert{numnodesfilter}$ vertices and $n(\E)=\perplexityinsert{numedgesfilter}$ edges}{}. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
+As a guiding example, we consider the reconstruction of pollution maps in the city of Paris. We use the metric graph $\G$ provided by Open Street Maps and work with the Python library osmnx. We have worked with the graph covering the whole inner ring of the city as shown in Figure \ref{fig:paris-stations}. The full graph has $n(\V)=\perplexityinsert{numnodes}$ vertices and $n(\E)=\perplexityinsert{numedges}$ edges but we work with the biggest connected component of the subgraph that remains after filtering out all the edges whose associated streets have never been colored with traffic iformation. After this operation the actual graph used has $n(\V)=\perplexityinsert{numnodesfilter}$ vertices and $n(\E)=\perplexityinsert{numedgesfilter}$ edges. The street network is relatively dense: the node degree histogram of Figure \ref{fig:degree-histogram} reveals that most nodes are connected to 3 to 6 edges. The vertices $\vv \in \V$ come with precise geographical coordinates. In the following, we assume that the graph is embedded in a two dimensional plane ($d=2$), and we do not take altitude into account. Each edge $\ee\in \E$ is a street or a portion of it, and we have access to its length $\ell_\ee$ and details about the shape of the street path. The information is so detailed that the streets are represented by paths that are not necessarily straight lines. However, in the following, some of our operations have assumed straight lines so we will work under this slightly simplified setting.
 
 \begin{figure}
       \centering
@@ -495,7 +495,7 @@ As a guiding example, we consider the reconstruction of pollution maps in the ci
       \label{fig:stations-nodes}
  \end{figure}
 
-We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close to the exact locations given the global scale of the graph \asmodif{(the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m, see \cref{fig:correlation})}{}. %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
+We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in the region of interest. As already brought up, their locations do not exactly match with the topology of the metric graph, therefore we project the position to the nearest node on the graph in a pre-processing step. This yields the observational nodes $\vv^\obs$ and coordinates $r^\obs$. As Figure \ref{fig:paris-stations} illustrates, the projected locations are very close to the exact locations given the global scale of the graph (the maximal discrepancy is $\perplexityinsert{MinDistNodeStation}$m, see \cref{fig:correlation}). %Note however that the stations are originally located at different altitudes and since our graph is embedded only in $\bR^2$, we are not taking the effects of altitude into account.
 
 
 \begin{figure}
@@ -521,19 +521,16 @@ We have worked with $m=\perplexityinsert{numstations}$ sensors functioning in th
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Pre-processing of traffic data}
 \label{sec:traffic-preprocess}
-\asmodif{
+
 We work with traffic information extracted from Google Maps images. On the one hand, the information is very rich because it is available in real time, and for the whole city (see Figure \ref{fig:traffic-raw-data}). On the other hand, the data is only partial: it comes in the form of four colors, and each color represents a certain traffic intensity. Therefore we only get an estimation about how many cars are currently on the street. In addition, the estimates are relative in the sense that the exact mapping between the colors and the number of cars are unknown. We only know that, e.g., red is more congested than green. We use this information to build estimates about the online traffic emissions by implementing the following pipeline:
-}{}
 \begin{itemize}
-      \item \textbf{Raw data:} \asmodif{we made a script using the Selenium python library to automatically take screenshots of Paris\footnote{We tried in a first attempt to use the Google Maps Platform but as it required payment after one week of use we decided to code our own pipeline.} every $\perplexityinsert{screenshotperiod}$ minutes over an area of $\perplexityinsert{screenshotwidth} \times \perplexityinsert{screenshotheight}$ pixels with zoom $\perplexityinsert{zoom}$. An example of the raw  \textit{image} can be seen in \cref{fig:traffic-raw-data}. Note that city landmarks could not be removed before taking the screenshot neither by substracting a background image as each screenshot has slight variations rendering this approach impractical. Another issue is the absence of traffic data in the inner streets of the city. 
-      }{}
-      \item \textbf{Crop and extract colors:} \asmodif{for each image we first crop it to shape $\perplexityinsert{imagex} \times \perplexityinsert{imagey}$ to eliminate elements in the border that appear in the raw image like toolbars, minimap, etc. As the four colors associated with the four levels of traffic ($\{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}$ \footnote{The RGB values of each color are: $\texttt{green}=\perplexityinsert{green}$, $\texttt{orange}=\perplexityinsert{yellow}$, $\texttt{red}=\perplexityinsert{red}$, $\texttt{dark-red}=\perplexityinsert{darkred}$.} in increasing order of traffic intensity) are clearly separated from the rest of the colors in a screenshot, we can track over images and extract the pixels that at some point had been colored with traffic color. This pixel locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
-}{}
-      \item \textbf{Projection on graph:} For each image pixel, we can derive its geographical coordinate location, and find the closest edge from the street graph and consequently project the colored pixels presenting traffic to the closest edge. This way, we can build a function $q:\G\to \bR$ in the metric graph about the traffic level. For every edge $\ee\in \E$, the information is so detailed that the local traffic $r_\ee \to q_{|\ee}$ can be defined as a function varying with the coordinate $r_\ee$ of the edge. For the sake of simplicity, we work with constant values per edge: for each edge $\ee\in \E$, and each color $\texttt{c}\in \texttt{colors}$, \asmodif{we count the number of pixels with the corresponding color
+      \item \textbf{Raw data:} we made a script using the Selenium python library to automatically take screenshots of Paris\footnote{We tried in a first attempt to use the Google Maps Platform but as it required payment after one week of use we decided to code our own pipeline.} every $\perplexityinsert{screenshotperiod}$ minutes over an area of $\perplexityinsert{screenshotwidth} \times \perplexityinsert{screenshotheight}$ pixels with zoom $\perplexityinsert{zoom}$. An example of the raw  \textit{image} can be seen in \cref{fig:traffic-raw-data}. Note that city landmarks could not be removed before taking the screenshot neither by substracting a background image as each screenshot has slight variations rendering this approach impractical. Another issue is the absence of traffic data in the inner streets of the city.
+      \item \textbf{Crop and extract colors:} for each image we first crop it to shape $\perplexityinsert{imagex} \times \perplexityinsert{imagey}$ to eliminate elements in the border that appear in the raw image like toolbars, minimap, etc. As the four colors associated with the four levels of traffic ($\{ \texttt{green},\, \texttt{orange},\, \texttt{red},\, \texttt{dark-red} \}$ \footnote{The RGB values of each color are: $\texttt{green}=\perplexityinsert{green}$, $\texttt{orange}=\perplexityinsert{yellow}$, $\texttt{red}=\perplexityinsert{red}$, $\texttt{dark-red}=\perplexityinsert{darkred}$.} in increasing order of traffic intensity) are clearly separated from the rest of the colors in a screenshot, we can track over images and extract the pixels that at some point had been colored with traffic color. This pixel locations almost perfectly overlap with the Open Street Maps' metric graph. The task is then to project the information on the graph.
+
+      \item \textbf{Projection on graph:} For each image pixel, we can derive its geographical coordinate location, and find the closest edge from the street graph and consequently project the colored pixels presenting traffic to the closest edge. This way, we can build a function $q:\G\to \bR$ in the metric graph about the traffic level. For every edge $\ee\in \E$, the information is so detailed that the local traffic $r_\ee \to q_{|\ee}$ can be defined as a function varying with the coordinate $r_\ee$ of the edge. For the sake of simplicity, we work with constant values per edge: for each edge $\ee\in \E$, and each color $\texttt{c}\in \texttt{colors}$, we count the number of pixels with the corresponding color
       $$
       q_\ee(\texttt{c}) = \text{Number of pixels projected to $\ee$ with color $\texttt{c}$}.
       $$
-      }{}
       %$$
       %r_\ee(\texttt{c}) = \frac{\text{Number of pixels projected to $\ee$ with color $\texttt{c}$}}{\text{Number of pixels projected to $\ee$}}
       %\; \in [0, 1].
@@ -552,9 +549,9 @@ We work with traffic information extracted from Google Maps images. On the one h
       \label{eq:q}
       \end{equation}
       %An illustration of $q$ given weights $w_\texttt{c}$ is given in Figure \ref{fig:traffic-cars-on-edge}.
-      \item \textbf{Traffic intensity-to-emissions mapping:} \asmodif{To transform the above data into a meaningful physical quantity, like and estimated average of cars emissions, one has to choose for this mapping a model that can be fixed beforehand, using expert knowledge, or let it be inferred directly from data which can be achieved by learning a simple linear model or a non linear one like a neural network}{}.
-      
-      
+      \item \textbf{Traffic intensity-to-emissions mapping:} To transform the above data into a meaningful physical quantity, like and estimated average of cars emissions, one has to choose for this mapping a model that can be fixed beforehand, using expert knowledge, or let it be inferred directly from data which can be achieved by learning a simple linear model or a non linear one like a neural network.
+
+
       %A simple linear model could be to associate a learnable weight parameter associated to  map the traffic intensity to the emissions. We estimate their optimal values in a pre-processing step. \om{[Maybe we need to update the above discussion.]}
       % \item \textbf{Final traffic data:} For our state estimation purposes, we collect traffic data every hour at times $t_n,\, n\in \{0, \dots, N\}$. Therefore we have time-dependent traffic fields $\{q(t_n, x) \}_{n=0}^N$.
 \end{itemize}
@@ -588,7 +585,7 @@ We work with traffic information extracted from Google Maps images. On the one h
       \caption{Treatment of traffic data.}
       \label{fig:traffic-preprocess}
  \end{figure}
- 
+
 
 
 
@@ -611,7 +608,7 @@ x &\mapsto A(x)
 \end{align*}
 such that, for every $x_u\in \cX$, $A(x_u)$ approximates at best the corresponding $u$.
 
-% Note that, since the information $x$ is incomplete, there may be infinitely many $u\in V$ that satisfy  
+% Note that, since the information $x$ is incomplete, there may be infinitely many $u\in V$ that satisfy
 There are several ways to quantify the quality of $A$ to reconstruct pollution fields. Ideally, for a given $x_u$, one would like to build $A$ such that the error
 $$
 e(u, A) = \Vert u - A(x_u)\Vert
@@ -637,9 +634,8 @@ Unfortunately, in practice it is not possible to find the best $A$ because:
 \item For every $u\in \cM$, we cannot evaluate the error $e(u, A)$ given that we do not have access to $u$ (so we cannot evaluate $u(r)$ for all $r\in \G$ as the norm $\Vert u - A(x_u)\Vert$ would require).
 \item  The above points make it impossible to compute the wort-case error $e_\infty(A)$. The average error $e_\av(A)$ cannot be computed either because, in addition to all the previous points, $\pi$ is also unknown.
 \end{itemize}
-\asmodif{
 Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, we inevitably have to build sub-optimal mappings as it is not possible to compare their performance rigorously according to our above quality criteria. Due to this, we propose to use nested $n$-fold cross-validation techniques which will be explained in the following section.
-}{}
+
 
 
 
@@ -670,21 +666,53 @@ Since computing the best $A$ in the sense of \eqref{eq:best-A} is out of reach, 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Validation set-up}
-To validate the results we can only rely on the few available sensors ($m=\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a tripple Leave-One-Out procedure on the stations: one for testing, one for training super-learners and the final one for trainig each individual model (see \cref{fig:loodiagram} for a schematic view of the successive splitings).
+To validate the results we can only rely on the few available sensors ($m=\perplexityinsert{numstations}$) and it does not suffice to make a split of training and testing in time because we observed that models tend to over-fit the locations in which they where trained. For this we need to perform a triple Leave-One-Out procedure on the stations: one for testing, one for training super-learners and the final one for training each individual model (see \cref{fig:loodiagram} for a schematic view of the successive splittings).
+
+% \ascomment{[Attempt to systematize and formalize the iterative-LOO, the successive subdivisions and minimization errors.]}
+
+% Split $\cD$: starting from space $X_j^H \subseteq X$ \ascomment{It is not exactly a subset but a concatenation of sub-partitions} with $H$ the set of available times in $X_j^H$  we will construct space $\cD(X_j^H)=X_{j+1}^H\times Y_{j+1}^H$ as the concatenation of its 1-knock-out-element partitions $X_{j+1}^H\times Y_{j+1}^H=^\frown_{s\in S} X_{js}^H \times Y_{js}^H=^\frown_{s\in S}\cD_s(X_j^H)$ \ascomment{which symbol do we use for concatenation?} \ascomment{It is not a tensor product $\times$ but an "alignement", maybe better $(X_{j+1}^H, Y_{j+1}^H)$} where $s\in S_j$ with $S_j$ being the set of available stations in $X_j^H$, $I_s=\{i \in_{i \neq s} S\}$ and
+% \begin{align}
+%     Y_{js}^H &= (z_s(t), r^\obs_s) \in \bR \times \bR^{2} \, \forall t \in H\\
+%     X_{js} &= (z_{I_s}(t), r^\obs_{I_s}, q, T, w) \in \bR^{\#S_j-1} \times \bR^{2(\#S_j-1)} \times V \times \bR\times \bR^2 \, \forall t \in H
+% \end{align}
+% Then
+% \begin{align}
+% X^{\test}_s\times Y^{\test}_s &= \cD_s(X^{T_\test})\\
+% X^{\train}\times Y^{\train} &= \cD(X^{T_\train})\\
+% X^{SL}\times Y^{SL} &= \cD(X^{\train})\\
+% X^{M}\times Y^{M} &= \cD(X^{SL})\\
+% \end{align}
+
 \begin{enumerate}
-	\item \textbf{Test split}: The first split is performed both in time and space. We take the first $\perplexityinsert{percentagetraintime}\%$ of the available times ($\perplexityinsert{numberoftraintimes}$ hours) for training $T_{\train}$ and the rest for testing $T_{\test}$. The Leave-One-Out is done on the station locations $r^\obs$ and associated pollution measurements $z$. As some stations are too close to the border of the image, the available traffic information is not enough to add meaningfull information. For this reason even though we use all stations as information, we only take $\perplexityinsert{numstationstest}$ for perfoming the testing Leave-One-Out\footnote{Stations away from borders are: \perplexityinsert{stationstest}.}. This means that we have to train in total $\perplexityinsert{numstationstest}$ different sets of models associated with the different testing data splits $s\in S$, $\#S=\perplexityinsert{numstationstest}$, $I_s=\{i \in_{i \neq s} \{1, \dots m\}\}$ \om{[The idea is good. Something in the notation is maybe off. Some notation below was not introduced.]}
-\begin{align}
-	Y^{\test}_s(t) &= (z_s(t), r^\obs_s) \in \bR \times \bR^{2} \, \forall t \in T_{\test} \\
-	X^{\train}_s(t) &= (z_{I_s}(t), r^\obs_{I_s}, q, T, w) \in \bR^{m-1} \times \bR^{2(m-1)} \times V \times \bR\times \bR^2 \, \forall t \in T_{\train}.	
-\end{align}
-	So the test error will be calculated as follws:
-	$$e(u,A) \approx e^{\test}_{LOO}(Y^{\test}_s, A) = \frac{1}{\#T_{\test}}\sum_{t\in T_{\test}}\left(z_s-A(X^{\train}_s)(r^\obs_s)\right)^2$$
-    \item \textbf{Super-learner train split}: For each training set we perform another Leave-One-Out to train each super-learner $(Y^{SL}_s, X^{SL}_s)$ both in $X^{\train}_s$.
-    \item \textbf{Individual models train split}: For each training super-learner set we perform eone more Leave-One-Out to train each individual model under different circumstances avoiding this way the possibility of over-fitting: $(Y^{M}_s, X^{M}_s)$ both in $X^{SL}_s$.
+	\item \textbf{Test split}: The first split is performed both in time and space. We take the first $\perplexityinsert{percentagetraintime}\%$ of the available times ($\perplexityinsert{numberoftraintimes}$ hours) for training $T_{\train}$ and the rest for testing $T_{\test}$. The Leave-One-Out is done on the station locations $r^\obs$ and associated pollution measurements $z$. As some stations are too close to the border of the image, the available traffic information is not enough to add meaningfull information. For this reason even though we use all stations as information, we only take $\perplexityinsert{numstationstest}$ for perfoming the testing Leave-One-Out\footnote{Stations away from borders are: \perplexityinsert{stationstest}.}. This means that we have to train in total $\perplexityinsert{numstationstest}$ different sets of models each one associated with one of these different testing data splits. Let $m_\test = \perplexityinsert{numstationstest}$, and let
+    $$
+    I = \{1, \dots, m_\test\}
+    $$
+    and let
+    $$
+    [I]^k = \{ S\subseteq I \cond \#S=k \}
+    $$
+    be the set of all $k$-subsets of $I$ (for $1\leq k \leq m_\test$). Note that we have $\#[I]^k = \binom{m_\test}{k}$ subsets in $I$ and in particular $k=1$ for a Leave-one-out. For any $S\subseteq [I]^k$,
+    \begin{align}
+    X^{\train}_S(t)
+    &= (z_{S^c}(t), r^\obs_{S^c}, q, T, w) \, \quad\forall t \in T_{\train}. \\
+    % X^{\test}_S(t)
+    % &= (z_{S}(t), r^\obs_{S}, q, T, w) \, \quad\forall t \in T_{\test}. \\
+    Y^{\test}_S(t)
+    &= (z_{S}(t), r^\obs_{S}) \in \bR \times \bR^{2} \, \forall t \in T_{\test}
+    \end{align}
+    $$
+    e_S(u)
+    \approx
+    \frac{1}{T_\test %\binom{\perplexityinsert{numstationstest}}{k}
+    }
+    \sum_{t\in T_\test}
+    \Vert z_{S}(t) - A(X_{S^c}^\train)(r_{S}^\obs)\Vert^2
+    $$
+    \item \textbf{Super-learner train split}: Similarly, for each training set we perform another Leave-One-Out but now we train each super-learner on the concatenation of all the $m_\test-1$ partitions: $(Y^{SL}_{S}, X^{SL}_{S}) = \underset{S'\subset S^c \, : \, \#S'=1}{^\frown}(Y^{SL}_{SS'}, X^{SL}_{SS'})$ both in $X^{\train}_S$.
+    \item \textbf{Individual models train split}: For each training super-learner set $(Y^{SL}_{S}, X^{SL}_{S})$, both in $X^{SL}_S$, we perform in a similar way one more Leave-One-Out to train each individual model to avoid the possibility of over-fitting.
 \end{enumerate}
 
-
-\ascomment{[Systematic way of writing this successive subdivisions and minimization errors.]}
 
 
 
@@ -711,11 +739,11 @@ $$
 where the parameters $\theta$ belong to a compact set $\Theta \subset \bR^p$. The basis functions of $V_n$ can also be searched in a parameterized family such as, e.g., reproducing kernel functions. Alternatively, they can be selected from a finite collection of available functions that are pertinent for the problem. In our application, this can be done with reduced order modeling of parameterized PDEs describing pollution fields in the graph $\G$ (see Section \ref{sec:PDE}). \ascomment{For the moment we did not use ROM.}
 
 The most usual approach to find the parameters is to resort to cross-validation, in which we search for
-\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?} \om{[Which LOO do we use here?]}
+
 \begin{equation}
 \label{eq:fit-linear}
 \min_{ \substack{\theta_1,\dots, \theta_n \in \Theta \\ \gamma_1,\dots, \gamma_n \in \Gamma}}
-\sum_{ \substack{x\in X^{M} \\ (z, r)\in Y^{M}}}
+\sum_{ \substack{\left(x,(z, r)\right)\in (X^{M}, Y^{M})}}
 \Vert z - \sum_{i=1}^n \ell(x, \theta_i) v(r, \gamma_i) \Vert^2_2,
 \end{equation}
 where $\Vert \cdot \Vert_2$ denotes the Euclidean norm. This norm can of course be replaced by any other lower semi-continuous loss function. From the optimal parameters $\theta_i^*$ and $\gamma_i^*$ of \eqref{eq:fit-linear}, we define
@@ -729,19 +757,18 @@ $$
 \cF \coloneqq \{ D(\theta): \cX \to V   \cond \theta \in \Theta  \},
 $$
 where the decoder function $D:\cX\to V$ is not necessarily linear. A common choice is to take $D$ as neural-network $\cN\cN$ with a given architecture, and trainable parameters $\theta \in \Theta\subseteq \bR^n$. By computing
-\ascomment{Check the equations, is it well written formally the belonging to the different LOO splits?} \om{[What LOO to use?]}
 $$
-\theta^* \in \argmin_{\theta \in \Theta}
-\sum_{\substack{x\in X^{M} \\ (z, r)\in Y^{M}}}
-\Vert z - \cN\cN(\theta)(r, x) \Vert^2_2,
+\theta^*=\underset{\theta \in \Theta}{\argmin}
+\sum_{\substack{\left(x,(z, r)\right)\in (X^{M}, Y^{M})}}
+\Vert z - D(\theta)(r, x) \Vert^2_2,
 $$
 we then set
 $$
-A = \cN\cN(\theta^*).
+A = D(\theta^*).
 $$
 Note that the input and output spaces of the neural network are not finite dimensional spaces like in the classical definition of neural networks. Instead, our neural network should be understood as a neural operator. In section \ref{sec:concrete-methods} we provide a concrete example for our application.
 
-Another option as a nonlinear map are nonlinear extensions of the PBDW approach (see \cite{CDMN2022,CDMS2022}).
+Another option as a nonlinear map are nonlinear extensions of the PBDW approach (see \cite{CDMN2022,CDMS2023}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Super-Learning as a collaborative approach}
@@ -764,16 +791,16 @@ c(x, r) = ( A_1(x)(r), \dots, A_p(x)(r) )^T \in \bR^p, \quad \forall (x,r)\in \c
 $$
 we define
 $$
-\cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\sigma^*)( c(x,r) ). 
+\cS(A_1, \dots, A_p)(x)(r) =  \mathcal{NN} (\sigma^*)( c(x,r) ).
 $$
-where $\sigma^*$ is found by an $n$-fold leave-one out,
-\asmodif{
+where $\sigma^*$ is found by a leave-one out procedure,
+
 $$
-\sigma^* \in \underset{\sigma \in \Sigma}{\argmin}
-\sum_{\substack{x\in X^{SL} \\ (z, r)\in Y^{SL}}}
-\Vert z -  \mathcal{NN} (\sigma^*)( c(x,r) ) \Vert^2_2.
+\sigma^* = \underset{\sigma \in \Sigma}{\argmin}
+\sum_{\substack{(x, (z, r))\in (X^{SL}, Y^{SL})}}
+\Vert z -  \cS (\sigma^*)( c(x,r) ) \Vert^2_2.
 $$
-Note that here we use the first training set $X^{SL}$ instead of the second one which is used to train each learner.}{} This is done in order to avoid over-fitting.
+Note that here we use the first training set $X^{SL}$ instead of the second one which is used to train each learner. This is done in order to avoid over-fitting.
 
 %\begin{figure}
 %    \centering
@@ -782,24 +809,25 @@ Note that here we use the first training set $X^{SL}$ instead of the second one 
 %    \label{fig:superlearners}
 %\end{figure}
 
-\asmodif{
-Finally, another way to build a super-learner is by sequentially composing individual models $A_j$ together with transition functions $P_j$ and train them to correct the errors of previous ones so that \om{[It is $A_j(x)$ and not $A_j(\theta)$. I guess you mean to discuss the case when $A_j = \cN\cN(\theta)?$]}
+Finally, another way to build a super-learner is by sequentially composing individual models $A_j$ together with transition functions $P_j$ and train them to correct the errors of previous ones so that
 $$
-S_j(A_1, \dots, A_j) = P_j(\sigma_j^*) \circ A_j(\theta_j^*) \circ \dots \circ P_1(\sigma_1^*) \circ A_1(\theta_1^*)
+S_j(A_1, \dots, A_j) = P_j(\sigma_j^*) \circ A_j \circ \dots \circ P_1(\sigma_1^*) \circ A_1
 $$
 and $S=S_p$. At each step $j$ the target of each submodel is to correct the residuals $\tilde z_j=z - \cS_{j-1}(r, x)$ of previous steps, so $(z, r)\in Y^{M} \mapsto (\tilde z_j^{Y^{M}}, r) \in \tilde Y^{M}$. At the same time the information received from the pollution part of the input $x$ is also replaced by the last residual $x = (z, r^\obs, q, T, w) \in X^{M} \mapsto x_j^M = (\tilde z_j^{X^{M}}, r^\obs, q, T, w) \in \tilde X^{M}$ so the minimization problem in this step becomes
 $$
-\theta_j^* \in \underset{\theta_j \in \Theta_j}{\argmin}
+\theta_j^* = \underset{\theta_j \in \Theta_j}{\argmin}
 \sum_{x_j^M, \tilde z_j^{Y^{M}}, r}
-\Vert \tilde z_j^{Y^{M}} - A_j(\theta_j)(r, x_j^M)) \Vert^2_2.
+\Vert \tilde z_j^{Y^{M}} - D(\theta_j)(r, x_j^M)) \Vert^2_2.
 $$
-The transition maps $P_j$ are also trained to correct the residuals $\hat z_j=z - A_j(\theta_j^*)\circ\cS_{j-1}(r, x)$ of previous steps, so $(z, r)\in Y^{SL} \mapsto (\hat z_j^{Y^{SL}}, r) \in \hat Y^{SL}$ and $x = (z, r^\obs, q, T, w) \in X^{SL} \mapsto x_j^{SL} = (\tilde z_j^{X^{SL}}, r^\obs, q, T, w)  \in \hat X^{SL}$ so the minimization problem in this step becomes
+and then $A_j=D(\theta_j^*)$.
+
+The transition maps $P_j$ are also trained to correct the residuals $\hat z_j=z - D_j(\theta_j^*)\circ\cS_{j-1}(r, x)$ of previous steps, so $(z, r)\in Y^{SL} \mapsto (\hat z_j^{Y^{SL}}, r) \in \hat Y^{SL}$ and $x = (z, r^\obs, q, T, w) \in X^{SL} \mapsto x_j^{SL} = (\tilde z_j^{X^{SL}}, r^\obs, q, T, w)  \in \hat X^{SL}$ so the minimization problem in this step becomes
 $$
-\sigma_j^* \in \underset{\sigma_j \in \Sigma_j}{\argmin}
+\sigma_j^* = \underset{\sigma_j \in \Sigma_j}{\argmin}
 \sum_{\hat z_j^{X^{SL}}, \hat z_j^{Y^{SL}}, r}
 \Vert \hat z_j^{Y^{SL}} - P_j(\sigma_j)(\hat z_j^{X^{SL}}) \Vert^2_2.
 $$
-}{}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -807,7 +835,7 @@ $$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Reconstruction methods for our numerical experiments}
 \label{sec:concrete-methods}
-We have implemented several methods of state estimation by leveraging the different information sources: pollution measurements, traffic, wind intensity, and temperature. Some of the models do not make use all the available information $x\in \cX$, but only a portion of it. 
+We have implemented several methods of state estimation by leveraging the different information sources: pollution measurements, traffic, wind intensity, and temperature. Some of the models do not make use all the available information $x\in \cX$, but only a portion of it.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Spatial average}
@@ -824,7 +852,7 @@ $$
 \subsection{Graph Features \om{[To Do: Streamline]}}
 \label{sec:grpah_features}
 
-As the traffic information $q$ is supported on the edges of the street graph of the city of Paris one could extract meaningful information about the vicinity of some target point $x$ by doing some kind of convolution on the graph. This leads us naturally to the idea of Graph Convolution by which one can do meaningfull feature extraction for our problem.
+As the traffic information $q$ is supported on the edges of the street graph of the city of Paris one could extract meaningful information about the vicinity of some target point $x$ by doing some kind of convolution on the graph. This leads us naturally to the idea of Graph Convolution by which one can do meaningful feature extraction for our problem.
 
 In our case, we performed the following steps:
 \begin{enumerate}
@@ -852,7 +880,7 @@ In our case, we performed the following steps:
 
 Another way of modelling pollutant dispersion is through the construction of a \emph{quantum graph}. For this, we endow our metric graph $\G$ with a differential operator acting on functions from a certain space (see \cite{BK2013} for details and references). The metric graph structure allows us to take the shape of the city into account, while the definition of differential operators enables to physically model the phenomenon of pollutant dispersion through the streets. It also leads to the definition of suitable and natural functional spaces to pose the problem.
 
-% We next define a \emph{quantum graph} by assigning a differential operator (often called Hamiltonian) with appropriate vertex conditions. In our case, the operators that we consider in this work are relatively simple and based on elliptic/parabolic operators. 
+% We next define a \emph{quantum graph} by assigning a differential operator (often called Hamiltonian) with appropriate vertex conditions. In our case, the operators that we consider in this work are relatively simple and based on elliptic/parabolic operators.
 % This will allow us to model diffusion effects in urban air pollution. Of course, one could consider more refined models which may incorporate additional effects such as convection.
 
 \textbf{Elliptic equation:} One can first model pollution with a time-independent elliptic operator equation. For any point $r\in \G$, the pollutant concentration is modelled through a function $u: \G \to \bR$ solution to
@@ -865,7 +893,7 @@ which we choose to complement with ``Newmann-Kirchoff'' conditions on the vertic
 \label{eq:newmann-kirchoff}
 \sum_{\ee\in \E(v)}\frac{\dd u}{\dr}\Big\vert_\ee (v) = 0,\quad \forall v \in \V.
 \end{equation}
-Here, the derivatives are assumed to be taken in the directions away from the vertex (i.e., into the edge), which we will call outgoing directions. The function $a$ is a diffusion coefficient, and we assume $a\in L^\infty(\G)$. The function $h$ is an absorption coefficient, supposed in $L^\infty(\G)$. The function $q$ is a source term and assumed to be in $L^2(\G)$. In the modeling of urban air pollution, $q$ accounts for all possible pollution sources. These essentially come from traffic emissions, local heating, pollution from industries in the city and particles coming from outside the city. In this work, we concentrate on traffic which is among the most important ones, and is challenging to incorporate in real time. We use the traffic data from Google Maps to map it into traffic emissions following the procedure from in Section \ref{sec:traffic-preprocess}. This mapping yields the source term $q$ which we now use as a source term in \eqref{eq:strong-form-elliptic}. 
+Here, the derivatives are assumed to be taken in the directions away from the vertex (i.e., into the edge), which we will call outgoing directions. The function $a$ is a diffusion coefficient, and we assume $a\in L^\infty(\G)$. The function $h$ is an absorption coefficient, supposed in $L^\infty(\G)$. The function $q$ is a source term and assumed to be in $L^2(\G)$. In the modeling of urban air pollution, $q$ accounts for all possible pollution sources. These essentially come from traffic emissions, local heating, pollution from industries in the city and particles coming from outside the city. In this work, we concentrate on traffic which is among the most important ones, and is challenging to incorporate in real time. We use the traffic data from Google Maps to map it into traffic emissions following the procedure from in Section \ref{sec:traffic-preprocess}. This mapping yields the source term $q$ which we now use as a source term in \eqref{eq:strong-form-elliptic}.
 %\asmodif{Original section changed: leave a linear model? Readapt this paragraph [Agus]}{Note that $q$ depends on the parameters $\{w_\texttt{c}\}_{\texttt{c}\in \texttt{colors}}$ and we need to calibrate them. For this, we solve a parameter estimation problem in a pre-processing step and we  we search for the best parameter values that match at best observations taken during a certain time interval. We omit explaining the full details of this parameter estimation to keep the presentation concise.}
 %In fact the other terms are assumed to be constant in space. We first solve the equation with traffic data as the source term, then add a constant correction
 
@@ -936,28 +964,34 @@ The Galerkin approach ensure that the above system is invertible. Solving it yie
 \section{Numerical results \om{[Agustin]}}
 \label{sec:numerical-tests}
 
+\ascomment{Train and test only with the inner stations.}
 
-Following the methodollogy and using the data explained in the previous sections we put in comparison the following methods:
+Following the methodology and using the data explained in the previous sections we put in comparison the following models:
 \begin{itemize}
 \item \textbf{\perplexityinsert{average}}: our baseline as described in \cref{sec:snapshotmean}.
 \item \textbf{\perplexityinsert{krigging}}: a kernel method with an exponential kernel. \ascomment{Given that the results are no good at all, do we leave it to show how bad is the typical baseline? In that case we should explain before.}
-\item \textbf{\perplexityinsert{avgkrigging}}: a kernel method with an exponential kernel after substracting the average of pollution on the stations along all past times. 
-\item \textbf{\perplexityinsert{lm}}: We use a Super-learner approach by sequentially combining 
+\item \textbf{\perplexityinsert{avgkrigging}}: a kernel method with an exponential kernel after subtracting the pollution average along all past times.
+\item \textbf{\perplexityinsert{lm}}: We use a Super-learner approach by sequentially combining
 	\begin{enumerate}
 	\item The baseline: \perplexityinsert{average}.
 	\item A Graph Feature extractor using traffic information from neighbouring edges up to distance $\perplexityinsert{kneighbours}$, as described in \cref{sec:grpah_features}, with a learnable linear transformation (applying first a z-score normalization and then fitting a Lasso \cite{lasso}) trained to correct the residuals of the previous method in the concatenation.
 	\end{enumerate}
 	As transition functions for the sequential super-learner we used a linear regression for the first transition and a Lasso for the second.
 \item \textbf{\perplexityinsert{lmextra}}: Same as the previous except that we add also two more features, to account for wind and temperature, together with the graph features.
-\item \textbf{\perplexityinsert{nn}}: same as previous but now we replace the linear model by a neural network (from Scikit-learn python library \cite{scikit-learn}) with \perplexityinsert{hiddenlayers} hidden layers with \perplexityinsert{neurons} neurons each, activation function \perplexityinsert{activation} and solver \perplexityinsert{solver}.        
+\item \textbf{\perplexityinsert{nn}}: same as previous but now we replace the linear model by a neural network (from Scikit-learn python library \cite{scikit-learn}) with \perplexityinsert{hiddenlayers} hidden layers with \perplexityinsert{neurons} neurons each, activation function \perplexityinsert{activation} and solver \perplexityinsert{solver}.
 \item \textbf{\perplexityinsert{ensemble}}: Combining all the previous models using a Super-learner aggregator as described in \cref{sec:super-learning}.
 \end{itemize}
 
-We can see in \cref{fig:errorplots} the mean square error on the tested stations. Two things to observe, adding more information, if well managed, leads to some improvement and the same goes for passing from linear to non linear. However, the results show just a mild improvement in the predictions of pollution.
+We can acknowledge that, given the reduced amount of sensors, it is difficult to beat the baseline. However, if the available information is well managed, we can obtain some improvements in the prediction.
 
-\perplexityinsert{krigging} and \perplexityinsert{avgkrigging} perform usually bad except for the station in OPERA probably because of the presence of HAUS which gives us more correlated local information. \ascomment{in the plot of correlation as a function of distance is the first point with $0.87$}
+We can see in \cref{fig:errorplots} the mean square error on the tested stations. We observe that adding more information, if well managed, leads to improvements in the prediction task. Less clear is the use of non-linearity as the results are mixed in this regard. Overall, methods including traffic information show a mild improvement with respect to the simple average baseline, however, they allow the prediction of local variations of pollution (see \ref{fig:pollutionmaps}).
 
-The \perplexityinsert{ensemble} method sometimes shows a mild improvement thanks to the combination but also it shows some catastrofic failures . In overal the three sequential methods \perplexityinsert{lm}, \perplexityinsert{lmextra} and \perplexityinsert{nn} are the ones that behave the better exept for the BONAP station which we believe it is due to the nearness to the river as it it the case for CELES. also there is problems in HAUS due to the presence of the opera icon in the Screenshot image taking out information about traffic just where the station is placed.
+\perplexityinsert{krigging} and \perplexityinsert{avgkrigging} perform usually bad except for the stations OPERA and HAUS because both are very near to each other (just $\perplexityinsert{operahausdistance}$m appart) and a correlation of $0.87$ which makes kernels methods suitable for this case.
+
+The \perplexityinsert{ensemble} method sometimes shows a mild improvement thanks to the combination but also it shows some catastrophic failures. Overall, the three sequential methods \perplexityinsert{lm}, \perplexityinsert{lmextra} and \perplexityinsert{nn} are the ones that behave the better except for the BONAP adn CELES stations which we believe it is due to the closeness to the river (see \ref{fig:stations-nodes}). Also there is problems in HAUS station due to the presence of the opera icon in the Screenshot image (see \ref{fig:traffic-raw-data}) masking out information about traffic just where the station is placed.
+
+Finally, we should mention that even though the amount of traffic information is big, still, it remains of reduced utility as it measures intensity of traffic but not the amount of actual vehicles that is passing by the street which is the variable that directly impacts the emissions. It can be hoped then that by following a similar approach on better suited data better improvements could be expected.
+
 
 \begin{figure}
     \centering
@@ -971,7 +1005,7 @@ The \perplexityinsert{ensemble} method sometimes shows a mild improvement thanks
     \centering
     \includegraphics[width=0.9\linewidth]{figures/plot_pollution_map_in_graph_modelLR_Extra_stationOPERA.pdf}
     \includegraphics[width=0.9\linewidth]{figures/plot_pollution_map_in_graph_modelNN_Extra_stationOPERA.pdf}
-    \caption{Pollution maps.}
+    \caption{Pollution maps. \ascomment{Change color map to autumn}}
     \label{fig:pollutionmaps}
 \end{figure}
 

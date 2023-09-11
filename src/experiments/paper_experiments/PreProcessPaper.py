@@ -440,6 +440,7 @@ if __name__ == "__main__":
     distance_between_stations = pd.DataFrame(
         cdist(station_coordinates.values.T * ratio, station_coordinates.values.T * ratio),
         columns=station_coordinates.columns, index=station_coordinates.columns)
+    runsinfo.append_info(operahausdistance=f'{distance_between_stations.loc["OPERA", "HAUS"]:.0f}')
     pollution = get_pollution(date_start=datetime(2022, 1, 1, 0), date_end=datetime.now())
     pollution = pollution[station_coordinates.columns]
     triu = np.triu_indices(len(distance_between_stations), 1)

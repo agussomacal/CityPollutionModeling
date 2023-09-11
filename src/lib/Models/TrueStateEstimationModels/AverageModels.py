@@ -1,6 +1,4 @@
 import copy
-import datetime
-from typing import List, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -8,9 +6,8 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.preprocessing import StandardScaler
 
-from src.lib.Models.BaseModel import BaseModel, loo, pollution_dependent, mse, NONE_OPTIM_METHOD, pollution_agnostic, \
-    split_loo
 from PerplexityLab.miscellaneous import filter_dict, if_true_str
+from src.lib.Models.BaseModel import BaseModel, loo, mse, NONE_OPTIM_METHOD, pollution_agnostic
 
 
 class SummaryModel(BaseModel):

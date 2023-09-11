@@ -204,7 +204,7 @@ if __name__ == "__main__":
         ("NN_Extra", "Graph Temp Wind \n NeuralNetwork"),
     ])
 
-    models_order = list(model_names.values()) + ["Ensamble"]
+    models_order = list(model_names.values()) + ["Ensemble"]
     # models_order.remove("Krigging")
     models2plot = set(data_manager["model"])
     # models2plot.remove("ExponentialKernelModel")
@@ -217,13 +217,13 @@ if __name__ == "__main__":
         lm=model_names["LR"].replace(" \n", ""),
         lmextra=model_names["LR_Extra"].replace(" \n", ""),
         nn=model_names["NN_Extra"].replace(" \n", ""),
-        ensemble="Ensamble",
+        ensemble="Ensemble",
     )
 
 
     def name_models(model):
         if "Pipeline" in model:
-            return "Ensamble"
+            return "Ensemble"
         else:
             return model_names[model]
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     #     folder=path2latex_figures,
     #     time=times_future[4], station="OPERA",
     #     plot_by=["model", "station"],
-    #     num_cores=10, models=name_models, model=["LR", "LR_Extra", "NN_Extra", "Ensamble"], s=10,
+    #     num_cores=10, models=name_models, model=["LR", "LR_Extra", "NN_Extra", "Ensemble"], s=10,
     #     nodes_indexes=np.arange(len(graph)),
     #     # nodes_indexes=np.random.choice(len(graph), size=2000, replace=False),
     #     cmap=sns.color_palette("coolwarm", as_cmap=True), alpha=0.7, dpi=300,
