@@ -342,9 +342,9 @@ if __name__ == "__main__":
         station="OPERA",
         plot_by=["model", "station"],
         num_cores=1, models=name_models, model=[
-            # "SnapshotMeanModelmean", "AvgKrigging",
-            "GaussianKernelModel"
+            "SnapshotMeanModelmean", "ExponentialKernelModel",
+            "AvgKrigging", "LR_Extra", "NN_Extra"
         ],
         nodes_indexes=np.arange(len(graph)), s=10,
-        cmap=sns.color_palette("autumn", as_cmap=True), alpha=0.7, dpi=300,
+        cmap=sns.color_palette("plasma", as_cmap=True), alpha=0.6, dpi=300,
         format=".pdf")

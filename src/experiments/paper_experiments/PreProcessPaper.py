@@ -24,7 +24,8 @@ from src.experiments.paper_experiments.params4runs import screenshot_period, rec
 from src.lib.DataProcessing.OtherVariablesPreprocess import process_windGuru_data
 from src.lib.DataProcessing.PollutionPreprocess import get_pollution, get_stations_lat_long, filter_pollution_dates
 from src.lib.DataProcessing.Prepare4Experiments import get_traffic_pollution_data_per_hour
-from src.lib.DataProcessing.SeleniumScreenshots import traffic_screenshots_folder, center_of_paris
+from src.lib.DataProcessing.SeleniumScreenshots import traffic_screenshots_folder, center_of_paris, \
+    get_filename_from_date
 from src.lib.DataProcessing.TrafficGraphConstruction import osm_graph, project_pixels2edges, project_traffic_to_edges
 from src.lib.DataProcessing.TrafficProcessing import save_load_traffic_by_pixel_data, get_traffic_pixel_coords, \
     load_background, load_image, filter_image_by_colors, TRAFFIC_VALUES, TRAFFIC_COLORS
@@ -363,9 +364,9 @@ def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes)
 @one_line_iterator
 def plot_pollution_map_in_graph(fig, ax, station, trained_model, diffusion_method=None, time=None, nodes_indexes=None,
                                 cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5):
-    # img = load_image(
-    #     f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
-    img = load_background(screenshot_period)
+    img = load_image(
+        f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
+    # img = load_background(screenshot_period)
     ax.imshow(img, extent=[0, 1, 0, 1], alpha=1 - alpha)
     estimation = estimate_pollution_map_in_graph(path=data_manager.path,
                                                  filename=f"PollutionEstimation_{station}_{time}_{trained_model}",
