@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import List
+from typing import List, Union, Tuple
 
 import joblib
 import networkx as nx
@@ -221,10 +221,11 @@ else:
 
 
 # ----- Defining Experiment ----- #
+
 def train_test(model, station):
     # in train time use the past
     data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
-                                     observed_pollution=pollution_past, traffic=traffic_past)
+                                                observed_pollution=pollution_past, traffic=traffic_past)
     target_position = data_known.pop("target_positions")  # this are reserved only when testing.
     t0 = time.time()
     model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
@@ -246,6 +247,10 @@ def train_test(model, station):
                                         latitudes=latitudes)
     t_to_estimate = time.time() - t0
 
+    # path2model = Path(f"{path2models}/{station}")
+    # path2model.mkdir(parents=True, exist_ok=True)
+    # joblib.dump((model, t_to_fit), filename=f"{path2model}/{model}.compressed")
+
     return {
         "losses": model.losses,
         "model_params": model.params,
@@ -260,28 +265,27 @@ def train_test(model, station):
 
 def train_test_model(model: BaseModel):
     def decorated_func(station):
-        print(station, model)
-        res = train_test(model, station)
+        if isinstance(model, BaseModel):
+            m = model
+        else:
+            aggregator, models = model
+            path2model = Path(f"{path2models}/{station}")
+            path2model.mkdir(parents=True, exist_ok=True)
+            loaded_models, fitting_time = tuple(
+                list(zip(*[joblib.load(filename=f"{path2model}/{m}.compressed") for m in models])))
+            m = ModelsAggregator(models=loaded_models, aggregator=aggregator)
 
-        # in train time use the past
-        # data_known, _ = split_by_station(unknown_station=station, observed_stations=station_coordinates,
-        #                                  observed_pollution=pollution_past, traffic=traffic_past)
-        # data_known.pop("target_positions")  # this are reserved only when testing.
-        # t0 = time.time()
-        # model.calibrate(**data_known, traffic_coords=traffic_pixels_coords,
-        #                 distance_between_stations_pixels=distance_between_stations_pixels,
-        #                 stations2test=stations2test,
-        #                 graph=graph, traffic_by_edge=traffic_by_edge,
-        #                 temperature=temperature, wind=wind, longitudes=longitudes, latitudes=latitudes)
-        # t_to_fit = time.time() - t0
+        print(station, m)
+        res = train_test(m, station)
 
-        path2model = Path(f"{path2models}/{station}")
-        path2model.mkdir(parents=True, exist_ok=True)
-        joblib.dump((model, res["time_to_fit"]), filename=f"{path2model}/{model}.compressed")
+        if isinstance(model, BaseModel):
+            path2model = Path(f"{path2models}/{station}")
+            path2model.mkdir(parents=True, exist_ok=True)
+            joblib.dump((m, res["time_to_fit"]), filename=f"{path2model}/{m}.compressed")
 
         return res
 
-    decorated_func.__name__ = str(model)
+    decorated_func.__name__ = str(model) if isinstance(model, BaseModel) else "_".join(list(map(str, model[1:])))
     return decorated_func
 
 

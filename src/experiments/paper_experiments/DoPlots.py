@@ -26,6 +26,8 @@ model_names = OrderedDict([
     ("LR", "Graph \n Linear Regression"),
     ("LR_Extra", "Graph Temp Wind \n Linear Regression"),
     ("NN_Extra", "Graph Temp Wind \n NeuralNetwork"),
+    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,AK,LR,LRE,NNE)", "Ensemble"),
+    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", "Ensemble NN")
 ])
 
 models_order = list(model_names.values()) + ["Ensemble"]
@@ -47,10 +49,10 @@ models2plot = list(models2plot)
 
 
 def name_models(model_name):
-    if "Pipeline" in model_name:
-        return "Ensemble"
-    else:
-        return model_names[model_name]
+    # if "Pipeline" in model_name:
+    #     return "Ensemble"
+    # else:
+    return model_names[model_name]
 
 
 # generic_plot(
@@ -92,6 +94,7 @@ generic_plot(
     models=name_models,
     model=models2plot,
     station=stations_order,
+    xlim=(None, 20),
     dpi=300,
     # format=".pdf"
 )
