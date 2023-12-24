@@ -18,5 +18,6 @@ cma
 spiderplot
 psutil
 osmnx
--i https://test.pypi.org/simple/ PerplexityLab==0.0.1b0
+tensorflow>=2.11.0
+git+https://github.com/agussomacal/PerplexityLab
 spektral

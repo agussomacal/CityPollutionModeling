@@ -12,7 +12,7 @@ from src.lib.DataProcessing.TrafficProcessing import image_shape
 
 sns.set_theme()
 
-runsinfo = RunsInfo2Latex(path2latex=f"{Path(__file__).parent.parent.parent.parent}/paper/main.tex")
+runsinfo = RunsInfo2Latex(path2latex=f"{config.paper_dir}/main.tex")
 runsinfo.insert_preamble_in_latex_file()
 path2latex_figures = runsinfo.latex_folder.joinpath("figures")
 
