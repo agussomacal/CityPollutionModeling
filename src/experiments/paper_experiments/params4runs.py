@@ -1,16 +1,9 @@
-import logging
-from pathlib import Path
-
 import psutil
-import seaborn as sns
 
 import src.config as config
 from PerplexityLab.LaTexReports import RunsInfo2Latex
-from PerplexityLab.miscellaneous import if_true_str
 from src.lib.DataProcessing.SeleniumScreenshots import window_size, zoom
 from src.lib.DataProcessing.TrafficProcessing import image_shape
-
-sns.set_theme()
 
 runsinfo = RunsInfo2Latex(path2latex=f"{config.paper_dir}/main.tex")
 runsinfo.insert_preamble_in_latex_file()
@@ -26,7 +19,7 @@ simulation = False
 max_num_stations = 100
 filter_graph = True  # filter by nodes with neighboaring edges having traffic and keep the biggest commponent.
 seed = 42
-# stations2test = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS',
+# all_stations = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS',
 #                  'PA15L']
 # stations that are inside Paris so traffic information is all around
 # stations2test = ['OPERA', 'HAUS', 'BONAP', 'CELES',  'ELYS', 'PA07', 'PA13', 'PA18']
@@ -43,7 +36,7 @@ runsinfo.append_info(
     imagey=image_shape[1],
     numstationstest=len(stations2test),
     stationstest=", ".join(stations2test),
-    percentagetraintime=int(100*proportion_of_past_times),
+    percentagetraintime=int(100 * proportion_of_past_times),
 )
 
 RAM = psutil.virtual_memory().total / 1000000000

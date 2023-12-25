@@ -1,12 +1,4 @@
-import logging
-
 import psutil
-import seaborn as sns
-
-import src.config as config
-from PerplexityLab.miscellaneous import if_true_str
-
-sns.set_theme()
 
 # ----- parameters of experiment ----- #
 recalculate_traffic_by_pixel = False
@@ -54,22 +46,3 @@ if simulation:
         ],
         weights=[1, 1, 1, 0]
     )
-
-# # ----- logger ----- #
-# # Create and configure logger
-# logging.basicConfig(
-#     level=logging.INFO,
-#     # handlers=[logging.FileHandler(f"{data_manager.path}/experiment.log"), logging.StreamHandler()],
-#     filename=f"{config.results_dir}/Shuffle{shuffle}_experiment{if_true_str(simulation, '_Sim')}.log",
-#     format='%(asctime)s %(message)s',
-#     filemode='a')
-#
-# # define a Handler which writes INFO messages or higher to the sys.stderr
-# console = logging.StreamHandler()
-# console.setLevel(logging.INFO)
-# # set a format which is simpler for console use
-# formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-# # tell the handler to use this format
-# console.setFormatter(formatter)
-# # add the handler to the root logger
-# logging.getLogger().addHandler(console)

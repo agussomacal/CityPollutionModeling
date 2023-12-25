@@ -67,7 +67,11 @@ if __name__ == "__main__":
                                beta=Optim(start=np.log(1), lower=np.log(0.01), upper=np.log(2)),
                                distrust=0,
                                name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False),
-        BLUEModel(name="BLUE")
+        BLUEModel(name="BLUE", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False),
+        BLUEModel(name="BLUEIU", sensor_distrust=Optim(start=0, lower=0, upper=1),
+                  loss=mse, optim_method=GRAD, niter=1000, verbose=False),
+        BLUEModel(name="BLUEI", sensor_distrust={c: Optim(start=0, lower=0, upper=1) for c in pollution_past.columns},
+                  loss=mse, optim_method=GRAD, niter=1000, verbose=False)
 
     ]
     # 621.5069384089682 = [2.87121906 0.16877082 1.04179242 1.23798909 3.42959526 3.56328527]
@@ -236,8 +240,10 @@ if __name__ == "__main__":
         "individual_models",
         *list(map(train_test_model,
                   [
-                      (Pipeline([("LR", LassoCV(selection="random"))]), base_models[:-1] + models),
-                      (Pipeline([("LR", LassoCV(selection="random"))]), [models[-1]])
+                      (Pipeline([("LR", LassoCV(selection="random"))]), base_models[:2] + models),
+                      (Pipeline([("LR", LassoCV(selection="random"))]), [models[-1]]),
+                      (Pipeline([("LR", LassoCV(selection="random"))]), [models[-2]]),
+                      (Pipeline([("LR", LassoCV(selection="random"))]), [models[-3]])
                   ],
                   )),
         recalculate=False
