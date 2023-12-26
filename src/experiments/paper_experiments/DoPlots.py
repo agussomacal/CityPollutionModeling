@@ -5,7 +5,7 @@ import seaborn as sns
 
 from PerplexityLab.DataManager import DataManager
 from PerplexityLab.miscellaneous import NamedPartial
-from PerplexityLab.visualization import generic_plot
+from PerplexityLab.visualization import generic_plot, LegendOutsidePlot
 from src import config
 from src.experiments.paper_experiments.params4runs import path2latex_figures
 
@@ -53,7 +53,8 @@ model_style = OrderedDict([
      PlotStyle(color=cblack, marker="o", linestyle="--")),
     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", PlotStyle(color=cgreen, marker="o", linestyle="-")),
     (
-    "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)", PlotStyle(color=cpurple, marker="o", linestyle="-")),
+        "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)",
+        PlotStyle(color=cpurple, marker="o", linestyle="-")),
     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LR)", PlotStyle(color=cgray, marker=".", linestyle="-."))
 ])
 model_style = {model_names[k]: v for k, v in model_style.items() if k in model_names}
@@ -108,7 +109,7 @@ def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_betwee
 # stations_order = ["ELYS", "HAUS", "OPERA", "PA13", "PA07"]
 # stations_order = ["BASCH", "PA18", "PA12", "BONAP", "CELES"]
 for kernel_wins, stations_order in zip([True, False],
-                                       [["HAUS", "OPERA", "ELYS", "PA07", "PA13", ],  #
+                                       [["HAUS", "OPERA", "PA07", "PA13", "ELYS", ],  #
                                         ["BONAP", "CELES", "BASCH", "PA18", "PA12", ]]):
     generic_plot(
         name=f"ErrorPlot_KernelWins{kernel_wins}",
@@ -131,14 +132,18 @@ for kernel_wins, stations_order in zip([True, False],
         station=stations_order,
         # xlim=(None, 20),
         dpi=300,
-        # format=".pdf"
-        axes_xy_proportions=(8, 8),
-        axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
-        legend_font_dict={'weight': 'normal', "size": 12, 'stretch': 'normal'},
+        format=".pdf",
+        axes_xy_proportions=(8, 10),
+        axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+        labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+        legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
         font_family="amssymb",
         uselatex=True,
         xlabel=r"mse",
         ylabel=r"stations",
         # create_preimage_data=True,
         # only_create_preimage_data=False
+        legend_outside_plot=LegendOutsidePlot(loc="lower center",
+                                              extra_y_top=0.01, extra_y_bottom=0.25,
+                                              extra_x_left=0.125, extra_x_right=0.075),
     )
