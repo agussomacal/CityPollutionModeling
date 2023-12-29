@@ -14,6 +14,7 @@ import pandas as pd
 
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES
 from PerplexityLab.miscellaneous import if_exist_load_else_do
+from src.lib.FeatureExtractors.GraphFeatureExtractors import compute_adjacency
 
 
 def load_transform_graph(filename):
@@ -76,3 +77,37 @@ def project_traffic_to_edges(traffic_by_pixel: pd.DataFrame, edges_pixels: Dict[
                 traffic_by_edge[e].loc[:, color] += traffic_by_pixel.loc[:, pixel] == value
 
     return traffic_by_edge
+
+
+@if_exist_load_else_do(file_format="joblib")
+def get_traffic_by_node(traffic_by_edge, graph, nodes=None):
+    """
+
+    :param observed_pollution:
+    :param traffic_by_edge:
+    :param graph:
+    :param nodes:
+    :return: traffic_by_node: [#times, #nodes, #traffic colors]
+    """
+    nodes = list(graph.nodes) if nodes is None else nodes
+    deg = compute_adjacency(graph, lambda data: data["length"] * data["lanes"]).toarray().sum(axis=1)
+    node2ix = {n: i for i, n in enumerate(graph.nodes)}
+    traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
+    # TODO: make it incremental instead of replacing the whole matrix.
+    traffic_by_node = np.zeros((len(observed_pollution), len(nodes), len(TRAFFIC_VALUES)))
+    for edge, df in traffic_by_edge.items():
+        if (edge in graph.edges) and (edge[0] in nodes or edge[1] in nodes):
+            for i, color in enumerate(TRAFFIC_VALUES):
+                # length is added because we are doing the integral against the P1 elements.
+                # a factor of 1/2 may be added too.
+                update_val = df.loc[observed_pollution.index, color]
+                update_val *= graph.edges[edge]["length"] * graph.edges[edge]["lanes"] / 2
+
+                if edge[0] in nodes:
+                    self.traffic_by_node[:, self.node2index[edge[0]], i] += \
+                        update_val / deg[node2ix[edge[0]]] / traffic_by_edge_normalization[edge]
+
+                if edge[1] in nodes:
+                    self.traffic_by_node[:, self.node2index[edge[1]], i] += \
+                        update_val / deg[node2ix[edge[1]]] / traffic_by_edge_normalization[edge]
+    return self.traffic_by_node

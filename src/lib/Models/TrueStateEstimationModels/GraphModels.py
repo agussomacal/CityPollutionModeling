@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union
 
 import networkx as nx
@@ -9,7 +10,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
-from PerplexityLab.miscellaneous import filter_dict, timeit
+from PerplexityLab.miscellaneous import filter_dict, timeit, if_exist_load_else_do
 from src.experiments.config_experiments import screenshot_period
 from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES, load_background
 from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEConvolutionFixedPixels, WaterColor, GreenAreaColor
@@ -81,13 +82,53 @@ def check_is_fitted(estimator):
     return True
 
 
+@if_exist_load_else_do(file_format="joblib", loader=None, saver=None,
+                       description=None, check_hash=True)
+def get_traffic_by_node(node2index, last_nodes, last_times, observed_pollution, traffic_by_edge, graph, nodes=None):
+    """
+
+    :param observed_pollution:
+    :param traffic_by_edge:
+    :param graph:
+    :param nodes:
+    :return: traffic_by_node: [#times, #nodes, #traffic colors]
+    """
+    nodes = list(graph.nodes) if nodes is None else nodes
+    deg = compute_adjacency(graph, lambda data: data["length"] * data["lanes"]).toarray().sum(axis=1)
+    node2ix = {n: i for i, n in enumerate(graph.nodes)}
+    traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
+    if last_nodes != set(nodes) or last_times != set(list(observed_pollution.index)):
+        # TODO: make it incremental instead of replacing the whole matrix.
+        last_nodes = set(nodes)
+        last_times = set(list(observed_pollution.index))
+        traffic_by_node = np.zeros((len(observed_pollution), len(nodes), len(TRAFFIC_VALUES)))
+        for edge, df in traffic_by_edge.items():
+            if (edge in graph.edges) and (edge[0] in nodes or edge[1] in nodes):
+                for i, color in enumerate(TRAFFIC_VALUES):
+                    # length is added because we are doing the integral against the P1 elements.
+                    # a factor of 1/2 may be added too.
+                    update_val = df.loc[observed_pollution.index, color]
+                    update_val *= graph.edges[edge]["length"] * graph.edges[edge]["lanes"] / 2
+
+                    if edge[0] in nodes:
+                        traffic_by_node[:, node2index[edge[0]], i] += \
+                            update_val / deg[node2ix[edge[0]]] / traffic_by_edge_normalization[edge]
+
+                    if edge[1] in nodes:
+                        traffic_by_node[:, node2index[edge[1]], i] += \
+                            update_val / deg[node2ix[edge[1]]] / traffic_by_edge_normalization[edge]
+        return traffic_by_node, last_times, last_nodes, node2index
+
+
 class GraphModelBase(BaseModel):
 
-    def __init__(self, name="", loss=mse, optim_method=GRAD, verbose=False, niter=1000, k_neighbours=None, sigma0=1,
+    def __init__(self, path2trafficbynode: Union[str, Path], name="", loss=mse, optim_method=GRAD, verbose=False,
+                 niter=1000, k_neighbours=None, sigma0=1,
                  **kwargs):
         # super call
         super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, sigma0=sigma0,
                          **kwargs)
+        self.path2trafficbynode = path2trafficbynode
         self.position2node_index = dict()
         self.nodes = None
         self.node_positions = None
@@ -121,30 +162,12 @@ class GraphModelBase(BaseModel):
         :param nodes:
         :return: traffic_by_node: [#times, #nodes, #traffic colors]
         """
-        nodes = list(graph.nodes) if nodes is None else nodes
-        deg = compute_adjacency(graph, lambda data: data["length"] * data["lanes"]).toarray().sum(axis=1)
-        node2ix = {n: i for i, n in enumerate(graph.nodes)}
-        traffic_by_edge_normalization = {e: df.sum(axis=1).max() for e, df in traffic_by_edge.items()}
-        if self.last_nodes != set(nodes) or self.last_times != set(list(observed_pollution.index)):
-            # TODO: make it incremental instead of replacing the whole matrix.
-            self.last_nodes = set(nodes)
-            self.last_times = set(list(observed_pollution.index))
-            self.traffic_by_node = np.zeros((len(observed_pollution), len(nodes), len(TRAFFIC_VALUES)))
-            for edge, df in traffic_by_edge.items():
-                if (edge in graph.edges) and (edge[0] in nodes or edge[1] in nodes):
-                    for i, color in enumerate(TRAFFIC_VALUES):
-                        # length is added because we are doing the integral against the P1 elements.
-                        # a factor of 1/2 may be added too.
-                        update_val = df.loc[observed_pollution.index, color]
-                        update_val *= graph.edges[edge]["length"] * graph.edges[edge]["lanes"] / 2
-
-                        if edge[0] in nodes:
-                            self.traffic_by_node[:, self.node2index[edge[0]], i] += \
-                                update_val / deg[node2ix[edge[0]]] / traffic_by_edge_normalization[edge]
-
-                        if edge[1] in nodes:
-                            self.traffic_by_node[:, self.node2index[edge[1]], i] += \
-                                update_val / deg[node2ix[edge[1]]] / traffic_by_edge_normalization[edge]
+        res = get_traffic_by_node(path=self.path2trafficbynode, filename=None,
+                                  node2index=self.node2index, last_nodes=self.last_nodes, last_times=self.last_times,
+                                  observed_pollution=observed_pollution, traffic_by_edge=traffic_by_edge, graph=graph,
+                                  nodes=None)
+        if res is not None:
+            self.traffic_by_node, self.node2index, self.last_nodes, self.last_times = res
         return self.traffic_by_node
 
     def get_emissions(self, traffic_by_node):
@@ -188,7 +211,7 @@ class GraphModelBase(BaseModel):
             emissions = self.get_emissions(traffic_by_node)
 
         with timeit("solutions"):
-            solutions = self.state_estimation_core(emissions, **kwargs)
+            solutions = self.state_estimation_core(emissions=emissions, **kwargs)
 
         return solutions[:, indexes]
 
@@ -204,13 +227,15 @@ class GraphModelBase(BaseModel):
 class GraphEmissionsNeigEdgeModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
-    def __init__(self, model: Pipeline, k_neighbours=1, name="", loss=mse, verbose=False, optim_method=GRAD,
+    def __init__(self, model: Pipeline, k_neighbours=1, name="", loss=mse, verbose=False, path2trafficbynode=None,
+                 optim_method=GRAD,
                  extra_regressors=[], **kwargs):
         self.model = model
         assert k_neighbours >= 1 and isinstance(k_neighbours, int), "k_neighbours should be integer >= 1"
         # self.fit_intercept = fit_intercept
         self.extra_regressors = extra_regressors
         super().__init__(
+            path2trafficbynode=path2trafficbynode,
             name=name + "_".join([step[0] for step in model.steps]),
             loss=loss, verbose=verbose,
             k_neighbours=k_neighbours, optim_method=optim_method, **kwargs)
@@ -447,15 +472,46 @@ class GraphEmissionsModel(GraphModelBase):
         return self.traffic2pollution(traffic_by_node)
 
 
+@if_exist_load_else_do(file_format="joblib", loader=None, saver=None,
+                       description=None, check_hash=True)
+def HEqestimation(diffusion, absorption, emissions, Kd, Ms):
+    if diffusion == 0 and absorption == 0:
+        return emissions / np.diagonal(Ms.toarray()) * (1 / 2)
+    else:
+        A = diffusion * Kd + absorption * Ms
+        return np.array([gmres(A, e, x0=e, maxiter=100)[0] for e in tqdm(emissions)])
+    # return spsolve(csr_matrix(A), emissions).T
+    # n=2 1.11s/it A calculated each time: 16min A precalculated: 10.3min
+    # A precalculated: 30s
+    # return np.concatenate(
+    #     [spsolve(A, emissions[:, i:i + n]).T for i in
+    #      tqdm(range(0, emissions.shape[1], n))])
+
+    # return np.concatenate(
+    #     [solve(A, emissions[:, i:i + n]).T for i in
+    #      tqdm(range(0, emissions.shape[1], n))])
+
+    # 18 it/s with 1823 samples to perform: 1:40 min.
+    # return np.concatenate(
+    #     [lu_solve((lu, piv), emissions[:, i:i + n], overwrite_b=True, check_finite=False).T for i in
+    #      tqdm(range(0, emissions.shape[1], n))])
+    # return lu_solve((lu, piv), emissions, overwrite_b=True, check_finite=False).T
+    # return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T
+
+
 class HEqStaticModel(GraphModelBase):
     POLLUTION_AGNOSTIC = True
 
-    def __init__(self, absorption: Union[float, Optim], diffusion: Union[float, Optim], green: Union[float, Optim],
+    def __init__(self, path2trafficbynode: Union[str, Path], estimations_path: Union[str, Path],
+                 absorption: Union[float, Optim],
+                 diffusion: Union[float, Optim], green: Union[float, Optim],
                  yellow: Union[float, Optim], red: Union[float, Optim], dark_red: Union[float, Optim],
                  k_neighbours=None, name="", loss=mse, optim_method="lsq", verbose=False, niter=1000, sigma0=1):
-        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose, k_neighbours=k_neighbours,
+        super().__init__(path2trafficbynode=path2trafficbynode, name=name, loss=loss, optim_method=optim_method,
+                         verbose=verbose, k_neighbours=k_neighbours,
                          absorption=absorption, diffusion=diffusion, green=green, yellow=yellow, red=red,
                          dark_red=dark_red, niter=niter, sigma0=sigma0)
+        self.estimations_path = estimations_path
 
     def preprocess_graph(self, graph: nx.Graph):
         preprocess_dict = super(HEqStaticModel, self).preprocess_graph(graph)
@@ -473,27 +529,8 @@ class HEqStaticModel(GraphModelBase):
             # preprocess_dict["lu"], preprocess_dict["piv"] = lu_factor(A)
         return preprocess_dict
 
-    def state_estimation_core(self, emissions, Kd, Ms, **kwargs):
+    def state_estimation_core(self, emissions, **kwargs):
         print(self.params["diffusion"], self.params["absorption"])
-        if self.params["diffusion"] == 0 and self.params["absorption"] == 0:
-            return emissions / np.diagonal(Ms.toarray()) * (1 / 2)
-        else:
-            A = self.params["diffusion"] * Kd + self.params["absorption"] * Ms
-            return np.array([gmres(A, e, x0=e, maxiter=100)[0] for e in tqdm(emissions)])
-        # return spsolve(csr_matrix(A), emissions).T
-        # n=2 1.11s/it A calculated each time: 16min A precalculated: 10.3min
-        # A precalculated: 30s
-        # return np.concatenate(
-        #     [spsolve(A, emissions[:, i:i + n]).T for i in
-        #      tqdm(range(0, emissions.shape[1], n))])
-
-        # return np.concatenate(
-        #     [solve(A, emissions[:, i:i + n]).T for i in
-        #      tqdm(range(0, emissions.shape[1], n))])
-
-        # 18 it/s with 1823 samples to perform: 1:40 min.
-        # return np.concatenate(
-        #     [lu_solve((lu, piv), emissions[:, i:i + n], overwrite_b=True, check_finite=False).T for i in
-        #      tqdm(range(0, emissions.shape[1], n))])
-        # return lu_solve((lu, piv), emissions, overwrite_b=True, check_finite=False).T
-        # return solve(self.params["diffusion"] * Kd + self.params["absorption"] * Ms, emissions).T
+        return HEqestimation(path=self.estimations_path, filename=None, recalculate=False,
+                             diffusion=self.params["diffusion"], absorption=self.params["absorption"],
+                             emissions=emissions, Kd=kwargs["Kd"], Ms=kwargs["Ms"])

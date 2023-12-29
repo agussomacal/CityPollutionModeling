@@ -11,6 +11,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
+import matplotlib as mpl
+from matplotlib import colors
+from scipy.interpolate import griddata
 from scipy.spatial.distance import cdist
 from sklearn.pipeline import Pipeline
 
@@ -137,10 +140,14 @@ with data_manager.track_emissions("PreprocessesTrafficPollution"):
     pollution_future = pollution_future.loc[pollution_future.index.intersection(available_times), :]
     traffic_past = pollution_past.loc[traffic_past.index.intersection(available_times), :]
     traffic_future = pollution_future.loc[traffic_future.index.intersection(available_times), :]
+    times_past = pollution_past.index
     times_future = pollution_future.index
+    times_all = times_past.tolist() + times_future.tolist()
     runsinfo.append_info(
         numstations=int(len(station_coordinates.columns)),
-        numberoftraintimes=len(times_future),
+        numberoftesttimes=len(times_future),
+        numberoftraintimes=len(times_past),
+        numberoftimes=len(times_all),
     )
 
 with data_manager.track_emissions("PreprocessGraph"):
@@ -413,14 +420,14 @@ def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes)
         axis=1)
 
 
-@perplex_plot()
+@perplex_plot(legend=False)
 @one_line_iterator
 def plot_pollution_map_in_graph(fig, ax, station, trained_model, diffusion_method=None, time=None, nodes_indexes=None,
-                                cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5):
+                                cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5, bar=False,
+                                max_val=None, plot_nodes=False, levels=0):
     img = load_image(
         f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
-    # img = load_background(screenshot_period)
-    ax.imshow(img, extent=[0, 1, 0, 1], alpha=1 - alpha)
+
     estimation = estimate_pollution_map_in_graph(path=data_manager.path,
                                                  filename=f"PollutionEstimation_{station}_{time}_{trained_model}",
                                                  time=time, station=station, trained_model=trained_model,
@@ -428,11 +435,32 @@ def plot_pollution_map_in_graph(fig, ax, station, trained_model, diffusion_metho
 
     # smoothing
     pollution = np.ravel(diffusion_method(estimation["pollution"].values.reshape((-1, 1))))
-    sc = ax.scatter(x=(estimation["long"] - long_bounds.lower) / (long_bounds.upper - long_bounds.lower),
-                    y=(estimation["lat"] - lat_bounds.lower) / (lat_bounds.upper - lat_bounds.lower),
-                    c=pollution, cmap=cmap,
-                    s=s, alpha=alpha)
-    plt.colorbar(sc, ax=ax)
+    x = (estimation["long"] - long_bounds.lower) / (long_bounds.upper - long_bounds.lower)
+    y = (estimation["lat"] - lat_bounds.lower) / (lat_bounds.upper - lat_bounds.lower)
+    print(min(pollution), max(pollution))
+    if plot_nodes:
+        sc = ax.scatter(x=x,
+                        y=y,
+                        c=pollution, cmap=cmap,
+                        norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None,
+                        s=s, alpha=alpha)
+    else:
+        grid_x, grid_y = np.meshgrid(np.linspace(np.min(estimation["long"]), np.max(estimation["long"])),
+                                     np.linspace(np.min(estimation["lat"]), np.max(estimation["lat"])))
+        grid_z2 = griddata(np.transpose([x, y]), pollution, (grid_x, grid_y), method='nearest')
+        if levels > 0:
+            sc = ax.contourf(grid_z2, levels=levels, alpha=alpha, cmap=cmap,
+                             norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None)
+        else:
+            sc = ax.imshow(grid_z2.T, extent=(0, 1, 0, 1), origin='lower', alpha=alpha, cmap=cmap,
+                           # interpolation="bicubic",
+                           # norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None
+                           )
+
+    ax.imshow(img, extent=[0, 1, 0, 1], alpha=1 - alpha)
+
+    if bar:
+        plt.colorbar(sc, ax=ax)
 
 
 print(f"CO2 {data_manager.CO2kg}kg")

@@ -48,6 +48,7 @@ def pollution_agnostic(state_estimation4optim):
     """
     LOO for models that don't make use of pollution information (like traffic average).
     """
+
     def decorated(self, observed_stations, observed_pollution, traffic, **kwargs) -> [np.ndarray, np.ndarray]:
         stations2test = kwargs.get("stations2test", observed_pollution.columns)
         order = [unknown_station_ix for unknown_station_ix in split_loo(observed_pollution) if
@@ -167,15 +168,17 @@ class BaseModel:
             self.optim_method = GRAD
 
         def optim_func(params):
+            dictparams = dict(zip(self.bounds, params))
             if self.verbose:
-                print(f"Params for optimization: {params}")
-            self.set_params(**dict(zip(self.bounds, params)))
+                df = pd.DataFrame(np.reshape(list(dictparams.values()), (1, -1)), columns=list(dictparams.keys()))
+                print(f"Params for optimization: \n {df}")
+            self.set_params(**dictparams)
             predicted_pollution, target_pollution = self.state_estimation_for_optim(
                 observed_stations, observed_pollution, traffic, **kwargs)
             loss = self.loss(predicted_pollution, target_pollution)
             self.losses[tuple(params)] = loss
             if self.verbose:
-                print(loss)
+                print(f"loss: {loss}")
             return loss
 
         self.losses = dict()
@@ -185,7 +188,7 @@ class BaseModel:
             optim_params = x0
         elif self.optim_method == CMA:
             optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
-                                        sigma0=1, eval_initial_x=True,
+                                        sigma0=self.sigma0, eval_initial_x=True,
                                         options={'popsize': 10, 'maxfevals': self.niter})
         elif self.optim_method == GRAD:
             optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds.values(),
@@ -217,6 +220,8 @@ class BaseModel:
             self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=self.bounds.keys()),
                                     name="loss")
         print(self, "Optim params: ", self.params)
+
+        # dbvsuvbsd
         self.calibrated = True
         return self
 
@@ -253,7 +258,7 @@ class ModelsSequenciator(BaseModel):
                                        **kwargs).reshape((-1, 1))).reshape(np.shape(predictions_i))
             # get the residuals on the observed values
             # the following lines are necessary for models that relly on the names of the sensors and are not properly
-            # state stimation methods.
+            # state estimation methods.
             # only actualize if it is not the las model
             if observed_pollution_i is not None and i < len(self.models) - 1:
                 observed_pollution_i -= self.transition_model[i].predict(
@@ -266,6 +271,7 @@ class ModelsSequenciator(BaseModel):
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
+        # the prediction is the average of predictions
         return np.nanmean([self.single_state_estimation(
             observed_stations=known_data["observed_stations"],
             observed_pollution=known_data["observed_pollution"],
