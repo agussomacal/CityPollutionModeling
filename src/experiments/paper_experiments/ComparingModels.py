@@ -17,7 +17,7 @@ from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
 from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
 from PerplexityLab.visualization import generic_plot, perplex_plot
-from src.experiments.paper_experiments.PreProcessPaper import train_test_model, train_test_averagers, stations2test, \
+from src.experiments.paper_experiments.PreProcessPaper import train_test_model, stations2test, \
     plot_pollution_map_in_graph, times_future, graph, pollution_past, station_coordinates, times_all, traffic_by_edge
 from src.experiments.paper_experiments.params4runs import path2latex_figures, runsinfo
 from src.lib.FeatureExtractors.GraphFeatureExtractors import label_prop, diffusion_eq
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     data_manager = DataManager(
         path=config.paper_experiments_dir,
         emissions_path=config.results_dir,
-        name="NumericalResults",
+        name="NumericalResults3",
         country_alpha_code="FR",
         trackCO2=True
     )
@@ -99,6 +99,55 @@ if __name__ == "__main__":
                      # red=Optim(start=5.643795, lower=None, upper=None),
                      # dark_red=Optim(start=6.794929, lower=None, upper=None)
                      ),
+        ModelsSequenciator(
+            name="PhysicsKrigging",
+            models=[
+                PhysicsModel(path4preprocess=data_manager.path, graph=graph,
+                             spacial_locations=station_coordinates, times=times_all,
+                             traffic_by_edge=traffic_by_edge,
+                             extra_regressors=["temperature", "wind"],
+                             k_max=10,
+                             k=10,
+                             redo_preprocessing=False,
+                             name="", loss=mse, optim_method=GRAD,
+                             verbose=True, niter=500, sigma0=1,
+                             absorption=Optim(start=6.240205, lower=0, upper=None),
+                             diffusion=Optim(start=0.598104, lower=0, upper=None),
+                             alpha=Optim(start=0.99, lower=0, upper=1),
+                             ),
+                ExponentialKernelModel(alpha=Optim(start=None, lower=0.001, upper=0.5),  # 0.01266096365565058
+                                       beta=Optim(start=np.log(1), lower=np.log(0.01), upper=np.log(2)),
+                                       distrust=0,
+                                       name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False)
+            ],
+            transition_model=[
+                Pipeline([("Id", IdentityTransformer())]),
+                Pipeline([("Lss", LassoCV(selection="cyclic"))])
+            ]
+        ),
+        # PhysicsModel(path4preprocess=data_manager.path,
+        #              # name="K",
+        #              graph=graph,
+        #              spacial_locations=station_coordinates, times=times_all,
+        #              traffic_by_edge=traffic_by_edge,
+        #              extra_regressors=["temperature", "wind"],
+        #              k_max=50,
+        #              k=50,
+        #              redo_preprocessing=False,
+        #              loss=mse, optim_method=GRAD,
+        #              verbose=True, niter=500, sigma0=1,
+        #              absorption=Optim(start=6.240205, lower=0, upper=None),
+        #              # diffusion=Optim(start=-0.5981040000835097, lower=None, upper=None),
+        #              diffusion=Optim(start=0.598104, lower=0, upper=None),
+        #              # alpha=Optim(start=1.9263212966429901, lower=0, upper=2),
+        #              # alpha=Optim(start=0.000658, lower=0, upper=1),
+        #              alpha=Optim(start=0.99, lower=0, upper=1),
+        #              # alpha=1,
+        #              # green=Optim(start=2.58609, lower=None, upper=None),
+        #              # yellow=Optim(start=8.420218, lower=None, upper=None),
+        #              # red=Optim(start=5.643795, lower=None, upper=None),
+        #              # dark_red=Optim(start=6.794929, lower=None, upper=None)
+        #              ),
         # ModelsSequenciator(
         #     name="AvgKrigging",
         #     models=[
@@ -132,71 +181,70 @@ if __name__ == "__main__":
         #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
         #     ]
         # ),
-        ModelsSequenciator(
-            name="LR_Extra",
-            models=[
-                SnapshotMeanModel(summary_statistic="mean"),
-                GraphEmissionsNeigEdgeModel(
-                    path2trafficbynode=data_manager.path,
-                    extra_regressors=["temperature", "wind"],
-                    k_neighbours=k_neighbours,
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-                    model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-                    niter=2, verbose=True,
-                    optim_method=NONE_OPTIM_METHOD,
-                    loss=medianse)
-            ],
-            transition_model=[
-                Pipeline([("LR", LinearRegression())]),
-                Pipeline([("Lss", LassoCV(selection="cyclic"))])
-            ]
-        ),
-        ModelsSequenciator(
-            name="NN_Extra",
-            models=[
-                SnapshotMeanModel(summary_statistic="mean"),
-                GraphEmissionsNeigEdgeModel(
-                    path2trafficbynode=data_manager.path,
-                    extra_regressors=["temperature", "wind"],
-                    k_neighbours=k_neighbours,
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
-                    # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
-                    model=Pipeline(
-                        steps=[("zscore", StandardScaler()),
-                               ("NN",
-                                # SkKerasRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                                #                        epochs=max_iter, activation=activation, validation_size=0.1,
-                                #                        restarts=1,
-                                #                        batch_size=0.1, criterion="mse",
-                                #                        # optimizer="Adam",
-                                #                        lr=None, lr_lower_limit=1e-12,
-                                #                        lr_upper_limit=1, n_epochs_without_improvement=100,
-                                #                        train_noise=1e-5)
-                                MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                                             activation=activation,  # 'relu',
-                                             learning_rate_init=learning_rate_init,
-                                             learning_rate=learning_rate,
-                                             early_stopping=early_stopping,
-                                             solver=solver.lower(),
-                                             max_iter=max_iter)
-                                )]),
-                    niter=2, verbose=True,
-                    optim_method=NONE_OPTIM_METHOD,
-                    loss=medianse)
-            ],
-            transition_model=[
-                Pipeline([("LR", LinearRegression())]),
-                Pipeline([("Lss", LassoCV(selection="cyclic"))])
-            ]
-        ),
+        # ModelsSequenciator(
+        #     name="LR_Extra",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             path2trafficbynode=data_manager.path,
+        #             extra_regressors=["temperature", "wind"],
+        #             k_neighbours=k_neighbours,
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+        #             model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
+        # ModelsSequenciator(
+        #     name="NN_Extra",
+        #     models=[
+        #         SnapshotMeanModel(summary_statistic="mean"),
+        #         GraphEmissionsNeigEdgeModel(
+        #             path2trafficbynode=data_manager.path,
+        #             extra_regressors=["temperature", "wind"],
+        #             k_neighbours=k_neighbours,
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("LR", LinearRegression())]),
+        #             # model=Pipeline(steps=[("zscore", StandardScaler()), ("Lasso", LassoCV(selection="cyclic"))]),
+        #             model=Pipeline(
+        #                 steps=[("zscore", StandardScaler()),
+        #                        ("NN",
+        #                         # SkKerasRegressor(hidden_layer_sizes=hidden_layer_sizes,
+        #                         #                        epochs=max_iter, activation=activation, validation_size=0.1,
+        #                         #                        restarts=1,
+        #                         #                        batch_size=0.1, criterion="mse",
+        #                         #                        # optimizer="Adam",
+        #                         #                        lr=None, lr_lower_limit=1e-12,
+        #                         #                        lr_upper_limit=1, n_epochs_without_improvement=100,
+        #                         #                        train_noise=1e-5)
+        #                         MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+        #                                      activation=activation,  # 'relu',
+        #                                      learning_rate_init=learning_rate_init,
+        #                                      learning_rate=learning_rate,
+        #                                      early_stopping=early_stopping,
+        #                                      solver=solver.lower(),
+        #                                      max_iter=max_iter)
+        #                         )]),
+        #             niter=2, verbose=True,
+        #             optim_method=NONE_OPTIM_METHOD,
+        #             loss=medianse)
+        #     ],
+        #     transition_model=[
+        #         Pipeline([("LR", LinearRegression())]),
+        #         Pipeline([("Lss", LassoCV(selection="cyclic"))])
+        #     ]
+        # ),
     ]
 
     lab = LabPipeline()
     lab.define_new_block_of_functions(
         "individual_models",
         *list(map(train_test_model,
-                  models +
-                  base_models
+                  models + base_models[:3]
                   )),
         recalculate=False
     )
@@ -243,10 +291,13 @@ if __name__ == "__main__":
         *list(map(train_test_model,
                   [
                       # (Pipeline([("LR", LassoCV(selection="random"))]), base_models[:2] + models),
-                      (Pipeline([("LR", LassoCV(selection="random"))]), base_models[:1] + models),
+                      # (Pipeline([("LR", LassoCV(selection="random"))]), base_models[:1] + models),
                       # (Pipeline([("LR", LassoCV(selection="random"))]), [models[-1]]),
                       # (Pipeline([("LR", LassoCV(selection="random"))]), [models[-2]]),
                       # (Pipeline([("LR", LassoCV(selection="random"))]), [models[0]]),
+                      # (Pipeline([("LR", LassoCV(selection="random"))]), [models[0]]),
+                      # (Pipeline([("LR", LassoCV(selection="random"))]), [models[1]]),
+                      (Pipeline([("LR", LassoCV(selection="random"))]), models[:2]),
 
                       # (Pipeline([("Id", IdentityTransformer())]), [models[0]]),
                       # (Pipeline([("LR", LassoCV(selection="random"))]), [models[0], base_models[1]])

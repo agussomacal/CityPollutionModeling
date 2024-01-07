@@ -22,7 +22,7 @@ from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
 
 
-@if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
+@if_exist_load_else_do(file_format="joblib", loader=None, saver=None, description=None, check_hash=False)
 def get_absorption_matrix(graph: nx.Graph):
     # absorption matrix Ms
     Ms = -compute_laplacian_matrix_from_graph(graph, edge_function=lambda data: data["length"]) / 6
@@ -30,7 +30,7 @@ def get_absorption_matrix(graph: nx.Graph):
     return Ms
 
 
-@if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
+@if_exist_load_else_do(file_format="joblib", loader=None, saver=None, description=None, check_hash=False)
 def get_diffusion_matrix(graph: nx.Graph):
     # diffusion matrix Kd
     Kd = compute_laplacian_matrix_from_graph(graph, edge_function=lambda data: 1.0 / data["length"])
@@ -223,10 +223,10 @@ class PhysicsModel(BaseModel):
                                                position2node_index=self.position2node_index,
                                                recalculate=redo_preprocessing, filename=f"basis_point_eval_k{k_max}", )
         self.times = times
-        # traffic_by_node = get_traffic_by_node(path=path4preprocess, times=times,
-        #                                       traffic_by_edge=traffic_by_edge,
-        #                                       graph=graph, recalculate=redo_preprocessing)
-        traffic_by_node = None
+        traffic_by_node = get_traffic_by_node(path=path4preprocess, times=times,
+                                              traffic_by_edge=traffic_by_edge,
+                                              graph=graph, recalculate=redo_preprocessing)
+        # traffic_by_node = None
         self.source = get_basis_traffic_by_node(path=path4preprocess, basis=self.B, traffic_by_node=traffic_by_node,
                                                 recalculate=redo_preprocessing)
 
