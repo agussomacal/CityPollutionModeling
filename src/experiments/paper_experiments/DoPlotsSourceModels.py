@@ -53,9 +53,11 @@ model_style = OrderedDict([
     # ("SourceModel_Poly2Lasso_avg", PlotStyle(color=cgreen, marker=".", linestyle=":")),
     ("SourceModel_Poly1Lasso_avg", PlotStyle(color=cgreen, marker="o", linestyle=":")),
     ("SourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+    ("SourceModel_Poly1NN_avg_TW", PlotStyle(color=cblue, marker="o", linestyle="-")),
+    ("PCASourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cred, marker="o", linestyle="-")),
+
     # ("SourceModel_Poly1Lasso_avg_TWGW", PlotStyle(color=cred, marker="o", linestyle="-")),
     # ("SourceModel_Poly2Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
-
 
 ])
 
