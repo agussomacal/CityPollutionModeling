@@ -27,7 +27,8 @@ from src.lib.Models.SensorDependentModels.BLUEFamily import BLUEModel
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
 from src.lib.Models.TrueStateEstimationModels.GraphModels import GraphEmissionsNeigEdgeModel, HEqStaticModel
 from src.lib.Models.TrueStateEstimationModels.KernelModels import GaussianKernelModel, ExponentialKernelModel
-from src.lib.Models.TrueStateEstimationModels.PhysicsModel import PhysicsModel, NodeSourceModel, PCASourceModel
+from src.lib.Models.TrueStateEstimationModels.PhysicsModel import PhysicsModel, NodeSourceModel, PCASourceModel, \
+    LaplacianSourceModel
 from src.lib.Modules import Optim
 
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -58,62 +59,62 @@ if __name__ == "__main__":
         emissions_path=config.results_dir,
         name="SourceModels",
         country_alpha_code="FR",
-        trackCO2=True
+        trackCO2=False
     )
     copy_main_script_version(__file__, data_manager.path)
 
     models = {
-        "Spatial Avg":
-            SnapshotMeanModel(summary_statistic="mean"),
-        "Kernel":
-            ExponentialKernelModel(alpha=Optim(start=None, lower=0.001, upper=0.5),
-                                   beta=Optim(start=np.log(1), lower=np.log(0.01), upper=np.log(2)),
-                                   distrust=0,
-                                   name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False),
-        "BLUE":
-            BLUEModel(name="BLUE", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False),
-        "SourceModel_Poly1Lasso_avg":
-            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-                            spacial_locations=station_coordinates, times=times_all,
-                            traffic_by_edge=traffic_by_edge,
-                            redo_preprocessing=False,
-                            name="", loss=mse, optim_method=GRAD,
-                            verbose=True, niter=10, sigma0=1,
-                            lnei=1,
-                            source_model=LassoCV(selection="random", positive=False),
-                            substract_mean=True,
-                            # extra_regressors=["temperature", "wind"],
-                            ),
-        "SourceModel_Poly1Lasso_avg_TW":
-            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-                            spacial_locations=station_coordinates, times=times_all,
-                            traffic_by_edge=traffic_by_edge,
-                            redo_preprocessing=False,
-                            name="", loss=mse, optim_method=GRAD,
-                            verbose=True, niter=10, sigma0=1,
-                            lnei=1,
-                            source_model=LassoCV(selection="random", positive=False),
-                            substract_mean=True,
-                            extra_regressors=["temperature", "wind"],
-                            ),
-        "SourceModel_Poly1NN_avg_TW":
-            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-                            spacial_locations=station_coordinates, times=times_all,
-                            traffic_by_edge=traffic_by_edge,
-                            redo_preprocessing=False,
-                            name="", loss=mse, optim_method=GRAD,
-                            verbose=True, niter=10, sigma0=1,
-                            lnei=1,
-                            source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                                                      activation=activation,  # 'relu',
-                                                      learning_rate_init=learning_rate_init,
-                                                      learning_rate=learning_rate,
-                                                      early_stopping=early_stopping,
-                                                      solver=solver.lower(),
-                                                      max_iter=max_iter),
-                            substract_mean=True,
-                            extra_regressors=["temperature", "wind"],
-                            ),
+        # "Spatial Avg":
+        #     SnapshotMeanModel(summary_statistic="mean"),
+        # "Kernel":
+        #     ExponentialKernelModel(alpha=Optim(start=None, lower=0.001, upper=0.5),
+        #                            beta=Optim(start=np.log(1), lower=np.log(0.01), upper=np.log(2)),
+        #                            distrust=0,
+        #                            name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False),
+        # "BLUE":
+        #     BLUEModel(name="BLUE", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False),
+        # "SourceModel_Poly1Lasso_avg":
+        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                     spacial_locations=station_coordinates, times=times_all,
+        #                     traffic_by_edge=traffic_by_edge,
+        #                     redo_preprocessing=False,
+        #                     name="", loss=mse, optim_method=GRAD,
+        #                     verbose=True, niter=10, sigma0=1,
+        #                     lnei=1,
+        #                     source_model=LassoCV(selection="random", positive=False),
+        #                     substract_mean=True,
+        #                     # extra_regressors=["temperature", "wind"],
+        #                     ),
+        # "SourceModel_Poly1Lasso_avg_TW":
+        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                     spacial_locations=station_coordinates, times=times_all,
+        #                     traffic_by_edge=traffic_by_edge,
+        #                     redo_preprocessing=False,
+        #                     name="", loss=mse, optim_method=GRAD,
+        #                     verbose=True, niter=10, sigma0=1,
+        #                     lnei=1,
+        #                     source_model=LassoCV(selection="random", positive=False),
+        #                     substract_mean=True,
+        #                     extra_regressors=["temperature", "wind"],
+        #                     ),
+        # "SourceModel_Poly1NN_avg_TW":
+        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                     spacial_locations=station_coordinates, times=times_all,
+        #                     traffic_by_edge=traffic_by_edge,
+        #                     redo_preprocessing=False,
+        #                     name="", loss=mse, optim_method=GRAD,
+        #                     verbose=True, niter=10, sigma0=1,
+        #                     lnei=1,
+        #                     source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+        #                                               activation=activation,  # 'relu',
+        #                                               learning_rate_init=learning_rate_init,
+        #                                               learning_rate=learning_rate,
+        #                                               early_stopping=early_stopping,
+        #                                               solver=solver.lower(),
+        #                                               max_iter=max_iter),
+        #                     substract_mean=True,
+        #                     extra_regressors=["temperature", "wind"],
+        #                     ),
 
         "PCASourceModel_Poly1Lasso_avg_TW":
             PCASourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -122,11 +123,25 @@ if __name__ == "__main__":
                            redo_preprocessing=False,
                            name="", loss=mse, optim_method=GRAD,
                            verbose=True, niter=10, sigma0=1,
-                           lnei=1, k_max=10,
+                           lnei=1, k_max=10,  # k=5,
                            source_model=LassoCV(selection="random", positive=False),
                            substract_mean=True,
                            extra_regressors=["temperature", "wind"],
                            ),
+
+        "LaplacianSourceModel_Poly1Lasso_avg_TW":
+            LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
+                                 spacial_locations=station_coordinates, times=times_all,
+                                 traffic_by_edge=traffic_by_edge,
+                                 redo_preprocessing=False,
+                                 name="", loss=mse, optim_method=GRAD,
+                                 verbose=True, niter=10, sigma0=1,
+                                 lnei=1, k_max=10,  # k=5,
+                                 source_model=LassoCV(selection="random", positive=False),
+                                 substract_mean=False,
+                                 substract_std=False,
+                                 extra_regressors=["temperature", "wind"],
+                                 ),
 
     }
 
@@ -134,7 +149,7 @@ if __name__ == "__main__":
     lab.define_new_block_of_functions(
         "individual_models",
         *list(map(train_test_model, models.items())),
-        recalculate=False
+        recalculate=True
     )
 
     lab.execute(
