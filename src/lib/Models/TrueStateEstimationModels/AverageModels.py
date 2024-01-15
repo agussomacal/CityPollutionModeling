@@ -28,6 +28,11 @@ class SnapshotMeanModel(SummaryModel):
         return summary_function(observed_pollution.values, axis=1, keepdims=True) * \
             np.ones((1, np.shape(target_positions)[1]))
 
+    @pollution_agnostic
+    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, target_positions,
+                                   **kwargs) -> [np.ndarray, np.ndarray]:
+        return self.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs)
+
 
 class SnapshotQuantileModel(SummaryModel):
     def __init__(self, summary_statistic="mean"):

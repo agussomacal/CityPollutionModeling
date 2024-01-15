@@ -59,7 +59,7 @@ def pollution_agnostic(state_estimation4optim):
             observed_stations=observed_stations.iloc[:, order],
             observed_pollution=observed_pollution.iloc[:, order],
             traffic=traffic,
-            # target_positions=observed_stations.iloc[:, order],
+            target_positions=observed_stations.iloc[:, order],
             **kwargs
         )
 

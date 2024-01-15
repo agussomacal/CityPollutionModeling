@@ -19,94 +19,164 @@ cwhite = (1, 1, 1)
 data_manager = DataManager(
     path=config.paper_experiments_dir,
     emissions_path=config.results_dir,
-    name="NumericalResults",
+    # name="NumericalResults",
+    name="Experimentation",
     country_alpha_code="FR",
     trackCO2=True
 )
 data_manager.load()
 
 OptimModel = "BLUE"
-BaselineModel = "Average in space"
-Krigging = "Krigging"
+BaselineModel = "Spatial Avg"#"Average in space"
+Krigging = "Kernel"#"Krigging"
 
 model_names = OrderedDict([
-    ("SnapshotMeanModelmean", BaselineModel),
-    ("BLUEModelBLUE", OptimModel),
+    ("Spatial Avg", BaselineModel),
+    ("SL Spatial Avg", "SL " + BaselineModel),
+    ("BLUE", OptimModel),
 
-    ("ExponentialKernelModel", Krigging),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", "Physics model"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PMK)", "Physics model 50"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)", "T W Graph F  - Linear model"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", "T W Graph F - Neural network"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)", "Ensemble - no Kernel"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)", "Ensemble"),
+    ("Kernel", Krigging),
 
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PK)", "Physics Kernel"),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,PK)", "Ensemble Physics"),
+    ("Physics", "Pysics model"),
+    ("SL Physics", "SL Pysics model"),
 
-    # ("BLUEModelBLUEI", "BLUE Distrust uniform"),
-    # ("BLUEModelBLUEIU", "BLUE Distrust"),
+    ("Physics-avg", "Pysics-avg-z model"),
+    ("SL Physics-avg", "SL Pysics-avg-z model"),
 
-    # ("AvgKrigging", "Global Average Krigging"),
+    ("SL Physics + Kernel", "SL Pysics + Kernel"),
 
-    # ("PhysicsModel_k10", "Phisics model"),
-    # ("Pipeline(steps=[('Id', IdentityTransformer())])(PM)", "Ensemble Avg - Physics model"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,EKM)", "Ensemble - Physics model and Kernel"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,LRE,NNE)", "Ensemble - no Physics no Kernel"),
-    # ("LR", "Graph F - Linear model"),
-    # ("LR_Extra", "T W Graph F  - Linear model"),
-    # ("NN_Extra", "T W Graph F - Neural network"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,AK,LR,LRE,NNE)", "Ensemble"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)", "Ensemble"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", "T W Graph F - Neural network"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)", "T W Graph F  - Linear model"),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LR)", "Ensemble - Graph F - Linear model")
+    ("Graph Linear + T W", "Graph Linear + T W"),
+    ("Graph NN + T W", "Graph Linear + T W"),
+    ("SL Graph Linear", "SL Graph Linear"),
+    ("SL Graph NN", "SL Graph NN"),
+    ("Esemble", "Ensemble"),
+
+    # ("SL-z Physics", "SL-z Pysics model"),
+
+    # ("Physics-z", "Pysics model z"),
+    # ("SL Physics-z", "SL Pysics model z"),
+    # ("SL-z Physics-z", "SL-z Pysics model z"),
+
+    # ("Physics-zNN", "Pysics model zNN"),
+    # ("SL-z Physics-zNN", "SL-z Pysics model zNN"),
 ])
 
+model_names = list(set(data_manager["individual_models"]))
+model_names = dict(zip(model_names, model_names))
 model_style = OrderedDict([
+    ("Spatial Avg", PlotStyle(color=cred, marker=None, linestyle=":")),
+    ("SL Spatial Avg", PlotStyle(color=cred, marker="*", linestyle=":")),
 
-    ("SnapshotMeanModelmean", PlotStyle(color=cred, marker=None, linestyle=":")),
-    ("BLUEModelBLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
+    ("BLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
+    ("Kernel", PlotStyle(color=cyellow, marker=None, linestyle=":")),
 
-    ("ExponentialKernelModel", PlotStyle(color=cyellow, marker=None, linestyle=":")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", PlotStyle(color=cgreen, marker="o", linestyle="-")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PMK)", PlotStyle(color=cblue, marker="o", linestyle="-")),
-    (
-        "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)",
-        PlotStyle(color=corange, marker=None, linestyle="-")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", PlotStyle(color=cred, marker=None, linestyle="-")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)",
-     PlotStyle(color=cpurple, marker=None, linestyle="-.")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)",
-     PlotStyle(color=cblack, marker="o", linestyle="--")),
+    ("Physics", PlotStyle(color=cgreen, marker=".", linestyle="--")),
+    ("SL Physics", PlotStyle(color=cgreen, marker="o", linestyle="-")),
 
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PK)", PlotStyle(color=corange, marker="o", linestyle="-")),
-    ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,PK)",
-     PlotStyle(color=cpurple, marker="o", linestyle="-")),
+    ("Physics-avg", PlotStyle(color=cblue, marker=".", linestyle="--")),
+    ("SL Physics-avg", PlotStyle(color=cblue, marker="o", linestyle="--")),
 
-    # ("BLUEModelBLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
-    # # ("PhysicsModel_k10", PlotStyle(color=cyellow, marker="o", linestyle="-")),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", PlotStyle(color=cblue, marker="o", linestyle="-")),
-    # # ("Pipeline(steps=[('Id', IdentityTransformer())])(PM)", PlotStyle(color=cblue, marker="o", linestyle="--")),
-    # # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,EKM)",
-    # #  PlotStyle(color=cyellow, marker="o", linestyle="-")),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)",
-    #  PlotStyle(color=cyellow, marker="o", linestyle="--")),
-    # # ("BLUEModelBLUEI", PlotStyle(color=cblue, marker=".", linestyle="--")),
-    # # ("BLUEModelBLUEIU", PlotStyle(color=cblue, marker="o", linestyle="-")),
-    # ("ExponentialKernelModel", PlotStyle(color=corange, marker="o", linestyle="-")),
-    # # ("AvgKrigging", PlotStyle(color=corange, marker=".", linestyle=":")),
-    # ("SnapshotMeanModelmean", PlotStyle(color=cred, marker=None, linestyle=":")),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,AK,LR,LRE,NNE)",
-    #  PlotStyle(color=cblack, marker="o", linestyle="-")),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,LRE,NNE)",
-    #  PlotStyle(color=cblack, marker="o", linestyle="--")),
-    # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", PlotStyle(color=cgreen, marker="o", linestyle="-")),
-    # (
-    #     "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)",
-    #     PlotStyle(color=cpurple, marker="o", linestyle="-")),
-    # # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LR)", PlotStyle(color=cgray, marker=".", linestyle="-."))
+
+    ("Physics-seq", PlotStyle(color=cyellow, marker=None, linestyle=":")),
+    ("SL Physics-seq", PlotStyle(color=cyellow, marker="s", linestyle="--")),
+
+    ("SL Physics + Kernel", PlotStyle(color=cpurple, marker="o", linestyle="-")),
+
+    ("Graph Linear + T W", PlotStyle(color=corange, marker="*", linestyle="-.")),
+    ("Graph NN + T W", PlotStyle(color=cpink, marker="*", linestyle="-.")),
+    ("SL Graph Linear", PlotStyle(color=corange, marker=".", linestyle="-")),
+    ("SL Graph NN", PlotStyle(color=cpink, marker=".", linestyle="-")),
+    ("Esemble", PlotStyle(color=cblack, marker="o", linestyle="--")),
+
+    ("SL-z Physics", PlotStyle(color=cgreen, marker="*", linestyle="-")),
+
+    ("Physics-z", PlotStyle(color=cblue, marker=".", linestyle="--")),
+    ("SL Physics-z", PlotStyle(color=cblue, marker="o", linestyle="-")),
+    ("SL-z Physics-z", PlotStyle(color=cblue, marker="*", linestyle="-")),
+
+    ("Physics-zNN", PlotStyle(color=cred, marker=".", linestyle="--")),
+    ("SL-z Physics-zNN", PlotStyle(color=cred, marker="o", linestyle="-")),
 ])
+
+# model_names = OrderedDict([
+#     ("SnapshotMeanModelmean", BaselineModel),
+#     ("BLUEModelBLUE", OptimModel),
+#
+#     ("ExponentialKernelModel", Krigging),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", "Physics model"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PMK)", "Physics model 50"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)", "T W Graph F  - Linear model"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", "T W Graph F - Neural network"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)", "Ensemble - no Kernel"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)", "Ensemble"),
+#
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PK)", "Physics Kernel"),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,PK)", "Ensemble Physics"),
+#
+#     # ("BLUEModelBLUEI", "BLUE Distrust uniform"),
+#     # ("BLUEModelBLUEIU", "BLUE Distrust"),
+#
+#     # ("AvgKrigging", "Global Average Krigging"),
+#
+#     # ("PhysicsModel_k10", "Phisics model"),
+#     # ("Pipeline(steps=[('Id', IdentityTransformer())])(PM)", "Ensemble Avg - Physics model"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,EKM)", "Ensemble - Physics model and Kernel"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,LRE,NNE)", "Ensemble - no Physics no Kernel"),
+#     # ("LR", "Graph F - Linear model"),
+#     # ("LR_Extra", "T W Graph F  - Linear model"),
+#     # ("NN_Extra", "T W Graph F - Neural network"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,AK,LR,LRE,NNE)", "Ensemble"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)", "Ensemble"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", "T W Graph F - Neural network"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)", "T W Graph F  - Linear model"),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LR)", "Ensemble - Graph F - Linear model")
+# ])
+
+# model_style = OrderedDict([
+#
+#     ("SnapshotMeanModelmean", PlotStyle(color=cred, marker=None, linestyle=":")),
+#     ("BLUEModelBLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
+#
+#     ("ExponentialKernelModel", PlotStyle(color=cyellow, marker=None, linestyle=":")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PMK)", PlotStyle(color=cblue, marker="o", linestyle="-")),
+#     (
+#         "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)",
+#         PlotStyle(color=corange, marker=None, linestyle="-")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", PlotStyle(color=cred, marker=None, linestyle="-")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)",
+#      PlotStyle(color=cpurple, marker=None, linestyle="-.")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,LRE,NNE)",
+#      PlotStyle(color=cblack, marker="o", linestyle="--")),
+#
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PK)", PlotStyle(color=corange, marker="o", linestyle="-")),
+#     ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,PK)",
+#      PlotStyle(color=cpurple, marker="o", linestyle="-")),
+#
+#     # ("BLUEModelBLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
+#     # # ("PhysicsModel_k10", PlotStyle(color=cyellow, marker="o", linestyle="-")),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM)", PlotStyle(color=cblue, marker="o", linestyle="-")),
+#     # # ("Pipeline(steps=[('Id', IdentityTransformer())])(PM)", PlotStyle(color=cblue, marker="o", linestyle="--")),
+#     # # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(PM,EKM)",
+#     # #  PlotStyle(color=cyellow, marker="o", linestyle="-")),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,PM,LRE,NNE)",
+#     #  PlotStyle(color=cyellow, marker="o", linestyle="--")),
+#     # # ("BLUEModelBLUEI", PlotStyle(color=cblue, marker=".", linestyle="--")),
+#     # # ("BLUEModelBLUEIU", PlotStyle(color=cblue, marker="o", linestyle="-")),
+#     # ("ExponentialKernelModel", PlotStyle(color=corange, marker="o", linestyle="-")),
+#     # # ("AvgKrigging", PlotStyle(color=corange, marker=".", linestyle=":")),
+#     # ("SnapshotMeanModelmean", PlotStyle(color=cred, marker=None, linestyle=":")),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,EKM,PM,AK,LR,LRE,NNE)",
+#     #  PlotStyle(color=cblack, marker="o", linestyle="-")),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(SMM,LRE,NNE)",
+#     #  PlotStyle(color=cblack, marker="o", linestyle="--")),
+#     # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(NNE)", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+#     # (
+#     #     "Pipeline(steps=[('LR', LassoCV(selection='random'))])(LRE)",
+#     #     PlotStyle(color=cpurple, marker="o", linestyle="-")),
+#     # # ("Pipeline(steps=[('LR', LassoCV(selection='random'))])(LR)", PlotStyle(color=cgray, marker=".", linestyle="-."))
+# ])
+
 model_style = {model_names[k]: v for k, v in model_style.items() if k in model_names}
 
 # model_names.pop("LR")
@@ -168,11 +238,11 @@ for kernel_wins, stations_order in zip([True, False],
     for metric in ["RMSE", ]:  # "RMSE",, "COE", "MB""cor"
         xlim = (3, 18)
         generic_plot(
-            format=".pdf",
+            # format=".pdf",
             name=f"{metric}_KernelWins{kernel_wins}",
             data_manager=data_manager,
             # folder=path2latex_figures,
-            y="Station", x=metric, label="models",
+            y="station", x=metric, label="models",
             plot_func=NamedPartial(plot_errors, model_style=model_style,
                                    hue_order=models_order, orient="y", sort=True,
                                    y_order=stations_order,
@@ -184,8 +254,8 @@ for kernel_wins, stations_order in zip([True, False],
                                                                 alpha=0.15),
                                    xlim=xlim
                                    ),
-            sort_by=["models"],
-            Station=lambda station: station,
+            sort_by=["individual_models"],
+            # Station=lambda station: station,
             RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
             cor=lambda error, estimation, ground_truth: np.NAN if error is None else np.nansum(
                 (estimation[:, np.newaxis] - np.nanmean(estimation[:, np.newaxis])) / np.nanstd(
@@ -197,8 +267,8 @@ for kernel_wins, stations_order in zip([True, False],
                 np.abs(estimation - ground_truth)) / np.sum(
                 np.abs(ground_truth - np.mean(ground_truth))),
             MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.mean(estimation - ground_truth),
-            models=lambda model_name: model_names[model_name],
-            model_name=models2plot,
+            models=lambda individual_models: model_names[individual_models],
+            individual_models=models2plot,
             station=stations_order,
             dpi=300,
             axes_xy_proportions=(8, 10),

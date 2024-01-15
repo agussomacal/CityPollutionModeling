@@ -262,11 +262,11 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
                 traffic_by_node[:, j, level] /= max((1, dc))
         return traffic_by_node
 
-    def reduce_traffic(self, times, target_positions: pd.DataFrame, **kwargs) -> np.ndarray:
+    def reduce_traffic(self, times, target_positions: pd.DataFrame, traffic_by_edge, graph) -> np.ndarray:
         indexes = [self.position2node_index[position]
                    for position in zip(target_positions.loc["long"].values, target_positions.loc["lat"].values)]
-        nodes = [list(kwargs["graph"].nodes)[i] for i in indexes]
-        return self.get_traffic_by_node(times, kwargs["traffic_by_edge"], kwargs["graph"], nodes, indexes)
+        nodes = [list(graph.nodes)[i] for i in indexes]
+        return self.get_traffic_by_node(times, traffic_by_edge, graph, nodes, indexes)
 
     def traffic2pollution(self, times, positions, **kwargs):
         # return np.einsum("tnp,p->tn", traffic_by_node, list(filter_dict(TRAFFIC_VALUES, self.params).values())) + \
@@ -309,7 +309,8 @@ class GraphEmissionsNeigEdgeModel(GraphModelBase):
 
     def prepare_input2model(self, times, positions, **kwargs):
         X = []
-        traffic = self.reduce_traffic(times, positions, **kwargs)
+        traffic = self.reduce_traffic(times=times, target_positions=positions,
+                                      traffic_by_edge=kwargs["traffic_by_edge"], graph=kwargs["graph"])
 
         for regressor_name in self.extra_regressors:
             if regressor_name in ["water", "green"]:

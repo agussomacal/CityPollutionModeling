@@ -56,14 +56,23 @@ class KernelModel(BaseModel):
         self.k_matrix = None
 
     @property
-    def distrust(self):
+    def sensor_distrust(self):
         return self.params["distrust"]
+
+    # @property
+    # def sensor_distrust(self):
+    #     if "sensor_distrust" in self.params.keys():
+    #         return np.repeat(self.params["sensor_distrust"], len(self.k_matrix))
+    #     else:
+    #         assert len(self.k_matrix.index) == len(set(self.k_matrix.index).intersection(
+    #             self.params.keys())), "all the stations named in correlation should be in parameter keys."
+    #         return np.array([self.params[c] for c in self.k_matrix.columns])  # the good ordering.
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
         self.calculate_K_matrix(observed_stations)
         k_matrix = self.k_matrix.loc[observed_stations.columns, observed_stations.columns]
-        k_matrix.values[np.diag_indices(len(k_matrix))] += self.distrust
+        k_matrix.values[np.diag_indices(len(k_matrix))] += self.sensor_distrust
         # print(self, ": ", np.linalg.cond(K))
 
         umean = zmean = 0  # np.mean(observed_values)

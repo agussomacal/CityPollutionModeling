@@ -241,6 +241,15 @@ def train_test(model, station):
                     temperature=temperature, wind=wind, longitudes=longitudes, latitudes=latitudes,
                     target_position=target_position, target_observation=data_unknown)
     t_to_fit = time.time() - t0
+    t0 = time.time()
+    predicted_pollution, target_pollution = (
+        model.state_estimation_for_optim(**data_known, traffic_coords=traffic_pixels_coords,
+                                         distance_between_stations_pixels=distance_between_stations_pixels,
+                                         graph=graph, traffic_by_edge=traffic_by_edge,
+                                         temperature=temperature, wind=wind, longitudes=longitudes,
+                                         latitudes=latitudes))
+    t_to_estimate = time.time() - t0
+    train_error = ((predicted_pollution - target_pollution) ** 2).ravel()
 
     # in test time use the future
     data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
@@ -253,25 +262,35 @@ def train_test(model, station):
                                         temperature=temperature, wind=wind, longitudes=longitudes,
                                         latitudes=latitudes)
     t_to_estimate = time.time() - t0
+    test_error = ((estimation.ravel() - data_unknown.values.ravel()) ** 2).ravel()
 
     # path2model = Path(f"{path2models}/{station}")
     # path2model.mkdir(parents=True, exist_ok=True)
     # joblib.dump((model, t_to_fit), filename=f"{path2model}/{model}.compressed")
 
+    print(
+        f"Finish training model {model}: "
+        f"\n\t - train loss: {np.mean(train_error)}"
+        f"\n\t - test loss: {np.mean(test_error)}"
+        "\n__________\n"
+    )
     return {
         "losses": model.losses,
-        "model_params": model.params,
+        # "model_params": model.params,
         "estimation": estimation.ravel(),
         "ground_truth": data_unknown.values.ravel(),
-        "error": ((estimation.ravel() - data_unknown.values.ravel()) ** 2).ravel(),
+        "error": test_error,
+        "train_error": train_error,
         "time_to_fit": t_to_fit,
         "time_to_estimate": t_to_estimate,
-        "trained_model": model,
+        # "trained_model": model,
         "model_name": str(model)
     }
 
 
-def train_test_model(model: BaseModel):
+def train_test_model(model_tuple: Tuple[str, Union[BaseModel, Tuple]]):
+    model_name, model = model_tuple
+
     def decorated_func(station):
         if isinstance(model, BaseModel):
             m = model
@@ -289,11 +308,12 @@ def train_test_model(model: BaseModel):
         if isinstance(model, BaseModel):
             path2model = Path(f"{path2models}/{station}")
             path2model.mkdir(parents=True, exist_ok=True)
-            joblib.dump((m, res["time_to_fit"]), filename=f"{path2model}/{m}.compressed")
+            joblib.dump((m, res["time_to_fit"]), filename=f"{path2model}/{model_name}.compressed")
 
         return res
 
-    decorated_func.__name__ = str(model) if isinstance(model, BaseModel) else "_".join(list(map(str, model[1:])))
+    # decorated_func.__name__ = str(model) if isinstance(model, BaseModel) else "_".join(list(map(str, model[1:])))
+    decorated_func.__name__ = model_name
     return decorated_func
 
 
