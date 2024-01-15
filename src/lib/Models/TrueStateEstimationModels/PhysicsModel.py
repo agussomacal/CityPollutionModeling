@@ -266,7 +266,7 @@ class NodeSourceModel(BaseModel):
         source = source[:, indexes, :]
         source = source.reshape((-1, 4))
         if len(self.extra_regressors) > 1:
-            extra_data = extra_regressors(observed_pollution.index, observed_stations, self.extra_regressors, **kwargs)
+            extra_data = extra_regressors(observed_pollution.index, target_positions, self.extra_regressors, **kwargs)
             source = np.concatenate([source, extra_data], axis=1)
 
         # average in space

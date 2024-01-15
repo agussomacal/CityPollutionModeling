@@ -49,14 +49,19 @@ model_style = OrderedDict([
     ("BLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
     ("Kernel", PlotStyle(color=cyellow, marker=None, linestyle=":")),
 
-    ("SourceModel_Poly2Lasso+", PlotStyle(color=cgreen, marker=".", linestyle="--")),
-    ("SourceModel_Poly2Lasso_avg", PlotStyle(color=cgreen, marker=".", linestyle="--")),
+    # ("SourceModel_Poly2Lasso+", PlotStyle(color=cgreen, marker=".", linestyle="--")),
+    # ("SourceModel_Poly2Lasso_avg", PlotStyle(color=cgreen, marker=".", linestyle=":")),
+    ("SourceModel_Poly1Lasso_avg", PlotStyle(color=cgreen, marker="o", linestyle=":")),
+    ("SourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+    # ("SourceModel_Poly1Lasso_avg_TWGW", PlotStyle(color=cred, marker="o", linestyle="-")),
+    # ("SourceModel_Poly2Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+
 
 ])
 
 model_style = {model_names[k]: v for k, v in model_style.items() if k in model_names}
 models_order = list(model_names.values())
-models2plot = list(model_names.keys())
+models2plot = list(model_style.keys())
 
 FillBetweenInfo = namedtuple("FillBetweenInfo",
                              ["model1", "model2", "model3", "color_low", "color_middle", "color_high", "alpha"])

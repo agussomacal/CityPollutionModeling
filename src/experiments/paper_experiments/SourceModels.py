@@ -101,6 +101,59 @@ if __name__ == "__main__":
                             extra_regressors=[],
                             # extra_regressors=["temperature", "wind"],
                             ),
+
+        "SourceModel_Poly2Lasso_avg_TW":
+            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+                            spacial_locations=station_coordinates, times=times_all,
+                            traffic_by_edge=traffic_by_edge,
+                            redo_preprocessing=False,
+                            name="", loss=mse, optim_method=GRAD,
+                            verbose=True, niter=10, sigma0=1,
+                            lnei=1,
+                            source_model=Pipeline([("Poly", PolynomialFeatures(degree=2)),
+                                                   ("Lss", LassoCV(selection="random", positive=False))]),
+                            substract_mean=True,
+                            extra_regressors=["temperature", "wind"],
+                            ),
+
+        "SourceModel_Poly1Lasso_avg":
+            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+                            spacial_locations=station_coordinates, times=times_all,
+                            traffic_by_edge=traffic_by_edge,
+                            redo_preprocessing=False,
+                            name="", loss=mse, optim_method=GRAD,
+                            verbose=True, niter=10, sigma0=1,
+                            lnei=1,
+                            source_model=LassoCV(selection="random", positive=False),
+                            substract_mean=True,
+                            # extra_regressors=["temperature", "wind"],
+                            ),
+
+        "SourceModel_Poly1Lasso_avg_TW":
+            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+                            spacial_locations=station_coordinates, times=times_all,
+                            traffic_by_edge=traffic_by_edge,
+                            redo_preprocessing=False,
+                            name="", loss=mse, optim_method=GRAD,
+                            verbose=True, niter=10, sigma0=1,
+                            lnei=1,
+                            source_model=LassoCV(selection="random", positive=False),
+                            substract_mean=True,
+                            extra_regressors=["temperature", "wind"],
+                            ),
+
+        "SourceModel_Poly1Lasso_avg_TWGW":
+            NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
+                            spacial_locations=station_coordinates, times=times_all,
+                            traffic_by_edge=traffic_by_edge,
+                            redo_preprocessing=False,
+                            name="", loss=mse, optim_method=GRAD,
+                            verbose=True, niter=10, sigma0=1,
+                            lnei=1,
+                            source_model=LassoCV(selection="random", positive=False),
+                            substract_mean=True,
+                            extra_regressors=["temperature", "wind", "water", "green"],
+                            ),
     }
 
     lab = LabPipeline()
@@ -112,7 +165,7 @@ if __name__ == "__main__":
 
     lab.execute(
         data_manager,
-        num_cores=1,
+        num_cores=15,
         forget=False,
         save_on_iteration=None,
         station=stations2test
