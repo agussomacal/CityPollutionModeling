@@ -398,7 +398,7 @@ class LaplacianSourceModel(BaseSourceModel):
                                         recalculate=redo_preprocessing)
 
     def project_to_subspace(self, source, k):
-        return np.einsum("tnc,nk,dk->tdc", source, self.B, self.B)
+        return np.einsum("tkc,dk->tdc", np.einsum("tdc,dk->tkc", source, self.B[:, :k]), self.B[:, :k])
 
     def fit_for_a_given_k(self, k, source, spatial_indexes, observed_stations, observed_pollution, avg,
                           **kwargs):
@@ -426,7 +426,7 @@ class LaplacianSourceModel(BaseSourceModel):
 
         if self.k is None:
             self.mse = []
-            for k in tqdm(range(1, self.k_max), desc="Finding optimal number of PCA components."):
+            for k in tqdm(range(1, self.k_max), desc="Finding optimal number of Laplacian components."):
                 s = self.fit_for_a_given_k(k, source, spatial_indexes, observed_stations, observed_pollution,
                                            avg, **kwargs)
                 # calculate error to optimize k

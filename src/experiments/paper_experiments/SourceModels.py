@@ -138,8 +138,9 @@ if __name__ == "__main__":
                                  verbose=True, niter=10, sigma0=1,
                                  lnei=1, k_max=10,  # k=5,
                                  source_model=LassoCV(selection="random", positive=False),
-                                 substract_mean=False,
-                                 substract_std=False,
+                                 substract_mean=True,
+                                 mean_normalize=True,
+                                 std_normalize=False,
                                  extra_regressors=["temperature", "wind"],
                                  ),
 
@@ -149,7 +150,7 @@ if __name__ == "__main__":
     lab.define_new_block_of_functions(
         "individual_models",
         *list(map(train_test_model, models.items())),
-        recalculate=True
+        recalculate=False
     )
 
     lab.execute(
