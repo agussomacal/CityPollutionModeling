@@ -10,6 +10,7 @@ from scipy.spatial.distance import cdist
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression, LassoCV
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
 from tqdm import tqdm
 
 from PerplexityLab.miscellaneous import filter_dict, timeit, if_exist_load_else_do
@@ -163,7 +164,7 @@ def get_basis_traffic_by_node(basis: np.ndarray, traffic_by_node):
     return np.einsum("nk,tnc->tck", basis, traffic_by_node)
 
 
-def extra_regressors(times, positions, extra_regressors, **kwargs):
+def extra_regressors(times: pd.DatetimeIndex, positions, extra_regressors, **kwargs):
     X = []
 
     for regressor_name in extra_regressors:
@@ -185,6 +186,19 @@ def extra_regressors(times, positions, extra_regressors, **kwargs):
                                                                                                   positions)[:, :,
                             np.newaxis]  # * np.mean(traffic, axis=-1, keepdims=True)
 
+            else:
+                continue
+
+        elif regressor_name in ["hours", "week"]:
+            if regressor_name in ["hours"]:
+                t = np.pi * 2 * times.hour / 24
+                regressor = PolynomialFeatures(degree=2).fit_transform(np.transpose([np.cos(t), np.sin(t)]))
+                regressor = np.transpose([regressor] * np.shape(positions)[-1], axes=(1, 0, 2))
+            elif regressor_name in ["week"]:
+                weekend_days = 1 * (times.dayofweek > 4)
+                labour_days = 1 * (times.dayofweek <= 4)
+                regressor = np.transpose([weekend_days, labour_days])
+                regressor = np.transpose([regressor] * np.shape(positions)[-1], axes=(1, 0, 2))
             else:
                 continue
         else:

@@ -55,6 +55,7 @@ model_style = OrderedDict([
     ("SourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
     ("SourceModel_Poly1NN_avg_TW", PlotStyle(color=cblue, marker="o", linestyle="-")),
     ("PCASourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cred, marker="o", linestyle="-")),
+    ("PCASourceModel_Poly1Lasso_avg_TWHW", PlotStyle(color=corange, marker="o", linestyle="-")),
     ("LaplacianSourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cpurple, marker="o", linestyle="-")),
 
     # ("SourceModel_Poly1Lasso_avg_TWGW", PlotStyle(color=cred, marker="o", linestyle="-")),
@@ -67,26 +68,37 @@ models_order = list(model_names.values())
 models2plot = list(model_style.keys())
 
 FillBetweenInfo = namedtuple("FillBetweenInfo",
-                             ["model1", "model2", "model3", "color_low", "color_middle", "color_high", "alpha"])
+                             ["model1", "model2", "model3", "model4", "color_low", "color_middle", "color_high",
+                              "alpha"])
 
 
 def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None, *args,
                 **kwargs):
     # plot regions
     if fill_between is not None:
-        df1 = data.loc[data[hue] == fill_between.model1].set_index(y, drop=True, inplace=False)
-        df2 = data.loc[data[hue] == fill_between.model2].set_index(y, drop=True, inplace=False)
-        df3 = data.loc[data[hue] == fill_between.model3].set_index(y, drop=True, inplace=False)
-        df1 = df1 if y_order is None else df1.loc[y_order, :]
-        df2 = df2 if y_order is None else df2.loc[y_order, :]
-        df3 = df3 if y_order is None else df3.loc[y_order, :]
-        ax.fill_betweenx(y=df1.index, x1=kwargs.get("xlim", (0, None))[0], x2=df1[x],
-                         color=fill_between.color_low + (fill_between.alpha,))
-        # ax.fill_betweenx(y=df1.index, x1=df1[x], x2=df2[x], color=fill_between.color_middle + (fill_between.alpha,))
-        ax.fill_betweenx(y=df1.index, x1=df3[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
-                         color=fill_between.color_middle + (fill_between.alpha,))
-        ax.fill_betweenx(y=df1.index, x1=df2[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
-                         color=fill_between.color_high + (fill_between.alpha,))
+        if fill_between.model1 is not None:
+            df1 = data.loc[data[hue] == fill_between.model1].set_index(y, drop=True, inplace=False)
+            df1 = df1 if y_order is None else df1.loc[y_order, :]
+            ax.fill_betweenx(y=df1.index, x1=kwargs.get("xlim", (0, None))[0], x2=df1[x],
+                             color=fill_between.color_low + (fill_between.alpha,))
+
+        if fill_between.model2 is not None:
+            df2 = data.loc[data[hue] == fill_between.model2].set_index(y, drop=True, inplace=False)
+            df2 = df2 if y_order is None else df2.loc[y_order, :]
+            ax.fill_betweenx(y=df2.index, x1=df2[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
+                             color=fill_between.color_high + (fill_between.alpha,))
+
+        if fill_between.model3 is not None:
+            df3 = data.loc[data[hue] == fill_between.model3].set_index(y, drop=True, inplace=False)
+            df3 = df3 if y_order is None else df3.loc[y_order, :]
+            ax.fill_betweenx(y=df3.index, x1=df3[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
+                             color=fill_between.color_middle + (fill_between.alpha,))
+
+        if fill_between.model4 is not None:
+            df4 = data.loc[data[hue] == fill_between.model4].set_index(y, drop=True, inplace=False)
+            df4 = df4 if y_order is None else df4.loc[y_order, :]
+            ax.fill_betweenx(y=df4.index, x1=kwargs.get("xlim", (0, None))[0], x2=df4[x],
+                             color=fill_between.color_middle + (fill_between.alpha,))
 
     # plot models
     ins = inspect.getfullargspec(sns.lineplot)
@@ -118,7 +130,7 @@ for kernel_wins, stations_order in zip([True, False],
                                    hue_order=models_order, orient="y", sort=True,
                                    y_order=stations_order,
                                    fill_between=FillBetweenInfo(model1=OptimModel, model2=BaselineModel,
-                                                                model3=Krigging,
+                                                                model3=Krigging, model4=None,
                                                                 color_low=model_style[OptimModel].color,
                                                                 color_middle=cyellow,
                                                                 color_high=model_style[BaselineModel].color,
@@ -138,6 +150,163 @@ for kernel_wins, stations_order in zip([True, False],
                 np.abs(estimation - ground_truth)) / np.sum(
                 np.abs(ground_truth - np.mean(ground_truth))),
             MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.mean(estimation - ground_truth),
+            models=lambda individual_models: model_names[individual_models],
+            individual_models=models2plot,
+            station=stations_order,
+            dpi=300,
+            axes_xy_proportions=(8, 10),
+            axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+            labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+            legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
+            font_family="amssymb",
+            uselatex=True,
+            xlabel=fr"{metric}",
+            ylabel=r"Stations",
+            xlim=xlim,
+            # create_preimage_data=True,
+            # only_create_preimage_data=False
+            legend_outside_plot=LegendOutsidePlot(loc="lower center",
+                                                  extra_y_top=0.01, extra_y_bottom=0.3,
+                                                  extra_x_left=0.125, extra_x_right=0.075),
+        )
+
+    #
+    for metric in ["cor", ]:  # "RMSE",,"COE", "MB",
+        xlim = (0.75, 1)
+        generic_plot(
+            # format=".pdf",
+            name=f"{metric}_KernelWins{kernel_wins}",
+            data_manager=data_manager,
+            # folder=path2latex_figures,
+            y="station", x=metric, label="models",
+            plot_func=NamedPartial(plot_errors, model_style=model_style,
+                                   hue_order=models_order, orient="y", sort=True,
+                                   y_order=stations_order,
+                                   fill_between=FillBetweenInfo(model1=BaselineModel, model2=OptimModel,
+                                                                model3=None, model4=Krigging,
+                                                                color_low=model_style[BaselineModel].color,
+                                                                color_middle=cyellow,
+                                                                color_high=model_style[OptimModel].color,
+                                                                alpha=0.15),
+                                   xlim=xlim
+                                   ),
+            sort_by=["individual_models"],
+            # Station=lambda station: station,
+            RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
+            cor=lambda error, estimation, ground_truth: np.NAN if error is None else np.nansum(
+                (estimation[:, np.newaxis] - np.nanmean(estimation[:, np.newaxis])) / np.nanstd(
+                    estimation[:, np.newaxis]) *
+                (ground_truth[:, np.newaxis] - np.nanmean(ground_truth[:, np.newaxis])) / np.nanstd(
+                    ground_truth[:, np.newaxis])
+            ) / (len(estimation) - 1),
+            COE=lambda error, ground_truth, estimation: np.NAN if error is None else 1 - np.sum(
+                np.abs(estimation - ground_truth)) / np.sum(
+                np.abs(ground_truth - np.mean(ground_truth))),
+            MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.mean(estimation - ground_truth),
+            models=lambda individual_models: model_names[individual_models],
+            individual_models=models2plot,
+            station=stations_order,
+            dpi=300,
+            axes_xy_proportions=(8, 10),
+            axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+            labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+            legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
+            font_family="amssymb",
+            uselatex=True,
+            xlabel=fr"{metric}",
+            ylabel=r"Stations",
+            xlim=xlim,
+            # create_preimage_data=True,
+            # only_create_preimage_data=False
+            legend_outside_plot=LegendOutsidePlot(loc="lower center",
+                                                  extra_y_top=0.01, extra_y_bottom=0.3,
+                                                  extra_x_left=0.125, extra_x_right=0.075),
+        )
+
+    for metric in ["COE", ]:  # "RMSE",, "COE", "MB""cor"
+        xlim = (-0.4, 0.8)
+        generic_plot(
+            # format=".pdf",
+            name=f"{metric}_KernelWins{kernel_wins}",
+            data_manager=data_manager,
+            # folder=path2latex_figures,
+            y="station", x=metric, label="models",
+            plot_func=NamedPartial(plot_errors, model_style=model_style,
+                                   hue_order=models_order, orient="y", sort=True,
+                                   y_order=stations_order,
+                                   fill_between=FillBetweenInfo(model1=BaselineModel, model2=OptimModel,
+                                                                model3=None, model4=Krigging,
+                                                                color_low=model_style[BaselineModel].color,
+                                                                color_middle=cyellow,
+                                                                color_high=model_style[OptimModel].color,
+                                                                alpha=0.15),
+                                   xlim=xlim
+                                   ),
+            sort_by=["individual_models"],
+            # Station=lambda station: station,
+            RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
+            cor=lambda error, estimation, ground_truth: np.NAN if error is None else np.nansum(
+                (estimation[:, np.newaxis] - np.nanmean(estimation[:, np.newaxis])) / np.nanstd(
+                    estimation[:, np.newaxis]) *
+                (ground_truth[:, np.newaxis] - np.nanmean(ground_truth[:, np.newaxis])) / np.nanstd(
+                    ground_truth[:, np.newaxis])
+            ) / (len(estimation) - 1),
+            COE=lambda error, ground_truth, estimation: np.NAN if error is None else 1 - np.sum(
+                np.abs(estimation - ground_truth)) / np.sum(
+                np.abs(ground_truth - np.mean(ground_truth))),
+            MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.mean(estimation - ground_truth),
+            models=lambda individual_models: model_names[individual_models],
+            individual_models=models2plot,
+            station=stations_order,
+            dpi=300,
+            axes_xy_proportions=(8, 10),
+            axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+            labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+            legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
+            font_family="amssymb",
+            uselatex=True,
+            xlabel=fr"{metric}",
+            ylabel=r"Stations",
+            xlim=xlim,
+            # create_preimage_data=True,
+            # only_create_preimage_data=False
+            legend_outside_plot=LegendOutsidePlot(loc="lower center",
+                                                  extra_y_top=0.01, extra_y_bottom=0.3,
+                                                  extra_x_left=0.125, extra_x_right=0.075),
+        )
+
+    for metric in ["MB", ]:  # "RMSE",, "COE", "MB""cor"
+        xlim = (-15, 15)
+        generic_plot(
+            # format=".pdf",
+            name=f"{metric}_KernelWins{kernel_wins}",
+            data_manager=data_manager,
+            # folder=path2latex_figures,
+            y="station", x=metric, label="models",
+            plot_func=NamedPartial(plot_errors, model_style=model_style,
+                                   hue_order=models_order, orient="y", sort=True,
+                                   y_order=stations_order,
+                                   fill_between=FillBetweenInfo(model1=OptimModel, model2=BaselineModel,
+                                                                model3=Krigging, model4=None,
+                                                                color_low=model_style[OptimModel].color,
+                                                                color_middle=cyellow,
+                                                                color_high=model_style[BaselineModel].color,
+                                                                alpha=0.15),
+                                   xlim=xlim
+                                   ),
+            sort_by=["individual_models"],
+            # Station=lambda station: station,
+            RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
+            cor=lambda error, estimation, ground_truth: np.NAN if error is None else np.nansum(
+                (estimation[:, np.newaxis] - np.nanmean(estimation[:, np.newaxis])) / np.nanstd(
+                    estimation[:, np.newaxis]) *
+                (ground_truth[:, np.newaxis] - np.nanmean(ground_truth[:, np.newaxis])) / np.nanstd(
+                    ground_truth[:, np.newaxis])
+            ) / (len(estimation) - 1),
+            COE=lambda error, ground_truth, estimation: np.NAN if error is None else 1 - np.sum(
+                np.abs(estimation - ground_truth)) / np.sum(
+                np.abs(ground_truth - np.mean(ground_truth))),
+            MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.abs(np.mean(estimation - ground_truth)),
             models=lambda individual_models: model_names[individual_models],
             individual_models=models2plot,
             station=stations_order,

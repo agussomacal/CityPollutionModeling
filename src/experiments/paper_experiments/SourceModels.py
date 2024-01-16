@@ -129,6 +129,19 @@ if __name__ == "__main__":
                            extra_regressors=["temperature", "wind"],
                            ),
 
+        "PCASourceModel_Poly1Lasso_avg_TWHW":
+            PCASourceModel(path4preprocess=data_manager.path, graph=graph,
+                           spacial_locations=station_coordinates, times=times_all,
+                           traffic_by_edge=traffic_by_edge,
+                           redo_preprocessing=False,
+                           name="", loss=mse, optim_method=GRAD,
+                           verbose=True, niter=10, sigma0=1,
+                           lnei=1, k_max=10,  # k=5,
+                           source_model=LassoCV(selection="random", positive=False),
+                           substract_mean=True,
+                           extra_regressors=["temperature", "wind", "hours", "week"],
+                           ),
+
         "LaplacianSourceModel_Poly1Lasso_avg_TW":
             LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
                                  spacial_locations=station_coordinates, times=times_all,
