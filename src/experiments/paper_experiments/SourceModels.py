@@ -1,39 +1,9 @@
-import subprocess
-from collections import OrderedDict
-from datetime import datetime
-from functools import partial
-
-import numpy as np
-import seaborn as sns
-from sklearn.linear_model import LinearRegression, LassoCV
-from sklearn.neural_network import MLPRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from spiderplot import spiderplot
-
 import src.config as config
-from PerplexityLab.mlutils.scikit_keras import SkKerasRegressor
 from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
-from PerplexityLab.miscellaneous import NamedPartial, copy_main_script_version
-from PerplexityLab.visualization import generic_plot, perplex_plot
-from src.experiments.paper_experiments.PreProcessPaper import train_test_model, stations2test, \
-    plot_pollution_map_in_graph, times_future, graph, pollution_past, station_coordinates, times_all, traffic_by_edge
-from src.experiments.paper_experiments.params4runs import path2latex_figures, runsinfo
-from src.lib.FeatureExtractors.GraphFeatureExtractors import label_prop, diffusion_eq
-from src.lib.Models.BaseModel import ModelsSequenciator, \
-    medianse, NONE_OPTIM_METHOD, mse, GRAD, CMA
-from src.lib.Models.SensorDependentModels.BLUEFamily import BLUEModel
-from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel, GlobalMeanModel
-from src.lib.Models.TrueStateEstimationModels.GraphModels import GraphEmissionsNeigEdgeModel, HEqStaticModel
-from src.lib.Models.TrueStateEstimationModels.KernelModels import GaussianKernelModel, ExponentialKernelModel
-from src.lib.Models.TrueStateEstimationModels.PhysicsModel import PhysicsModel, NodeSourceModel, PCASourceModel, \
-    LaplacianSourceModel
-from src.lib.Modules import Optim
-
-from sklearn.base import BaseEstimator, TransformerMixin
-
-from src.lib.tools import IdentityTransformer
+from PerplexityLab.miscellaneous import copy_main_script_version
+from src.experiments.paper_experiments.PreProcessPaper import train_test_model, stations2test
+from src.experiments.paper_experiments.params4runs import runsinfo
 
 if __name__ == "__main__":
     k_neighbours = 10
@@ -116,46 +86,86 @@ if __name__ == "__main__":
         #                     extra_regressors=["temperature", "wind"],
         #                     ),
 
-        "PCASourceModel_Poly1Lasso_avg_TW":
-            PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-                           spacial_locations=station_coordinates, times=times_all,
-                           traffic_by_edge=traffic_by_edge,
-                           redo_preprocessing=False,
-                           name="", loss=mse, optim_method=GRAD,
-                           verbose=True, niter=10, sigma0=1,
-                           lnei=1, k_max=10,  # k=5,
-                           source_model=LassoCV(selection="random", positive=False),
-                           substract_mean=True,
-                           extra_regressors=["temperature", "wind"],
-                           ),
-
-        "PCASourceModel_Poly1Lasso_avg_TWHW":
-            PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-                           spacial_locations=station_coordinates, times=times_all,
-                           traffic_by_edge=traffic_by_edge,
-                           redo_preprocessing=False,
-                           name="", loss=mse, optim_method=GRAD,
-                           verbose=True, niter=10, sigma0=1,
-                           lnei=1, k_max=10,  # k=5,
-                           source_model=LassoCV(selection="random", positive=False),
-                           substract_mean=True,
-                           extra_regressors=["temperature", "wind", "hours", "week"],
-                           ),
-
-        "LaplacianSourceModel_Poly1Lasso_avg_TW":
-            LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
-                                 spacial_locations=station_coordinates, times=times_all,
-                                 traffic_by_edge=traffic_by_edge,
-                                 redo_preprocessing=False,
-                                 name="", loss=mse, optim_method=GRAD,
-                                 verbose=True, niter=10, sigma0=1,
-                                 lnei=1, k_max=10,  # k=5,
-                                 source_model=LassoCV(selection="random", positive=False),
-                                 substract_mean=True,
-                                 mean_normalize=True,
-                                 std_normalize=False,
-                                 extra_regressors=["temperature", "wind"],
-                                 ),
+        # "PCASourceModel_Poly1Lasso_avg_TW":
+        #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                    spacial_locations=station_coordinates, times=times_all,
+        #                    traffic_by_edge=traffic_by_edge,
+        #                    redo_preprocessing=False,
+        #                    name="", loss=mse, optim_method=GRAD,
+        #                    verbose=True, niter=10, sigma0=1,
+        #                    lnei=1, k_max=10,  # k=5,
+        #                    source_model=LassoCV(selection="random", positive=False),
+        #                    substract_mean=True,
+        #                    extra_regressors=["temperature", "wind"],
+        #                    ),
+        #
+        # "PCASourceModel_Poly1Lasso_avg_TWHW":
+        #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                    spacial_locations=station_coordinates, times=times_all,
+        #                    traffic_by_edge=traffic_by_edge,
+        #                    redo_preprocessing=False,
+        #                    name="", loss=mse, optim_method=GRAD,
+        #                    verbose=True, niter=10, sigma0=1,
+        #                    lnei=1, k_max=10,  # k=5,
+        #                    source_model=LassoCV(selection="random", positive=False),
+        #                    substract_mean=True,
+        #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        #                    ),
+        # "PCASourceModel_Poly1Lasso_avg_TWHW_nei+":
+        #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                    spacial_locations=station_coordinates, times=times_all,
+        #                    traffic_by_edge=traffic_by_edge,
+        #                    redo_preprocessing=False,
+        #                    name="", loss=mse, optim_method=GRAD,
+        #                    verbose=True, niter=10, sigma0=1,
+        #                    lnei=2, k_max=10,  k=2,
+        #                    source_model=LassoCV(selection="random", positive=False),
+        #                    substract_mean=True,
+        #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        #                    ),
+        # "PCASourceModel_Poly1RF_avg_TWHW":
+        #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                    spacial_locations=station_coordinates, times=times_all,
+        #                    traffic_by_edge=traffic_by_edge,
+        #                    redo_preprocessing=False,
+        #                    name="", loss=mse, optim_method=GRAD,
+        #                    verbose=True, niter=10, sigma0=1,
+        #                    lnei=1, k_max=10, k=2,
+        #                    source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
+        #                    # source_model=BayesSearchCV(
+        #                    #     RandomForestRegressor(n_estimators=25),
+        #                    #     {
+        #                    #         "max_depth": Integer(1, 5),
+        #                    #         "min_samples_split": Integer(2, 10),
+        #                    #         "min_samples_leaf": Integer(1, 10),
+        #                    #         # "min_weight_fraction_leaf" = 0.0,
+        #                    #         "max_features": Integer(1, 10),
+        #                    #         # "max_leaf_nodes" = None,
+        #                    #         # "min_impurity_decrease" = 0.0,
+        #                    #         # ccp_alpha = 0.0,
+        #                    #         # max_samples = None,
+        #                    #     },
+        #                    #     cv=5,
+        #                    #     n_iter=32,
+        #                    #     random_state=0
+        #                    # ),
+        #                    substract_mean=True,
+        #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        #                    ),
+        # "LaplacianSourceModel_Poly1Lasso_avg_TW":
+        #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
+        #                          spacial_locations=station_coordinates, times=times_all,
+        #                          traffic_by_edge=traffic_by_edge,
+        #                          redo_preprocessing=False,
+        #                          name="", loss=mse, optim_method=GRAD,
+        #                          verbose=True, niter=10, sigma0=1,
+        #                          lnei=1, k_max=10,  # k=5,
+        #                          source_model=LassoCV(selection="random", positive=False),
+        #                          substract_mean=True,
+        #                          mean_normalize=True,
+        #                          std_normalize=False,
+        #                          extra_regressors=["temperature", "wind"],
+        #                          ),
 
     }
 
@@ -191,4 +201,3 @@ if __name__ == "__main__":
     #     station=stations2test
     # )
 
-    import DoPlotsSourceModels

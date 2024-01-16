@@ -1,20 +1,5 @@
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
-
-
-# class IdentityTransformer(BaseEstimator, TransformerMixin):
-#     def __init__(self):
-#         pass
-#
-#     def fit(self, input_array, y=None):
-#         return self
-#
-#     def transform(self, input_array, y=None):
-#         return input_array * 1
-#
-#     def predict(self, X):
-#         return X
 
 
 class IdentityTransformer(LinearRegression):
