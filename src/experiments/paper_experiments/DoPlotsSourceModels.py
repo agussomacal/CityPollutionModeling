@@ -11,7 +11,7 @@ from PerplexityLab.visualization import generic_plot, LegendOutsidePlot
 from src import config
 from src.experiments.paper_experiments.params4runs import path2latex_figures
 
-PlotStyle = namedtuple("PlotStyle", "color marker linestyle", defaults=["black", "o", "--"])
+PlotStyle = namedtuple("PlotStyle", "color marker linestyle linewidth", defaults=["black", "o", "--", None])
 cblue, corange, cgreen, cred, cpurple, cbrown, cpink, cgray, cyellow, ccyan = sns.color_palette("tab10")
 cblack = (0, 0, 0)
 cwhite = (1, 1, 1)
@@ -52,13 +52,18 @@ model_style = OrderedDict([
     # ("SourceModel_Poly2Lasso+", PlotStyle(color=cgreen, marker=".", linestyle="--")),
     # ("SourceModel_Poly2Lasso_avg", PlotStyle(color=cgreen, marker=".", linestyle=":")),
     ("SourceModel_Poly1Lasso_avg", PlotStyle(color=cgreen, marker="o", linestyle=":")),
-    ("SourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
-    ("SourceModel_Poly1NN_avg_TW", PlotStyle(color=cblue, marker="o", linestyle="-")),
+    ("SourceModel_Poly1Lasso_avg_TWHW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
+    ("PCASourceModel_Poly1NN_avg_TWHW", PlotStyle(color=cblue, marker="o", linestyle="-")),
     ("PCASourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cred, marker="o", linestyle="-")),
     ("PCASourceModel_Poly1Lasso_avg_TWHW", PlotStyle(color=corange, marker="o", linestyle="-")),
-    ("LaplacianSourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cpurple, marker="o", linestyle="-")),
+    # ("LaplacianSourceModel_Poly1Lasso_avg_TW", PlotStyle(color=cpurple, marker="o", linestyle="-")),
+    ("LaplacianSourceModel_Poly1Lasso_avg_TWHW", PlotStyle(color=cpurple, marker="o", linestyle="-")),
     ("PCASourceModel_Poly1RF_avg_TWHW", PlotStyle(color=cpink, marker="o", linestyle="-")),
     # ("PCASourceModel_Poly1Lasso_avg_TWHW_nei+", PlotStyle(color=ccyan, marker="o", linestyle="-")),
+    ("PhysicsModel", PlotStyle(color=cgray, marker="*", linestyle="--", linewidth=2)),
+    ("Ensemble", PlotStyle(color=cblack, marker="*", linestyle="-", linewidth=3)),
+    ("Ensemble2", PlotStyle(color=cblack, marker="o", linestyle=":", linewidth=3)),
+    ("EnsembleKernel", PlotStyle(color=cblack, marker="*", linestyle="--", linewidth=3)),
 
     # ("SourceModel_Poly1Lasso_avg_TWGW", PlotStyle(color=cred, marker="o", linestyle="-")),
     # ("SourceModel_Poly2Lasso_avg_TW", PlotStyle(color=cgreen, marker="o", linestyle="-")),
@@ -113,6 +118,7 @@ def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_betwee
             color=model_style[method].color if model_style is not None else None,
             marker=model_style[method].marker if model_style is not None else None,
             linestyle=model_style[method].linestyle if model_style is not None else None,
+            linewidth=model_style[method].linewidth if model_style is not None else None,
             **kw
         )
 
@@ -308,7 +314,8 @@ for kernel_wins, stations_order in zip([True, False],
             COE=lambda error, ground_truth, estimation: np.NAN if error is None else 1 - np.sum(
                 np.abs(estimation - ground_truth)) / np.sum(
                 np.abs(ground_truth - np.mean(ground_truth))),
-            MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.abs(np.mean(estimation - ground_truth)),
+            MB=lambda error, estimation, ground_truth: np.NAN if error is None else np.abs(
+                np.mean(estimation - ground_truth)),
             models=lambda individual_models: model_names[individual_models],
             individual_models=models2plot,
             station=stations_order,
@@ -328,3 +335,41 @@ for kernel_wins, stations_order in zip([True, False],
                                                   extra_y_top=0.01, extra_y_bottom=0.3,
                                                   extra_x_left=0.125, extra_x_right=0.075),
         )
+
+from src.experiments.paper_experiments.PreProcessPaper import plot_pollution_map_in_graph, graph, times_future, \
+    pollution_future
+import pandas as pd
+
+name2name = dict(pd.DataFrame.from_dict(data_manager[["individual_models", "model_name"]]).values.tolist())
+plot_pollution_map_in_graph(
+    data_manager=data_manager,
+    # folder=path2latex_figures,
+    # time=times_future[20],
+    # name="plot_map_1AM",
+    time=times_future[25],
+    name="plot_map_8AM",
+    diffusion_method=lambda f: f,
+    individual_models=["PCASourceModel_Poly1Lasso_avg_TWHW", "PhysicsModel"],
+    plot_by=["individual_models"],
+    # time=times_future[4], Screenshot_48.8580073_2.3342828_13_2022_12_8_13_15
+    # time=pollution_past.index[11],
+    # models=lambda model_name: model_names[model_name],
+    # model_name=[name2name["PCASourceModel_Poly1Lasso_avg_TWHW"]],
+    station="PA13",
+    # plot_by=["models", "station"],
+    num_cores=1,
+    nodes_indexes=np.arange(len(graph)), s=50,
+    cmap=sns.color_palette("autumn_r", as_cmap=True),
+    alpha=0.5,
+    dpi=300,
+    # limit_vals=(40, 50),
+    # limit_vals=(0.1, 0.95),
+    limit_vals=(30, 50),
+    # limit_vals=np.quantile(np.ravel(pollution_future.values.mean(axis=1)), q=limit_vals),
+    plot_nodes=False,
+    levels=0,
+    num_points=1000,
+    log=False,
+    # bar=True,
+    # format=".pdf"
+)

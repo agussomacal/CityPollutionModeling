@@ -11,6 +11,7 @@ from src.lib.Modules import Bounds, Optim
 
 CMA = "cma"
 GRAD = "bfgs"
+BAYES = "bayes"
 BFGS_PAR_OPTIM_METHOD = "bfgs_parallel"
 RANDOM = "random"
 UNIFORM = "uniform"
@@ -122,13 +123,14 @@ class BaseModel:
     POLLUTION_AGNOSTIC = False
 
     def __init__(self, name="", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False, sigma0=1,
-                 **kwargs):
+                 cv_in_space=True, **kwargs):
         self.name = name
         self.loss = loss
         self.niter = niter
         self.optim_method = optim_method
         self.sigma0 = sigma0  # for CMA
         self.verbose = verbose
+        self.cv_in_space = cv_in_space
         self._params = dict()
         self.bounds = dict()
         for k, v in kwargs.items():

@@ -1,16 +1,19 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
+import cma
 import networkx as nx
 import numpy as np
 import pandas as pd
 from scipy.linalg import eigh
+from scipy.optimize import minimize
 from scipy.sparse.linalg import gmres
 from scipy.spatial.distance import cdist
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression, LassoCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
+from skopt import gp_minimize
 from tqdm import tqdm
 
 from PerplexityLab.miscellaneous import filter_dict, timeit, if_exist_load_else_do
@@ -19,7 +22,8 @@ from src.lib.DataProcessing.TrafficProcessing import TRAFFIC_VALUES, load_backgr
 from src.lib.FeatureExtractors.ConvolutionFeatureExtractors import FEConvolutionFixedPixels, WaterColor, GreenAreaColor
 from src.lib.FeatureExtractors.GraphFeatureExtractors import get_graph_node_positions, compute_adjacency, \
     compute_laplacian_matrix_from_graph
-from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic
+from src.lib.Models.BaseModel import BaseModel, mse, GRAD, pollution_agnostic, loo, CMA, RANDOM, UNIFORM, LOGUNIFORM, \
+    NONE_OPTIM_METHOD, BAYES
 from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
 
@@ -161,7 +165,7 @@ def get_basis_traffic_by_node(basis: np.ndarray, traffic_by_node):
     :param traffic_by_node: [#times, #nodes, #traffic colors]
     :return: [#times, #colors, k]
     """
-    return np.einsum("nk,tnc->tck", basis, traffic_by_node)
+    return np.einsum("nk,tnc->tkc", basis, traffic_by_node)
 
 
 def extra_regressors(times: pd.DatetimeIndex, positions, extra_regressors, **kwargs):
@@ -224,13 +228,13 @@ class BaseSourceModel(BaseModel):
     def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
                  traffic_by_edge, extra_regressors=[],
                  name="", loss=mse, optim_method=GRAD,
-                 verbose=False, redo_preprocessing=False,
+                 verbose=False, redo_preprocessing=False, cv_in_space=True,
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
                  niter=1000, sigma0=1, **kwargs):
         # super call
         super().__init__(name=f"{name}_{substract_mean}_{source_model}",
-                         loss=loss, optim_method=optim_method, verbose=verbose, niter=niter,
+                         loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, cv_in_space=cv_in_space,
                          sigma0=sigma0, **kwargs)
         self.path4preprocess = path4preprocess
         self.extra_regressors = extra_regressors
@@ -243,6 +247,7 @@ class BaseSourceModel(BaseModel):
         if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
             raise Exception("Each edge in Graph should have edge attribute 'lanes'")
 
+        self.node_positions = get_graph_node_positions(graph)
         self.position2node_index = get_nearest_node_mapping(path=path4preprocess, filename=f"pos2node",
                                                             target_positions=spacial_locations,
                                                             graph=graph, recalculate=redo_preprocessing)
@@ -253,9 +258,16 @@ class BaseSourceModel(BaseModel):
                                                graph=graph, recalculate=redo_preprocessing,
                                                lnei=lnei)
 
+    def get_space_indexes(self, positions):
+        return [self.position2node_index[tuple(tp)] for tp in
+                (positions.values if isinstance(positions, pd.DataFrame) else positions).T]
+
+    def get_time_indexes(self, observed_pollution):
+        return [self.times.index(t) for t in observed_pollution.index]
+
     def get_source(self, positions, observed_pollution: pd.DataFrame, **kwargs):
-        spatial_indexes = [self.position2node_index[tuple(tp)] for tp in positions.values.T]
-        times_indexes = [self.times.index(t) for t in observed_pollution.index]
+        spatial_indexes = self.get_space_indexes(positions)
+        times_indexes = self.get_time_indexes(observed_pollution)
 
         # [#times, #nodes, #traffic colors]
         source = self.source[times_indexes, :, :]
@@ -291,11 +303,11 @@ class NodeSourceModel(BaseSourceModel):
         return u
 
 
-class PCASourceModel(BaseSourceModel):
+class ProjectionSourceModel(BaseSourceModel):
 
     def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
-                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, std_normalize=False,
-                 name="", loss=mse, optim_method=GRAD,
+                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, std_normalize=False, mean_normalize=True,
+                 name="", loss=mse, optim_method=GRAD, cv_in_space=True,
                  verbose=False, redo_preprocessing=False,
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
@@ -303,87 +315,7 @@ class PCASourceModel(BaseSourceModel):
         # super call
         super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
                          loss=loss, optim_method=optim_method, verbose=verbose,
-                         niter=niter, sigma0=sigma0,
-                         graph=graph, spacial_locations=spacial_locations,
-                         times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
-                         redo_preprocessing=redo_preprocessing, source_model=source_model,
-                         substract_mean=substract_mean, lnei=lnei, **kwargs)
-        self.k_max = k_max if k is None else k
-        self.k = k
-        self.pca = None
-        self.mse = []
-        self.source_mean = None
-        self.source_std = None
-        self.std_normalize = std_normalize  # it works slightly works adding the std
-
-    def project_to_pca_subspace(self, source, k):
-        s = np.zeros_like(source)
-        for i in range(np.shape(source)[-1]):
-            s[:, :, i] = self.pca[i].transform(source[:, :, i])[:, :k] @ self.pca[i].components_[:k, :]
-            # s[:, :, i] = self.pca[i].inverse_transform(self.pca[i].transform(source[:, :, i]))
-        return s
-
-    def fit_for_a_given_k(self, k, source, spatial_indexes, observed_stations, observed_pollution, avg,
-                          **kwargs):
-        s = self.project_to_pca_subspace(source, k)
-        s = s[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] + self.source_mean[:, spatial_indexes, :]
-        s = self.add_extra_regressors_and_reshape(s, observed_stations, observed_pollution, **kwargs)
-        self.source_model.fit(s, (observed_pollution.values - avg).ravel())
-        return s
-
-    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        source, avg, spatial_indexes, times_indexes = self.get_source(observed_stations, observed_pollution, **kwargs)
-        # source dimensions: [#times, #nodes, #traffic colors]
-        self.source_mean = np.mean(source, axis=0, keepdims=True)
-        # it works slightly works adding the std
-        if self.std_normalize:
-            self.source_std = np.std(source, axis=0, keepdims=True)
-            self.source_std[self.source_std == 0] = 1
-        else:
-            self.source_std = np.ones_like(self.source_mean)
-        source -= self.source_mean
-        source /= self.source_std
-        self.pca = [PCA(n_components=self.k_max).fit(source[:, :, i]) for i in range(np.shape(source)[-1])]
-
-        if self.k is None:
-            self.mse = []
-            for k in tqdm(range(1, self.k_max), desc="Finding optimal number of PCA components."):
-                s = self.fit_for_a_given_k(k, source, spatial_indexes, observed_stations, observed_pollution,
-                                           avg, **kwargs)
-                # calculate error to optimize k
-                u = self.source_model.predict(s).reshape((len(times_indexes), -1)) + avg
-                self.mse.append(np.mean((u - observed_pollution.values) ** 2))
-
-            self.k = np.argmin(self.mse) + 1  # we start in k=1 to explore
-            print("Best k", self.k)
-            print(self.mse)
-        self.fit_for_a_given_k(self.k, source, spatial_indexes, observed_stations, observed_pollution, avg, **kwargs)
-
-    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
-                         **kwargs) -> np.ndarray:
-        source, avg, spatial_indexes, times_indexes = self.get_source(target_positions, observed_pollution, **kwargs)
-        source = self.project_to_pca_subspace((source - self.source_mean) / self.source_std, self.k)
-        source = (source[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] +
-                  self.source_mean[:, spatial_indexes, :])
-        source = self.add_extra_regressors_and_reshape(source, target_positions, observed_pollution, **kwargs)
-        u = self.source_model.predict(source).reshape((len(times_indexes), -1)) + avg
-
-        # final solution
-        return u
-
-
-class LaplacianSourceModel(BaseSourceModel):
-    def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
-                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, std_normalize=False, mean_normalize=False,
-                 name="", loss=mse, optim_method=GRAD,
-                 verbose=False, redo_preprocessing=False,
-                 source_model=LassoCV(selection="random", positive=False),
-                 substract_mean=True, lnei=1,
-                 niter=1000, sigma0=1, **kwargs):
-        # super call
-        super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
-                         loss=loss, optim_method=optim_method, verbose=verbose,
-                         niter=niter, sigma0=sigma0,
+                         niter=niter, sigma0=sigma0, cv_in_space=cv_in_space,
                          graph=graph, spacial_locations=spacial_locations,
                          times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
                          redo_preprocessing=redo_preprocessing, source_model=source_model,
@@ -397,6 +329,113 @@ class LaplacianSourceModel(BaseSourceModel):
         self.mean_normalize = mean_normalize
         self.std_normalize = std_normalize  # it works slightly works adding the std
 
+    def init_Vn_space(self, source):
+        raise Exception("Not implemented.")
+        # self.pca = [PCA(n_components=self.k_max).fit(source[:, :, i]) for i in range(np.shape(source)[-1])]
+
+    def project_to_subspace(self, source, k):
+        raise Exception("Not implemented.")
+
+    def fit_source_model_for_a_given_k(self, k, source, spatial_indexes, observed_stations, observed_pollution, avg,
+                                       **kwargs):
+        s = self.project_to_subspace(source, k)
+        s = s[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] + self.source_mean[:, spatial_indexes, :]
+        s = self.add_extra_regressors_and_reshape(s, observed_stations, observed_pollution, **kwargs)
+        self.source_model.fit(s, (observed_pollution.values - avg).ravel())
+        return s
+
+    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+        source, avg, spatial_indexes, times_indexes = self.get_source(observed_stations, observed_pollution, **kwargs)
+        # source dimensions: [#times, #nodes, #traffic colors]
+        self.source_mean = np.mean(source, axis=0, keepdims=True)
+        if not self.mean_normalize:
+            self.source_mean *= 0
+        # it works slightly works adding the std
+        if self.std_normalize:
+            self.source_std = np.std(source, axis=0, keepdims=True)
+            self.source_std[self.source_std == 0] = 1
+        else:
+            self.source_std = np.ones_like(self.source_mean)
+        source -= self.source_mean
+        source /= self.source_std
+        self.init_Vn_space(source)
+
+        if self.k is None:
+            self.mse = []
+            for k in tqdm(range(1, self.k_max), desc="Finding optimal number of PCA components."):
+                s = self.fit_source_model_for_a_given_k(k, source, spatial_indexes, observed_stations,
+                                                        observed_pollution,
+                                                        avg, **kwargs)
+                # calculate error to optimize k
+                u = self.source_model.predict(s).reshape((len(times_indexes), -1)) + avg
+                self.mse.append(np.mean((u - observed_pollution.values) ** 2))
+
+            self.k = np.argmin(self.mse) + 1  # we start in k=1 to explore
+            print("Best k", self.k)
+            print(self.mse)
+        self.fit_source_model_for_a_given_k(self.k, source, spatial_indexes, observed_stations, observed_pollution, avg,
+                                            **kwargs)
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        source, avg, spatial_indexes, times_indexes = self.get_source(target_positions, observed_pollution, **kwargs)
+        source = self.project_to_subspace((source - self.source_mean) / self.source_std, self.k)
+        source = (source[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] +
+                  self.source_mean[:, spatial_indexes, :])
+        source = self.add_extra_regressors_and_reshape(source, target_positions, observed_pollution, **kwargs)
+        u = self.source_model.predict(source).reshape((len(times_indexes), -1)) + avg
+
+        # final solution
+        return u
+
+
+class PCASourceModel(ProjectionSourceModel):
+    def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
+                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, std_normalize=False, mean_normalize=True,
+                 name="", loss=mse, optim_method=GRAD, cv_in_space=True,
+                 verbose=False, redo_preprocessing=False,
+                 source_model=LassoCV(selection="random", positive=False),
+                 substract_mean=True, lnei=1,
+                 niter=1000, sigma0=1, **kwargs):
+        # super call
+        super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
+                         loss=loss, optim_method=optim_method, verbose=verbose,
+                         niter=niter, sigma0=sigma0, k_max=k_max, k=k, cv_in_space=cv_in_space,
+                         mean_normalize=mean_normalize, std_normalize=std_normalize,
+                         graph=graph, spacial_locations=spacial_locations,
+                         times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
+                         redo_preprocessing=redo_preprocessing, source_model=source_model,
+                         substract_mean=substract_mean, lnei=lnei, **kwargs)
+        self.pca = None
+
+    def init_Vn_space(self, source):
+        self.pca = [PCA(n_components=self.k_max).fit(source[:, :, i]) for i in range(np.shape(source)[-1])]
+
+    def project_to_subspace(self, source, k):
+        s = np.zeros_like(source)
+        for i in range(np.shape(source)[-1]):
+            s[:, :, i] = self.pca[i].transform(source[:, :, i])[:, :k] @ self.pca[i].components_[:k, :]
+            # s[:, :, i] = self.pca[i].inverse_transform(self.pca[i].transform(source[:, :, i]))
+        return s
+
+
+class LaplacianSourceModel(ProjectionSourceModel):
+    def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
+                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, std_normalize=False, mean_normalize=True,
+                 name="", loss=mse, optim_method=GRAD,
+                 verbose=False, redo_preprocessing=False,
+                 source_model=LassoCV(selection="random", positive=False),
+                 substract_mean=True, lnei=1,
+                 niter=1000, sigma0=1, **kwargs):
+        # super call
+        super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
+                         loss=loss, optim_method=optim_method, verbose=verbose,
+                         niter=niter, sigma0=sigma0, k_max=k_max, k=k,
+                         mean_normalize=mean_normalize, std_normalize=std_normalize,
+                         graph=graph, spacial_locations=spacial_locations,
+                         times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
+                         redo_preprocessing=redo_preprocessing, source_model=source_model,
+                         substract_mean=substract_mean, lnei=lnei, **kwargs)
         graph = nx.Graph(graph).to_undirected()
         if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
             raise Exception("Each edge in Graph should have edge attribute 'length'")
@@ -414,176 +453,266 @@ class LaplacianSourceModel(BaseSourceModel):
     def project_to_subspace(self, source, k):
         return np.einsum("tkc,dk->tdc", np.einsum("tdc,dk->tkc", source, self.B[:, :k]), self.B[:, :k])
 
-    def fit_for_a_given_k(self, k, source, spatial_indexes, observed_stations, observed_pollution, avg,
-                          **kwargs):
-        s = self.project_to_subspace(source, k)
-        s = s[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] + self.source_mean[:, spatial_indexes, :]
-        s = self.add_extra_regressors_and_reshape(s, observed_stations, observed_pollution, **kwargs)
-        self.source_model.fit(s, (observed_pollution.values - avg).ravel())
-        return s
+    def init_Vn_space(self, source):
+        pass  # it is the self.B of init method.
+
+
+def calibrate(model: BaseModel, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+    if len(model.params) == 1 and model.optim_method == CMA:
+        model.optim_method = GRAD
+
+    def optim_func(params):
+        dictparams = dict(zip(model.bounds, params))
+        if model.verbose:
+            df = pd.DataFrame(np.reshape(list(dictparams.values()), (1, -1)), columns=list(dictparams.keys()))
+            print(f"Params for optimization: \n {df}")
+
+        model.set_params(**dictparams)
+
+        if model.cv_in_space:
+            target_pollution, predicted_pollution = \
+                list(zip(*[(target_pollution,
+                            model.state_estimation(**known_data, **kwargs))
+                           for known_data, target_pollution in
+                           loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
+            predicted_pollution = np.concatenate(predicted_pollution, axis=0)
+            target_pollution = np.concatenate(target_pollution, axis=0)[:, np.newaxis]
+        else:
+            target_pollution = observed_pollution.values.ravel()
+            predicted_pollution = model.state_estimation(observed_stations=observed_stations,
+                                                         observed_pollution=observed_pollution,
+                                                         target_positions=observed_stations,
+                                                         traffic=traffic, **kwargs).ravel()
+
+        loss = model.loss(predicted_pollution, target_pollution)
+        model.losses[tuple(params)] = loss
+        if model.verbose:
+            print(f"loss: {loss}")
+        return loss
+
+    model.losses = dict()
+    x0 = np.array([model.params[k] for k in model.bounds])
+    if model.niter == 1 or len(model.bounds) == 0:
+        optim_func(x0)
+        optim_params = x0
+    elif model.optim_method == CMA:
+        optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
+                                    sigma0=model.sigma0, eval_initial_x=True,
+                                    options={'popsize': 10, 'maxfevals': model.niter})
+    elif model.optim_method == GRAD:
+        optim_params = minimize(fun=optim_func, x0=x0, bounds=model.bounds.values(),
+                                method="L-BFGS-B", options={'maxiter': model.niter}).x
+    elif model.optim_method == BAYES:
+        optim_params = gp_minimize(optim_func, dimensions=list(model.bounds.values()),
+                                   x0=x0.tolist(), n_calls=model.niter).x
+    elif model.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
+        if model.optim_method == UNIFORM:
+            sampler = np.linspace
+        elif model.optim_method == RANDOM:
+            sampler = np.random.uniform
+        elif model.optim_method == LOGUNIFORM:
+            sampler = lambda d, u, i: np.logspace(np.log10(d), np.log10(u), i)
+        else:
+            raise Exception(f"Optim method {model.optim_method} not implemented.")
+        samples = {k: sampler(bounds.lower, bounds.upper, model.niter).ravel().tolist() for k, bounds in
+                   model.bounds.items() if
+                   bounds is not None}
+        model.losses = {x: optim_func(list({**model.params, **dict(zip(samples.keys(), x))}.values())) for x in
+                        tqdm(zip(*samples.values()), desc=f"Training {model}")}
+        best_ix = np.argmin(model.losses.values())
+        optim_params = [v[best_ix] for v in samples.values()]
+    elif model.optim_method == NONE_OPTIM_METHOD:
+        return None
+    else:
+        raise Exception("Not implemented.")
+
+    if len(model.bounds) > 0:
+        model.set_params(**dict(zip(model.bounds.keys(), optim_params)))
+        model.losses = pd.Series(model.losses.values(), pd.Index(model.losses.keys(), names=model.bounds.keys()),
+                                 name="loss")
+    print(model, "Optim params: ", model.params)
+
+    model.calibrated = True
+    return model
+
+
+class PhysicsModel(PCASourceModel):
+    def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
+                 traffic_by_edge, extra_regressors=[], k_max=None, k=None, rb_k_max=None, rb_k=None,
+                 std_normalize=False, mean_normalize=True, basis="graph_laplacian",
+                 name="", loss=mse, optim_method=GRAD, cv_in_space=True,
+                 verbose=False, redo_preprocessing=False,
+                 source_model=LassoCV(selection="random", positive=False),
+                 substract_mean=True, lnei=1,
+                 niter=1000, sigma0=1, **kwargs):
+        self.rb_k_max = rb_k_max
+        self.path4preprocess = path4preprocess
+        self.redo_preprocessing = redo_preprocessing
+        self.basis = basis
+
+        # super call
+        super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
+                         loss=loss, optim_method=optim_method, verbose=verbose,
+                         niter=niter, sigma0=sigma0, k_max=k_max, k=k,
+                         mean_normalize=mean_normalize, std_normalize=std_normalize,
+                         graph=graph, spacial_locations=spacial_locations, cv_in_space=cv_in_space,
+                         times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
+                         redo_preprocessing=redo_preprocessing, source_model=source_model,
+                         substract_mean=substract_mean, lnei=lnei, rb_k=rb_k, **kwargs)
+
+    def project_source_to_rb(self, basis, source):
+        return np.einsum("dk,td->tk", basis, source)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        source, avg, spatial_indexes, times_indexes = self.get_source(observed_stations, observed_pollution, **kwargs)
-        # source dimensions: [#times, #nodes, #traffic colors]
+        PCASourceModel.calibrate(self, observed_stations=observed_stations, observed_pollution=observed_pollution,
+                                 traffic=traffic, **kwargs)
 
-        self.source_mean = np.mean(source, axis=0, keepdims=True)
-        if not self.mean_normalize:
-            self.source_mean *= 0
-        # it works slightly works adding the std
-        if self.std_normalize:
-            self.source_std = np.std(source, axis=0, keepdims=True)
-            self.source_std[self.source_std == 0] = 1
-        else:
-            self.source_std = np.ones_like(self.source_mean)
-        source -= self.source_mean
-        source /= self.source_std
-
-        if self.k is None:
-            self.mse = []
-            for k in tqdm(range(1, self.k_max), desc="Finding optimal number of Laplacian components."):
-                s = self.fit_for_a_given_k(k, source, spatial_indexes, observed_stations, observed_pollution,
-                                           avg, **kwargs)
-                # calculate error to optimize k
-                u = self.source_model.predict(s).reshape((len(times_indexes), -1)) + avg
-                self.mse.append(np.mean((u - observed_pollution.values) ** 2))
-
-            self.k = np.argmin(self.mse) + 1  # we start in k=1 to explore
-            print("Best k", self.k)
-            print(self.mse)
-        self.fit_for_a_given_k(self.k, source, spatial_indexes, observed_stations, observed_pollution, avg, **kwargs)
-
-    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
-                         **kwargs) -> np.ndarray:
-        source, avg, spatial_indexes, times_indexes = self.get_source(target_positions, observed_pollution, **kwargs)
-        source = self.project_to_subspace((source - self.source_mean) / self.source_std, self.k)
-        source = (source[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] +
-                  self.source_mean[:, spatial_indexes, :])
-        source = self.add_extra_regressors_and_reshape(source, target_positions, observed_pollution, **kwargs)
-        u = self.source_model.predict(source).reshape((len(times_indexes), -1)) + avg
-
-        # final solution
-        return u
-
-
-class PhysicsModel(BaseModel):
-
-    def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
-                 traffic_by_edge, k_max=10, extra_regressors=[],
-                 name="", loss=mse, optim_method=GRAD,
-                 verbose=False, redo_preprocessing=False,
-                 source_model=LassoCV(selection="random", positive=False), substract_mean=True, lnei=1,
-                 niter=1000, sigma0=1, **kwargs):
-        # super call
-        super().__init__(name=f"{name}_k{k_max}", loss=loss, optim_method=optim_method, verbose=verbose, niter=niter,
-                         sigma0=sigma0, **kwargs)
-        self.path4preprocess = path4preprocess
-        self.k_max = k_max  # number of basis elements.
-        self.extra_regressors = extra_regressors
-        self.source_model = source_model
-        self.substract_mean = substract_mean
-
-        graph = nx.Graph(graph).to_undirected()
+        graph = nx.Graph(kwargs["graph"]).to_undirected()
         if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
             raise Exception("Each edge in Graph should have edge attribute 'length'")
         if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
             raise Exception("Each edge in Graph should have edge attribute 'lanes'")
 
-        Kd = get_diffusion_matrix(path=path4preprocess, filename=f"diffusion_matrix", graph=graph,
-                                  recalculate=redo_preprocessing)
-        Ms = get_absorption_matrix(path=path4preprocess, filename=f"absorption_matrix", graph=graph,
-                                   recalculate=redo_preprocessing)
-        self.B, _ = get_geometric_basis(path=path4preprocess, filename=f"basis_k{k_max}", Kd=Kd, Ms=Ms, k=k_max,
-                                        recalculate=redo_preprocessing)
-        self.KdROM, self.MsROM = get_reduced_matrices(path=path4preprocess, filename=f"reduced_matrices_k{k_max}",
+        Kd = get_diffusion_matrix(path=self.path4preprocess, filename=f"diffusion_matrix", graph=graph,
+                                  recalculate=self.redo_preprocessing)
+        Ms = get_absorption_matrix(path=self.path4preprocess, filename=f"absorption_matrix", graph=graph,
+                                   recalculate=self.redo_preprocessing)
+
+        # average in space
+        avg = observed_pollution.mean(axis=1).values if self.substract_mean else 0
+        source = PCASourceModel.state_estimation(self, observed_stations=observed_stations,
+                                                 observed_pollution=observed_pollution,
+                                                 traffic=traffic, target_positions=self.node_positions.T, **kwargs)
+        self.source_avg = np.mean(source, axis=0, keepdims=True)
+        if self.basis == "graph_laplacian":
+            # [# nodes, k]
+            self.B, _ = get_geometric_basis(path=self.path4preprocess, filename=f"basis_k{self.rb_k_max}", Kd=Kd, Ms=Ms,
+                                            k=self.rb_k_max,
+                                            recalculate=self.redo_preprocessing)
+        elif self.basis == "pca_source":
+            # [# nodes, k]
+            self.B = PCA(n_components=self.rb_k_max).fit(source - self.source_avg).components_.T
+        else:
+            raise Exception("Invalid basis")
+
+        self.KdROM, self.MsROM = get_reduced_matrices(path=self.path4preprocess, save=False,
+                                                      filename=f"reduced_matrices_k{self.rb_k_max}",
                                                       Kd=Kd,
-                                                      Ms=Ms, basis=self.B, recalculate=redo_preprocessing)
+                                                      Ms=Ms, basis=self.B, recalculate=self.redo_preprocessing)
 
-        self.spacial_locations = spacial_locations
-        self.position2node_index = get_nearest_node_mapping(path=path4preprocess, filename=f"pos2node",
-                                                            target_positions=spacial_locations,
-                                                            graph=graph, recalculate=redo_preprocessing)
-        self.wtB = get_basis_point_evaluations(path=path4preprocess, basis=self.B, target_positions=spacial_locations,
-                                               position2node_index=self.position2node_index,
-                                               recalculate=redo_preprocessing, filename=f"basis_point_eval_k{k_max}", )
-        self.times = times
-        # shape [#times, #nodes, #traffic colors]
-        traffic_by_node = get_traffic_by_node_conv(path=path4preprocess, times=times,
-                                                   traffic_by_edge=traffic_by_edge,
-                                                   graph=graph, recalculate=redo_preprocessing,
-                                                   lnei=lnei)
-
-        # shape(source): times x color x k
-        self.source = get_basis_traffic_by_node(path=path4preprocess, basis=self.B, traffic_by_node=traffic_by_node,
-                                                recalculate=redo_preprocessing)
+        model = calibrate(self, observed_stations=observed_stations, observed_pollution=observed_pollution,
+                          traffic=traffic, source=source, avg=avg, **kwargs)
+        self.set_params(**model.params)
+        # super().calibrate(observed_stations, observed_pollution, traffic, **kwargs)
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
-
-        k = min((max((1, int(self.params["k"]))), self.k_max))
+        spatial_unknown_indexes = self.get_space_indexes(target_positions)
+        stations_indexes = self.get_space_indexes(observed_stations)
+        rb_k = int(self.params["rb_k"])
 
         # average in space
         avg = observed_pollution.mean(axis=1).values if self.substract_mean else 0
 
-        # traffic term
-        times_indexes = [self.times.index(t) for t in observed_pollution.index]
-        source = self.source[times_indexes, :, :k]
-        tck = np.shape(source)
-        source = self.source_model.predict(
-            np.swapaxes(source, 1, 2).reshape((-1, tck[1]))).reshape((tck[0], tck[-1])).T
+        # source model predictions
+        if "source" in kwargs and "avg" in kwargs:  # when calibarting do not re calculate each time.
+            source = kwargs["source"]
+            avg = kwargs["avg"]
+        else:
+            source = PCASourceModel.state_estimation(self, observed_stations=observed_stations,
+                                                     observed_pollution=observed_pollution,
+                                                     traffic=traffic, target_positions=self.node_positions.T, **kwargs)
+        # - avg[:, np.newaxis]
+        # source -= self.source_avg
+        source_k = self.project_source_to_rb(self.B[:, :rb_k], source).T
 
-        # S_params = np.array(list(filter_dict(TRAFFIC_VALUES, self.params).values()))
-        # source = np.einsum("tck,c->kt", self.source[times_indexes, :, :], S_params)
-
-        # extra_data = extra_regressors(observed_pollution.index, target_positions, self.extra_regressors, **kwargs)
-        # SED_params = np.array(list(filter_dict(self.extra_regressors, self.params).values()))
-        # source += np.einsum("te,e", extra_data, SED_params)
-        # SED_params = 0
-        # source += self.params["intercept"]
-
+        # diffusion equation
         Ms_param = self.params["absorption"]
         Kd_param = self.params["diffusion"]
-        At = (Kd_param * self.KdROM + Ms_param * self.MsROM)[:k, :k]
+        delta = self.params["delta"]
+        alpha = self.params["alpha"]
+        # delta = 1
+        # alpha = 1
+        # Ms_param = 10
+        # Kd_param = 10
+
+        At = Kd_param * self.KdROM[:rb_k, :rb_k] + Ms_param * self.MsROM[:rb_k, :rb_k]
 
         # inverse problem term
-        stations_indexes = [self.spacial_locations.columns.tolist().index(c) for c in observed_pollution.columns]
-        Bz = self.wtB[stations_indexes, :k].T @ (observed_pollution.T.values - avg)  # learn the correction
-        Az = self.wtB[stations_indexes, :k].T @ self.wtB[stations_indexes, :k]
+        Bz = self.B[stations_indexes, :rb_k].T @ (observed_pollution.T.values - avg)  # learn the correction
+        Az = self.B[stations_indexes, :rb_k].T @ self.B[stations_indexes, :rb_k]
 
         # solving the joint equation
-        alpha = self.params["alpha"]
-        c = np.linalg.solve(
-            (alpha * At + (1 - alpha) * Az)[:k, :k],
-            (alpha * source + (1 - alpha) * Bz)[:k, :]
-        )
+        c = np.linalg.solve((alpha * At + (1 - alpha) * Az), alpha * source_k + (1 - alpha) * Bz)
 
-        # final solution
-        indexes = [self.position2node_index[tuple(tp)] for tp in target_positions.values.T]
-        u = np.einsum("ik,kt->it", self.B[:, :k], c) + avg
-        um = u.mean() / source.mean()
-        return u[indexes, :].T
+        # final solution weighted
+        u = (delta * np.einsum("dk,kt->td", self.B[spatial_unknown_indexes, :rb_k], c)  # + avg[:, np.newaxis]
+             + source[:, spatial_unknown_indexes])
+
+        # u = (delta * (np.einsum("dk,kt->td", self.B[:, :rb_k], c) + avg[:, np.newaxis])
+        #      + (1 - delta) * source[:, :])
+        # rel = np.abs((u-source)/source*100)
+        # rmean = np.mean(rel)
+        # rmax = np.max(rel)
+        # rmin = np.min(rel)
+        # mse=np.mean((u[:, stations_indexes]-observed_pollution.values)**2)
+        # msesource=np.mean((source[:, stations_indexes]-observed_pollution.values)**2)
+        return u
+
+
+class ModelsAggregator(BaseModel):
+    def __init__(self, models: List[BaseModel], aggregator: Pipeline, name=None):
+        super().__init__()
+        self.losses = list()
+        self.name = name
+        self.TRUE_MODEL = np.all([model.TRUE_MODEL for model in models])
+        self.aggregator = aggregator
+        self.models = models
+
+    @property
+    def weights(self):
+        if hasattr(self.aggregator.steps[-1], "coef_") and hasattr(self.aggregator.steps[-1], "intercept_"):
+            return np.ravel(np.append(self.aggregator.steps[-1].coef_, self.aggregator.steps[-1].intercept_))
+
+    @property
+    def model_importance(self):
+        weights = self.weights
+        if weights is not None:
+            return {model_name: weight for model_name, weight in
+                    zip(list(map(str, self.models)) + ["intercept"], np.abs(self.weights) / np.abs(self.weights).sum())}
+
+    def __str__(self):
+        models_names = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in
+                                 self.models]) if self.name is None else self.name
+        return f"{self.aggregator}({models_names})"
+
+    def state_estimation_for_each_model(self, observed_stations, observed_pollution, traffic, target_positions,
+                                        **kwargs) -> [np.ndarray,
+                                                      np.ndarray]:
+        return np.transpose([
+            model.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs)
+            for model in self.models], axes=(1, 2, 0))
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        individual_predictions = self.state_estimation_for_each_model(observed_stations, observed_pollution, traffic,
+                                                                      target_positions, **kwargs)
+        shape = np.shape(individual_predictions)
+        return self.aggregator.predict(individual_predictions.reshape((-1, shape[-1]))).reshape((shape[0], shape[1]))
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        known_stations_indexes = [self.position2node_index[tuple(tp)] for tp in observed_stations.values.T]
-        k = min((max((1, int(self.params["k"]))), self.k_max))
-
-        # average in space
-        avg = observed_pollution.mean(axis=1).values if self.substract_mean else 0
-
-        # source term fitting
-        times_indexes = [self.times.index(t) for t in observed_pollution.index]
-        source = np.einsum("tck,lk->tlc", self.source[:, :, :k], self.B[:, :k])
-        source = source[times_indexes, :, :]
-        source = source[:, known_stations_indexes, :].reshape((-1, 4))
-
-        if len(self.extra_regressors) > 1:
-            extra_data = extra_regressors(observed_pollution.index, observed_stations, self.extra_regressors, **kwargs)
-            source = np.concatenate([source, extra_data], axis=1)
-
-        # To debug: almost all contributions are 0
-        # (source[:, :, 0] / observed_pollution.T.values.T)[source[:, :, 0] / observed_pollution.T.values.T > 0]
-        self.source_model.fit(source, (observed_pollution.T.values - avg).ravel())
-        # print(self.source_model.coef_)
-        # self.set_params(**dict(zip(list(TRAFFIC_VALUES.keys()) + self.extra_regressors, lr.coef_.ravel().tolist())))
-        # self.set_params(intercept=self.source_model.intercept_)
-
-        super().calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+        if not self.calibrated:
+            # calibrate models
+            for model in self.models:
+                if not model.calibrated:
+                    model.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+                self.losses.append(model.losses)
+            # find optimal weights for model averaging
+            individual_predictions = \
+                self.state_estimation_for_each_model(observed_stations, observed_pollution, traffic, observed_stations,
+                                                     **kwargs)
+            shape = np.shape(individual_predictions)
+            self.aggregator.fit(individual_predictions.reshape((-1, shape[-1])),
+                                observed_pollution.values.reshape((-1, 1)))
+            self.calibrated = True
+        print(f"Models importance: {self.model_importance}")

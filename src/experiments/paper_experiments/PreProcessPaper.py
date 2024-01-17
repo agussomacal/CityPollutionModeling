@@ -242,14 +242,20 @@ def train_test(model, station):
                     target_position=target_position, target_observation=data_unknown)
     t_to_fit = time.time() - t0
     t0 = time.time()
-    predicted_pollution, target_pollution = (
-        model.state_estimation_for_optim(**data_known, traffic_coords=traffic_pixels_coords,
-                                         distance_between_stations_pixels=distance_between_stations_pixels,
-                                         graph=graph, traffic_by_edge=traffic_by_edge,
-                                         temperature=temperature, wind=wind, longitudes=longitudes,
-                                         latitudes=latitudes))
+    predicted_pollution = model.state_estimation(**data_known, target_positions=target_position,
+                                                 traffic_coords=traffic_pixels_coords,
+                                                 distance_between_stations_pixels=distance_between_stations_pixels,
+                                                 graph=graph, traffic_by_edge=traffic_by_edge,
+                                                 temperature=temperature, wind=wind, longitudes=longitudes,
+                                                 latitudes=latitudes)
+    # predicted_pollution, target_pollution = (
+    #     model.state_estimation(**data_known, traffic_coords=traffic_pixels_coords,
+    #                            distance_between_stations_pixels=distance_between_stations_pixels,
+    #                            graph=graph, traffic_by_edge=traffic_by_edge,
+    #                            temperature=temperature, wind=wind, longitudes=longitudes,
+    #                            latitudes=latitudes))
     t_to_estimate = time.time() - t0
-    train_error = ((predicted_pollution - target_pollution) ** 2).ravel()
+    train_error = ((predicted_pollution.ravel() - np.ravel(data_unknown)) ** 2).ravel()
 
     # in test time use the future
     data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
@@ -288,6 +294,13 @@ def train_test(model, station):
     }
 
 
+def load_model(model_name, station):
+    path2model = Path(f"{path2models}/{station}")
+    path2model.mkdir(parents=True, exist_ok=True)
+    model, fitting_time = joblib.load(filename=f"{path2model}/{model_name}.compressed")
+    return model, fitting_time
+
+
 def train_test_model(model_tuple: Tuple[str, Union[BaseModel, Tuple]]):
     model_name, model = model_tuple
 
@@ -299,7 +312,7 @@ def train_test_model(model_tuple: Tuple[str, Union[BaseModel, Tuple]]):
             path2model = Path(f"{path2models}/{station}")
             path2model.mkdir(parents=True, exist_ok=True)
             loaded_models, fitting_time = tuple(
-                list(zip(*[joblib.load(filename=f"{path2model}/{m}.compressed") for m in models])))
+                list(zip(*[load_model(m, station) for m in models])))
             m = ModelsAggregator(models=loaded_models, aggregator=aggregator)
 
         print(station, m)
@@ -378,7 +391,7 @@ def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes)
                                                 distance_between_stations_pixels=distance_between_stations_pixels,
                                                 graph=graph, traffic_by_edge=traffic_by_edge,
                                                 temperature=temperature, wind=wind, longitudes=longitudes,
-                                                latitudes=latitudes)
+                                                latitudes=latitudes).T
     return pd.concat(
         (pd.DataFrame(node_positions, columns=["long", "lat"]), pd.DataFrame(estimation, columns=["pollution"])),
         axis=1)
@@ -386,37 +399,47 @@ def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes)
 
 @perplex_plot(legend=False)
 @one_line_iterator
-def plot_pollution_map_in_graph(fig, ax, station, trained_model, diffusion_method=None, time=None, nodes_indexes=None,
+def plot_pollution_map_in_graph(fig, ax, station, individual_models, diffusion_method=None, time=None,
+                                nodes_indexes=None, log=False,
                                 cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5, bar=False,
-                                max_val=None, plot_nodes=False, levels=0):
+                                limit_vals=(0, 1), plot_nodes=False, levels=0, num_points=1000):
+    trained_model, _ = load_model(individual_models, station)
     img = load_image(
         f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
 
     estimation = estimate_pollution_map_in_graph(path=data_manager.path,
-                                                 filename=f"PollutionEstimation_{station}_{time}_{trained_model}",
+                                                 filename=f"PollutionEstimation_{station}_{time}_{individual_models}",
                                                  time=time, station=station, trained_model=trained_model,
                                                  nodes_indexes=nodes_indexes)
 
     # smoothing
     pollution = np.ravel(diffusion_method(estimation["pollution"].values.reshape((-1, 1))))
+    pollution = np.log(pollution) if log else pollution
     x = (estimation["long"] - long_bounds.lower) / (long_bounds.upper - long_bounds.lower)
     y = (estimation["lat"] - lat_bounds.lower) / (lat_bounds.upper - lat_bounds.lower)
-    print(min(pollution), max(pollution))
+    print(min(pollution), np.median(pollution), np.mean(pollution), max(pollution))
+    if limit_vals[1] <= 1:
+        # limit_vals = np.quantile(np.ravel(pollution_future.values.mean(axis=1)), q=limit_vals)
+        limit_vals = np.quantile(pollution, q=limit_vals)
+    norm = colors.Normalize(vmin=limit_vals[0], vmax=limit_vals[1]) if limit_vals is not None else None
     if plot_nodes:
         sc = ax.scatter(x=x,
                         y=y,
                         c=pollution, cmap=cmap,
-                        norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None,
+                        norm=norm,
                         s=s, alpha=alpha)
     else:
-        grid_x, grid_y = np.meshgrid(np.linspace(np.min(estimation["long"]), np.max(estimation["long"])),
-                                     np.linspace(np.min(estimation["lat"]), np.max(estimation["lat"])))
-        grid_z2 = griddata(np.transpose([x, y]), pollution, (grid_x, grid_y), method='nearest')
+        pollution[pollution > limit_vals[1]] = limit_vals[1]
+        pollution[pollution < limit_vals[0]] = limit_vals[0]
+        grid_x, grid_y = np.meshgrid(np.linspace(np.min(x), np.max(x), num_points),
+                                     np.linspace(np.min(y), np.max(y), num_points))
+        grid_z2 = griddata(np.transpose([x, y]), pollution, (grid_x, grid_y), method='cubic')
         if levels > 0:
             sc = ax.contourf(grid_z2, levels=levels, alpha=alpha, cmap=cmap,
-                             norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None)
+                             norm=norm)
         else:
             sc = ax.imshow(grid_z2.T, extent=(0, 1, 0, 1), origin='lower', alpha=alpha, cmap=cmap,
+                           norm=norm
                            # interpolation="bicubic",
                            # norm=colors.Normalize(vmin=0, vmax=max_val) if max_val is not None else None
                            )
