@@ -1,19 +1,19 @@
-import datetime
 import inspect
-from typing import List, Dict, Union
+from typing import Dict
 
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
 
-from src.lib.Models.BaseModel import BaseModel, mse, GRAD
 from PerplexityLab.miscellaneous import filter_dict
+from src.lib.Models.BaseModel import BaseModel, mse, GRAD
+from src.lib.Modules import Optim
 
 
 # ================ ================ ================ #
 #                   Types of kernel                  #
 # ================ ================ ================ #
-def gaussian_kernel(x, y, sigma, beta):
+def gaussian_kernel(x, y, sigma):
     """
 
     @param x: vector 1
@@ -24,10 +24,10 @@ def gaussian_kernel(x, y, sigma, beta):
     # the if condition with the axis is to account for many vectors simultaneously, first dimension is the iterator,
     # the others correspond to the vector.
 
-    return np.exp(beta - cdist(np.matrix(x), np.matrix(y), metric='euclidean') ** 2 / sigma ** 2)
+    return np.exp(-cdist(np.matrix(x), np.matrix(y), metric='euclidean') ** 2 / (2 * sigma ** 2))
 
 
-def exponential_kernel(x, y, alpha, beta):
+def exponential_kernel(x, y, alpha):
     """
 
     @param x: vector 1
@@ -38,7 +38,21 @@ def exponential_kernel(x, y, alpha, beta):
     # the if condition with the axis is to account for many vectors simultaneously, first dimension is the iterator,
     # the others correspond to the vector.
 
-    return np.exp(beta - alpha * cdist(np.matrix(x), np.matrix(y), metric='euclidean'))
+    return np.exp(- alpha * cdist(np.matrix(x), np.matrix(y), metric='euclidean'))
+
+
+def rational_kernel(x, y, alpha, beta):
+    """
+
+    @param x: vector 1
+    @param y: vector 2
+    @param sigma: sigma of the gaussian kernel
+    @return:
+    """
+    # the if condition with the axis is to account for many vectors simultaneously, first dimension is the iterator,
+    # the others correspond to the vector.
+
+    return alpha / (beta + cdist(np.matrix(x), np.matrix(y), metric='euclidean'))
 
 
 # ================ ================ ================ #
@@ -46,39 +60,57 @@ def exponential_kernel(x, y, alpha, beta):
 # ================ ================ ================ #
 class KernelModel(BaseModel):
 
-    def __init__(self, kernel_function, distrust=0, name="", loss=mse, optim_method=GRAD, verbose=False,
-                 niter=1000, **kwargs):
-        super().__init__(name=name, loss=loss, optim_method=optim_method, distrust=distrust, verbose=verbose,
-                         niter=niter, **kwargs)
+    def __init__(self, kernel_function, name="", loss=mse, optim_method=GRAD, verbose=False,
+                 niter=1000, sensor_distrust=0, old_method=False, **kwargs):
+        if isinstance(sensor_distrust, (float, int, Optim)):
+            sensor_distrust = {"sensor_distrust": sensor_distrust}
+        elif isinstance(sensor_distrust, Dict):
+            pass
+        else:
+            raise Exception("The parameter sensor_distrust must be numeric or dict")
+        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose,
+                         niter=niter, cv_in_space=True, **sensor_distrust, **kwargs)
         self.kernel_function = kernel_function
         self.kernel_func_param_names = inspect.getfullargspec(kernel_function).args[2:]
         self.observed_locations = None
         self.k_matrix = None
+        self.old_method = old_method
 
-    @property
-    def sensor_distrust(self):
-        return self.params["distrust"]
-
-    # @property
-    # def sensor_distrust(self):
-    #     if "sensor_distrust" in self.params.keys():
-    #         return np.repeat(self.params["sensor_distrust"], len(self.k_matrix))
-    #     else:
-    #         assert len(self.k_matrix.index) == len(set(self.k_matrix.index).intersection(
-    #             self.params.keys())), "all the stations named in correlation should be in parameter keys."
-    #         return np.array([self.params[c] for c in self.k_matrix.columns])  # the good ordering.
+    def get_sensor_distrust(self, k_matrix):
+        if "sensor_distrust" in self.params.keys():
+            return np.repeat(self.params["sensor_distrust"], len(k_matrix))
+        else:
+            assert len(k_matrix.index) == len(set(k_matrix.index).intersection(
+                self.params.keys())), "all the stations named in correlation should be in parameter keys."
+            return np.array([self.params[c] for c in k_matrix.columns])  # the good ordering.
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
-        self.calculate_K_matrix(observed_stations)
-        k_matrix = self.k_matrix.loc[observed_stations.columns, observed_stations.columns]
-        k_matrix.values[np.diag_indices(len(k_matrix))] += self.sensor_distrust
-        # print(self, ": ", np.linalg.cond(K))
+        know_stations = observed_pollution.columns
 
-        umean = zmean = 0  # np.mean(observed_values)
-        b = np.linalg.lstsq(k_matrix, (observed_pollution - zmean).T, rcond=None)[0].T
-        prediction = umean + b @ self.kernel_eval(observed_stations, target_positions)
-        # TODO: what to do when observed_stations has nans?
+        self.calculate_K_matrix(observed_stations)
+        k_matrix = self.k_matrix.loc[know_stations, know_stations]
+        sensor_distrust = self.get_sensor_distrust(k_matrix)
+
+        if self.old_method:
+            # Old method
+            k_matrix.values[np.diag_indices(len(k_matrix))] += sensor_distrust
+
+            umean = zmean = 0  # np.mean(observed_values)
+            b = np.linalg.lstsq(k_matrix, (observed_pollution - zmean).T, rcond=None)[0].T
+            prediction = umean + b @ self.kernel_eval(observed_stations, target_positions)
+        else:
+            # TODO: check if not uniform distrust is written this way
+            k_matrix = k_matrix @ np.diag(1 - sensor_distrust) + np.diag(sensor_distrust)
+            gr = np.diag(1 - sensor_distrust) @ self.kernel_eval(observed_stations, target_positions)
+
+            c = np.linalg.solve(k_matrix, gr)  # solving linear system
+            c = c / np.nansum(c)  # normaization to sum 1
+            c[np.isnan(c)] = 0
+
+            m = len(know_stations)
+            umean = zmean = np.mean(observed_pollution.values, axis=1, keepdims=True)
+            prediction = umean + (observed_pollution[know_stations].values - zmean) @ (c - 1.0 / m)
         return prediction
 
     def calculate_K_matrix(self, observed_stations):
@@ -112,13 +144,15 @@ class KernelModel(BaseModel):
 #               Specific kernel models               #
 # ================ ================ ================ #
 class GaussianKernelModel(KernelModel):
-    def __init__(self, sigma, beta, distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False):
+    def __init__(self, sigma, sensor_distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000, verbose=False,
+                 old_method=False):
         super().__init__(name=name, kernel_function=gaussian_kernel, loss=loss, niter=niter,
-                         optim_method=optim_method, sigma=sigma, beta=beta, distrust=distrust, verbose=verbose)
+                         optim_method=optim_method, sigma=sigma, sensor_distrust=sensor_distrust,
+                         verbose=verbose, old_method=old_method)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
 
-        if self.params["sigma"] is None or self.params["beta"] is None:
+        if self.params["sigma"] is None or self.params["sensor_distrust"] is None:
             correlation = observed_pollution.corr()
             indexes = np.triu_indices(len(correlation), k=0)
             log_cor = np.log(correlation.values[indexes])
@@ -130,20 +164,24 @@ class GaussianKernelModel(KernelModel):
             beta, alpha = np.ravel(
                 np.linalg.lstsq(np.transpose([np.ones(np.sum(valid_indexes)), exp_correlations ** 2]),
                                 np.reshape(log_cor[valid_indexes], (-1, 1)), rcond=-1)[0])
-            self.set_params(sigma=np.sqrt(np.abs(1 / alpha)), beta=np.exp(beta))
+            sensor_distrust = (1 - np.exp(beta))
+            sensor_distrust[sensor_distrust > 1] = 1.0
+            sensor_distrust[sensor_distrust < 0] = 0.0
+            self.set_params(sigma=np.sqrt(np.abs(1 / alpha)), sensor_distrust=sensor_distrust)
 
         super().calibrate(observed_stations, observed_pollution, traffic, **kwargs)
 
 
 class ExponentialKernelModel(KernelModel):
-    def __init__(self, alpha=None, beta=None, distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000,
-                 verbose=False):
+    def __init__(self, alpha=None, sensor_distrust=0, name="", loss=mse, optim_method=GRAD, niter=1000,
+                 verbose=False, old_method=False):
         super().__init__(name=name, kernel_function=exponential_kernel, loss=loss, niter=niter,
-                         optim_method=optim_method, alpha=alpha, beta=beta, distrust=distrust, verbose=verbose)
+                         optim_method=optim_method, alpha=alpha, sensor_distrust=sensor_distrust,
+                         verbose=verbose, old_method=old_method)
 
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
 
-        if self.params["alpha"] is None or self.params["beta"] is None:
+        if self.params["alpha"] is None or self.params["sensor_distrust"] is None:
             correlation = observed_pollution.corr()
             indexes = np.triu_indices(len(correlation), k=0)
             log_cor = np.log(correlation.values[indexes])
@@ -154,6 +192,41 @@ class ExponentialKernelModel(KernelModel):
             exp_correlations = cdist(observed_stations.values.T, observed_stations.values.T)[indexes][valid_indexes]
             beta, alpha = np.ravel(np.linalg.lstsq(np.transpose([np.ones(np.sum(valid_indexes)), exp_correlations]),
                                                    np.reshape(log_cor[valid_indexes], (-1, 1)), rcond=-1)[0])
-            self.set_params(alpha=-alpha, beta=np.exp(beta))
+            self.set_params(alpha=-alpha)
+            if ("sensor_distrust" not in self.params) or (self.params["sensor_distrust"] is None) or len(
+                    self.params) < 3:
+                sensor_distrust = (1 - np.exp(beta))
+                sensor_distrust = 1.0 if sensor_distrust > 1 else sensor_distrust
+                sensor_distrust = 0.0 if sensor_distrust < 0 else sensor_distrust
+                self.set_params(sensor_distrust=sensor_distrust)
 
         super().calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+
+
+# ================ ================ ================ #
+#                 Generic DistanceModel                #
+# ================ ================ ================ #
+class DistanceModel(BaseModel):
+
+    def __init__(self, kernel_function, name="", loss=mse, optim_method=GRAD, verbose=False,
+                 niter=1000, **kwargs):
+        super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose,
+                         niter=niter, cv_in_space=True, **kwargs)
+        self.kernel_function = kernel_function
+        self.kernel_func_param_names = inspect.getfullargspec(kernel_function).args[2:]
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        d = self.kernel_eval(observed_stations, target_positions)
+        d /= np.sum(d)
+        avg = np.mean(observed_pollution.values, axis=1, keepdims=True)
+        return (observed_pollution.values - avg) @ d + avg
+
+    def kernel_eval(self, observed_stations, target_positions) -> np.ndarray:
+        """
+        @param observed_stations: x_i where observations exist -> give the kernel representers k_xi
+        @param target_positions: spatial points where inference is performed, x_j
+        """
+
+        return self.kernel_function(observed_stations.values.T, target_positions.values.T,
+                                    **filter_dict(self.kernel_func_param_names, self.params))

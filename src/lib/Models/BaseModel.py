@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from sklearn.pipeline import Pipeline
+from skopt import gp_minimize
 from tqdm import tqdm
 
 from src.lib.Modules import Bounds, Optim
@@ -120,7 +121,6 @@ def filter_by_quantile(values, lower_quantile, upper_quantile):
 
 class BaseModel:
     TRUE_MODEL = True
-    POLLUTION_AGNOSTIC = False
 
     def __init__(self, name="", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=False, sigma0=1,
                  cv_in_space=True, **kwargs):
@@ -160,72 +160,96 @@ class BaseModel:
         """
         raise Exception("Not implemented.")
 
-    @pollution_dependent
-    def state_estimation_for_optim(self, observed_stations, observed_pollution, traffic, target_positions,
-                                   **kwargs) -> [np.ndarray, np.ndarray]:
-        return self.state_estimation(observed_stations, observed_pollution, traffic, target_positions, **kwargs)
-
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
-        if len(self.params) == 1 and self.optim_method == CMA:
-            self.optim_method = GRAD
+        model = calibrate(self, observed_stations=observed_stations, observed_pollution=observed_pollution,
+                          traffic=traffic, **kwargs)
+        self.set_params(**model.params)
 
-        def optim_func(params):
-            dictparams = dict(zip(self.bounds, params))
-            if self.verbose:
-                df = pd.DataFrame(np.reshape(list(dictparams.values()), (1, -1)), columns=list(dictparams.keys()))
-                print(f"Params for optimization: \n {df}")
-            self.set_params(**dictparams)
-            predicted_pollution, target_pollution = self.state_estimation_for_optim(
-                observed_stations, observed_pollution, traffic, **kwargs)
-            loss = self.loss(predicted_pollution, target_pollution)
-            self.losses[tuple(params)] = loss
-            if self.verbose:
-                print(f"loss: {loss}")
-            return loss
 
-        self.losses = dict()
-        x0 = np.array([self.params[k] for k in self.bounds])
-        if self.niter == 1 or len(self.bounds) == 0:
-            optim_func(x0)
-            optim_params = x0
-        elif self.optim_method == CMA:
-            optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
-                                        sigma0=self.sigma0, eval_initial_x=True,
-                                        options={'popsize': 10, 'maxfevals': self.niter})
-        elif self.optim_method == GRAD:
-            optim_params = minimize(fun=optim_func, x0=x0, bounds=self.bounds.values(),
-                                    method="L-BFGS-B", options={'maxiter': self.niter}).x
+def calibrate(model: BaseModel, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+    if len(model.params) == 1 and model.optim_method == CMA:
+        model.optim_method = GRAD
 
-        elif self.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
-            if self.optim_method == UNIFORM:
-                sampler = np.linspace
-            elif self.optim_method == RANDOM:
-                sampler = np.random.uniform
-            elif self.optim_method == LOGUNIFORM:
-                sampler = lambda d, u, i: np.logspace(np.log10(d), np.log10(u), i)
-            else:
-                raise Exception(f"Optim method {self.optim_method} not implemented.")
-            samples = {k: sampler(bounds.lower, bounds.upper, self.niter).ravel().tolist() for k, bounds in
-                       self.bounds.items() if
-                       bounds is not None}
-            self.losses = {x: optim_func(list({**self.params, **dict(zip(samples.keys(), x))}.values())) for x in
-                           tqdm(zip(*samples.values()), desc=f"Training {self}")}
-            best_ix = np.argmin(self.losses.values())
-            optim_params = [v[best_ix] for v in samples.values()]
-        elif self.optim_method == NONE_OPTIM_METHOD:
-            return None
+    def optim_func(params):
+        dictparams = dict(zip(model.bounds, params))
+        if model.verbose:
+            df = pd.DataFrame(np.reshape(list(dictparams.values()), (1, -1)), columns=list(dictparams.keys()))
+            print(f"Params for optimization: \n {df}")
+
+        model.set_params(**dictparams)
+
+        if model.cv_in_space:
+            target_pollution, predicted_pollution = \
+                list(zip(*[(target_pollution,
+                            model.state_estimation(**known_data, **kwargs))
+                           for known_data, target_pollution in
+                           loo(observed_stations, observed_pollution, traffic, kwargs.get("stations2test", None))]))
+            predicted_pollution = np.concatenate(predicted_pollution, axis=0)
+            target_pollution = np.concatenate(target_pollution, axis=0)[:, np.newaxis]
         else:
-            raise Exception("Not implemented.")
+            stations_available2test = observed_pollution.columns
+            print("Num stations 2 test: ", len(stations_available2test))
+            # stations_available2test = observed_pollution.columns[
+            #     observed_pollution.columns.isin(kwargs.get("stations2test", observed_stations.columns))]
+            target_pollution = observed_pollution[stations_available2test]
+            predicted_pollution = model.state_estimation(
+                observed_stations=observed_stations,
+                observed_pollution=observed_pollution,
+                target_positions=observed_stations[stations_available2test],
+                target_pollution=target_pollution,
+                traffic=traffic, **kwargs).ravel()
+            target_pollution = target_pollution.values
 
-        if len(self.bounds) > 0:
-            self.set_params(**dict(zip(self.bounds.keys(), optim_params)))
-            self.losses = pd.Series(self.losses.values(), pd.Index(self.losses.keys(), names=self.bounds.keys()),
-                                    name="loss")
-        print(self, "Optim params: ", self.params)
+        loss = model.loss(predicted_pollution, target_pollution.ravel())
+        model.losses[tuple(params)] = loss
+        if model.verbose:
+            print(f"loss: {loss}")
+        return loss
 
-        # dbvsuvbsd
-        self.calibrated = True
-        return self
+    model.losses = dict()
+    x0 = np.array([model.params[k] for k in model.bounds])
+    if model.niter == 1 or len(model.bounds) == 0:
+        optim_func(x0)
+        optim_params = x0
+    elif model.optim_method == CMA:
+        optim_params, _ = cma.fmin2(objective_function=optim_func, x0=x0,
+                                    sigma0=model.sigma0, eval_initial_x=True,
+                                    options={'popsize': 10, 'maxfevals': model.niter})
+    elif model.optim_method == GRAD:
+        optim_params = minimize(fun=optim_func, x0=x0, bounds=model.bounds.values(),
+                                method="L-BFGS-B", options={'maxiter': model.niter}).x
+    elif model.optim_method == BAYES:
+        optim_params = gp_minimize(optim_func, dimensions=list(model.bounds.values()),
+                                   x0=x0.tolist(), n_calls=model.niter).x
+    elif model.optim_method in [RANDOM, UNIFORM, LOGUNIFORM]:
+        if model.optim_method == UNIFORM:
+            sampler = np.linspace
+        elif model.optim_method == RANDOM:
+            sampler = np.random.uniform
+        elif model.optim_method == LOGUNIFORM:
+            sampler = lambda d, u, i: np.logspace(np.log10(d), np.log10(u), i)
+        else:
+            raise Exception(f"Optim method {model.optim_method} not implemented.")
+        samples = {k: sampler(bounds.lower, bounds.upper, model.niter).ravel().tolist() for k, bounds in
+                   model.bounds.items() if
+                   bounds is not None}
+        model.losses = {x: optim_func(list({**model.params, **dict(zip(samples.keys(), x))}.values())) for x in
+                        tqdm(zip(*samples.values()), desc=f"Training {model}")}
+        best_ix = np.argmin(model.losses.values())
+        optim_params = [v[best_ix] for v in samples.values()]
+    elif model.optim_method == NONE_OPTIM_METHOD:
+        return model
+    else:
+        raise Exception("Not implemented.")
+
+    if len(model.bounds) > 0:
+        model.set_params(**dict(zip(model.bounds.keys(), optim_params)))
+        model.losses = pd.Series(model.losses.values(), pd.Index(model.losses.keys(), names=model.bounds.keys()),
+                                 name="loss")
+    print(model, "Optim params: ", model.params)
+
+    model.calibrated = True
+    return model
 
 
 class ModelsSequenciator(BaseModel):

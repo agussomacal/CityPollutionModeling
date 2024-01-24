@@ -25,7 +25,7 @@ class BLUEModel(BaseModel):
         else:
             raise Exception("The parameter sensor_distrust must be numeric or dict")
         super().__init__(name=name, loss=loss, optim_method=optim_method, verbose=verbose,
-                         niter=niter, **sensor_distrust)
+                         niter=niter, cv_in_space=True, **sensor_distrust)
         self.correlation_dict = dict()
         self.correlation = None
         self.obs_mean = None
@@ -47,14 +47,18 @@ class BLUEModel(BaseModel):
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
+        know_stations = observed_pollution.columns
+        unknown_stations = target_positions.columns
+
         correlation = self.correlation.copy()
         # distrust should be positive otherwise it means there is more confidence than 0-noise case
         correlation.values[np.diag_indices(len(self.correlation))] += np.abs(self.sensor_distrust)
-        c = correlation.loc[observed_pollution.columns, observed_pollution.columns]
-        b = correlation.loc[observed_pollution.columns, target_positions.columns].values
+        c = correlation.loc[know_stations, know_stations]
+        b = correlation.loc[know_stations, unknown_stations].values
 
         a = np.linalg.solve(c, b)
         # a = Ridge(alpha=1.0, tol=0.1, fit_intercept=False).fit(c, b).coef_.T
         # a = np.linalg.lstsq(c, b, rcond=-1)[0]
         # a = scipy.linalg.solve(c, b, assume_a='pos')  # singular matrix
-        return observed_pollution.values @ a
+        return (observed_pollution - self.obs_mean[know_stations]).values @ a + self.obs_mean[unknown_stations].values[
+                                                                                np.newaxis, :]
