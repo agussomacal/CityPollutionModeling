@@ -162,7 +162,7 @@ data_manager = DataManager(
     trackCO2=True
 )
 
-with (data_manager.track_emissions("PreprocessesTrafficPollution")):
+with ((data_manager.track_emissions("PreprocessesTrafficPollution"))):
     path2models = Path(
         f"{data_manager.path}/Rows{nrows2load_traffic_data}{if_true_str(simulation, '_Sim')}{if_true_str(shuffle, '_Shuffle')}_models")
     path2models.mkdir(parents=True, exist_ok=True)
@@ -178,6 +178,9 @@ with (data_manager.track_emissions("PreprocessesTrafficPollution")):
         screenshot_period=screenshot_period,
         traffic_past=traffic_past, pollution_past=pollution_past, traffic_future=traffic_future,
         pollution_future=pollution_future, station_coordinates=station_coordinates)
+    pollution_past = pollution_past[stations2test]
+    pollution_future = pollution_future[stations2test]
+    station_coordinates = station_coordinates[stations2test]
 
     runsinfo.append_info(
         numstations=int(len(station_coordinates.columns)),
@@ -342,7 +345,7 @@ def plot_pollution_map_in_graph(fig, ax, station, individual_models, diffusion_m
 @perplex_plot(legend=False)
 @one_line_iterator
 def plot_pollution_map_in_graph(fig, ax, station, individual_models, time=None,
-                                nodes_indexes=None, log=False,
+                                nodes_indexes=None, log=False, norm=None,
                                 cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5, bar=False,
                                 estimation_limit_vals=(0, 1), levels=0, n_ticks=5, method="cubic"):
     trained_model, _ = load_model(individual_models, station)
@@ -359,7 +362,7 @@ def plot_pollution_map_in_graph(fig, ax, station, individual_models, time=None,
     plot_estimation_map_in_graph(ax,
                                  long=estimation["long"].values,
                                  lat=estimation["lat"].values,
-                                 estimation=pollution,
+                                 estimation=pollution, norm=norm,
                                  img=img, cmap=cmap, s=s, alpha=alpha,
                                  bar=bar, estimation_limit_vals=estimation_limit_vals,
                                  levels=levels, n_ticks=n_ticks, method=method)
@@ -381,8 +384,11 @@ def plot_estimation_histogram(fig, ax, station, individual_models, time=None, no
                 alpha=alpha)
 
     if spatial_avg_model_name is not None:
-        avg = pollution_past.append(pollution_future).loc[time, :].mean()
+        pollution = pollution_past.append(pollution_future).loc[time, :]
+        avg = pollution.mean()
         ax.axvline(x=avg, linestyle="dashed", label="Spatial Avg", color=spatial_avg_model_color)
+        ax.plot(pollution.values.ravel(), [0.01] * len(pollution.values.ravel()), '|', color='k',
+                label="Stations pollution")
 
 
 print(f"CO2 {data_manager.CO2kg}kg")

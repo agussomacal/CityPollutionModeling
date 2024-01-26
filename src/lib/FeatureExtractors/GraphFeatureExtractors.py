@@ -14,6 +14,11 @@ from src.lib.FeatureExtractors.FeatureExtractorsBase import FeatureExtractor
 
 
 def get_graph_node_positions(graph):
+    """
+
+    :param graph:
+    :return: [#nodes, #space dimension = 2]
+    """
     return np.array([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in graph.nodes])
 
 

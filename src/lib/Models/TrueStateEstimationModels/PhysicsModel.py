@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Dict
 
 import networkx as nx
 import numpy as np
@@ -28,8 +28,18 @@ from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import gaussker
 from src.lib.Modules import Optim
 
 
+def graph2undirected(graph):
+    graph = nx.Graph(graph).to_undirected()
+    if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
+        raise Exception("Each edge in Graph should have edge attribute 'length'")
+    if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
+        raise Exception("Each edge in Graph should have edge attribute 'lanes'")
+    return graph
+
+
 @if_exist_load_else_do(file_format="joblib", loader=None, saver=None, description=None, check_hash=False)
 def get_absorption_matrix(graph: nx.Graph):
+    graph = graph2undirected(graph)
     # absorption matrix Ms
     Ms = -compute_laplacian_matrix_from_graph(graph, edge_function=lambda data: data["length"]) / 6
     Ms[np.diag_indices(graph.number_of_nodes())] *= -2
@@ -38,11 +48,7 @@ def get_absorption_matrix(graph: nx.Graph):
 
 @if_exist_load_else_do(file_format="joblib", loader=None, saver=None, description=None, check_hash=False)
 def get_diffusion_matrix(graph: nx.Graph):
-    graph = nx.Graph(graph).to_undirected()
-    if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
-        raise Exception("Each edge in Graph should have edge attribute 'length'")
-    if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
-        raise Exception("Each edge in Graph should have edge attribute 'lanes'")
+    graph = graph2undirected(graph)
     A = compute_adjacency(graph, edge_function=lambda data: data["lanes"] / data["length"])
     A.data[np.isnan(A.data)] = 0
     L = (A - diags(A.sum(axis=0))) @ diags(1 / A.sum(axis=0))
@@ -54,11 +60,7 @@ def get_diffusion_matrix(graph: nx.Graph):
 
 @if_exist_load_else_do(file_format="joblib", loader=None, saver=None, description=None, check_hash=False)
 def get_laplacian_matrix(graph: nx.Graph):
-    graph = nx.Graph(graph).to_undirected()
-    if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
-        raise Exception("Each edge in Graph should have edge attribute 'length'")
-    if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
-        raise Exception("Each edge in Graph should have edge attribute 'lanes'")
+    graph = graph2undirected(graph)
     A = compute_adjacency(graph, edge_function=lambda data: data["lanes"] / data["length"])
     A.data[np.isnan(A.data)] = 0
     L = (A - diags(A.sum(axis=0))) @ diags(1 / A.sum(axis=0))
@@ -135,6 +137,7 @@ def get_traffic_by_node(times, traffic_by_edge, graph):
     :param nodes:
     :return: traffic_by_node: [#times, #nodes, #traffic colors]
     """
+    graph = graph2undirected(graph)
     node2index = {n: i for i, n in enumerate(graph.nodes)}
 
     nodes = list(graph.nodes)
@@ -171,12 +174,75 @@ def get_traffic_by_node_conv(times, traffic_by_edge, graph, lnei):
     :return: [#times, #nodes, #traffic colors]
     """
     traffic_by_node = get_traffic_by_node(times, traffic_by_edge, graph)  # [#times, #nodes, #traffic colors]
+    traffic_by_node_new = traffic_by_node.copy()
 
     node2index = {n: i for i, n in enumerate(graph.nodes)}
     for node in tqdm(graph.nodes(), "new traffic by node"):
         nodes = [node2index[n] for n in nx.bfs_tree(graph, source=node, depth_limit=lnei).nodes()]
-        traffic_by_node[:, node2index[node], :] = traffic_by_node[:, nodes, :].mean(axis=1)
-    return traffic_by_node
+        traffic_by_node_new[:, node2index[node], :] = traffic_by_node[:, nodes, :].mean(axis=1)
+    traffic_by_node_new[np.isnan(traffic_by_node_new)] = 0
+    return traffic_by_node_new
+
+
+@if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
+def distance_between_nodes(graph):
+    # graph = nx.Graph(graph).to_undirected()
+    # if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
+    #     raise Exception("Each edge in Graph should have edge attribute 'length'")
+    # if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
+    #     raise Exception("Each edge in Graph should have edge attribute 'lanes'")
+    node_positions = get_graph_node_positions(graph)
+    return cdist(node_positions, node_positions)
+
+
+@if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
+def get_traffic_by_node_by_dist_conv(times, traffic_by_edge, graph, distance_threshold, distances_betw_nodes):
+    """
+
+    :param times:
+    :param traffic_by_edge:
+    :param graph:
+    :param lnei:
+    :return: [#times, #nodes, #traffic colors]
+    """
+    traffic_by_node = get_traffic_by_node(times, traffic_by_edge, graph)  # [#times, #nodes, #traffic colors]
+    traffic_by_node_new = traffic_by_node.copy()
+
+    node2index = {n: i for i, n in enumerate(graph.nodes)}
+    for node in tqdm(graph.nodes(), "new traffic by node"):
+        ix = distances_betw_nodes[node2index[node]] < distance_threshold
+        traffic_by_node_new[:, node2index[node], :] = np.nanmean(traffic_by_node[:, ix, :], axis=1)
+
+    traffic_by_node_new[np.isnan(traffic_by_node_new)] = 0
+    return traffic_by_node_new
+
+
+@if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
+def get_traffic_by_node_by_dist_weight_conv(times, traffic_by_edge, graph, distances_betw_nodes,
+                                            weight_func, wf_params: Dict):
+    """
+
+    :param times:
+    :param traffic_by_edge:
+    :param graph:
+    :param lnei:
+    :return: [#times, #nodes, #traffic colors]
+    """
+    traffic_by_node = get_traffic_by_node(times, traffic_by_edge, graph)  # [#times, #nodes, #traffic colors]
+    traffic_by_node[np.isnan(traffic_by_node)] = 0
+    # traffic_by_node_new = traffic_by_node.copy()
+
+    # node2index = {n: i for i, n in enumerate(graph.nodes)}
+    w = weight_func(distances_betw_nodes, **wf_params)
+    w = w / np.nansum(w, axis=1, keepdims=True)
+    traffic_by_node_new = np.einsum("tnc,mn->tmc", traffic_by_node, w)
+    # for node in tqdm(graph.nodes(), "new traffic by node"):
+    #     w = weight_func(distances_betw_nodes[node2index[node]], **wf_params)
+    #     w /= np.nansum(w)
+    #     traffic_by_node_new[:, node2index[node], :] = np.nansum(traffic_by_node * w[np.newaxis, :, np.newaxis], axis=1)
+
+    traffic_by_node_new[np.isnan(traffic_by_node_new)] = 0
+    return traffic_by_node_new
 
 
 @if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
@@ -227,7 +293,7 @@ def extra_regressors(times: pd.DatetimeIndex, positions, extra_regressors, **kwa
                 regressor = np.transpose([regressor] * np.shape(positions)[-1], axes=(1, 0, 2))
             else:
                 continue
-        else:
+        elif regressor_name in ["temperature", "wind"]:
             regressor = kwargs.get(regressor_name, None)
             if regressor is not None:
                 if regressor_name in ["temperature", "wind"]:
@@ -237,22 +303,55 @@ def extra_regressors(times: pd.DatetimeIndex, positions, extra_regressors, **kwa
 
                 else:
                     continue
+        else:
+            continue
         X.append(regressor)
 
     X = np.concatenate(X, axis=-1)
     X = X.reshape((-1, np.shape(X)[-1]), order="F")
-    # print(np.shape(X))
     return X
 
 
 def add_extra_regressors_and_reshape(extra_regressors_names, predictions, number_of_instances, positions,
-                                     observed_pollution, order="F",
-                                     **kwargs):
+                                     observed_pollution, order="F", **kwargs):
     predictions = predictions.reshape((-1, number_of_instances), order=order)
     if len(extra_regressors_names) > 1:
         extra_data = extra_regressors(observed_pollution.index, positions, extra_regressors_names, **kwargs)
         predictions = np.concatenate([predictions, extra_data], axis=1)
+
+    if "avg_traffic" in kwargs and "avg_traffic" in extra_regressors_names:
+        predictions = np.concatenate([
+            predictions,
+            np.transpose([kwargs["avg_traffic"]] * np.shape(positions)[1], (1, 0, 2)).reshape((-1, 4), order="F")],
+            axis=-1)
+    if "avg_nodes_traffic" in kwargs and "avg_nodes_traffic" in extra_regressors_names:
+        predictions = np.concatenate([
+            predictions,
+            np.transpose([kwargs["avg_nodes_traffic"]] * np.shape(positions)[1], (1, 0, 2)).reshape((-1, 4),
+                                                                                                    order="F")],
+            axis=-1)
+    if "avg_pollution" in kwargs and "avg_pollution" in extra_regressors_names:
+        predictions = np.concatenate([
+            predictions,
+            np.transpose([kwargs["avg"].ravel()] * np.shape(positions)[1], (1, 0)).reshape((-1, 1), order="F")],
+            axis=-1)
+
     return predictions
+
+
+def get_space_indexes(position2node_index, positions):
+    """
+
+    :param position2node_index: dict mapping locations with nodes in the graph
+    :param positions: each column is one location (2, m) dataframe or numpy array
+    :return:
+    """
+    return [position2node_index[tuple(tp)] for tp in
+            (positions.values if isinstance(positions, pd.DataFrame) else positions).T]
+
+
+def get_time_indexes(times_in_traffic, times_in_observations):
+    return [times_in_traffic.index(t) for t in times_in_observations]
 
 
 class BaseSourceModel(BaseModel):
@@ -260,7 +359,7 @@ class BaseSourceModel(BaseModel):
     def __init__(self, path4preprocess: Union[str, Path], graph, spacial_locations: pd.DataFrame, times,
                  traffic_by_edge, extra_regressors=[], train_with_relative_error=False,
                  name="", loss=mse, optim_method=GRAD,
-                 verbose=False, redo_preprocessing=False, cv_in_space=True,
+                 verbose=False, redo_preprocessing=False, cv_in_space=False,
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
                  niter=1000, sigma0=1, **kwargs):
@@ -289,21 +388,28 @@ class BaseSourceModel(BaseModel):
         self.lnei = lnei
 
     def get_space_indexes(self, positions):
-        return [self.position2node_index[tuple(tp)] for tp in
-                (positions.values if isinstance(positions, pd.DataFrame) else positions).T]
+        return get_space_indexes(self.position2node_index, positions)
 
     def get_time_indexes(self, observed_pollution):
-        return [self.times.index(t) for t in observed_pollution.index]
+        return get_time_indexes(self.times, observed_pollution.index)
 
     def get_source(self, positions, observed_pollution: pd.DataFrame, **kwargs):
         spatial_indexes = self.get_space_indexes(positions)
         times_indexes = self.get_time_indexes(observed_pollution)
 
         # [#times, #nodes, #traffic colors]
-        source = get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
-                                          traffic_by_edge=kwargs["traffic_by_edge"],
-                                          graph=kwargs["graph"], recalculate=self.redo_preprocessing,
-                                          lnei=self.lnei)
+        # TODO: this is hard coded the 0.05 put it as a parameter.
+        source = get_traffic_by_node_by_dist_weight_conv(
+            path=self.path4preprocess, times=self.times, filename="get_traffic_by_node_by_dist_weight_conv005",
+            traffic_by_edge=kwargs["traffic_by_edge"],
+            graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+            distances_betw_nodes=distance_between_nodes(path=self.path4preprocess, recalculate=self.redo_preprocessing,
+                                                        graph=kwargs["graph"]),
+            weight_func=lambda d, sigma: np.exp(-d ** 2 / sigma ** 2 / 2), wf_params={"sigma": 0.005})
+        # source = get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
+        #                                   traffic_by_edge=kwargs["traffic_by_edge"],
+        #                                   graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+        #                                   lnei=self.lnei)
         source = source[times_indexes, :, :]
         source[np.isnan(source)] = 0
 
@@ -315,21 +421,25 @@ class BaseSourceModel(BaseModel):
 class NodeSourceModel(BaseSourceModel):
     def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
         source, avg, spatial_indexes, _ = self.get_source(observed_stations, observed_pollution, **kwargs)
+        avg_traffic = np.nanmean(source, axis=1, keepdims=False)
+        avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
         source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, observed_stations,
                                                   observed_pollution, order="F",
-                                                  **kwargs)
-        self.source_model.fit(source, (observed_pollution.values - avg).ravel(order="F"),
-                              sample_weight=1 / observed_pollution.values.ravel(
-                                  order="F") if self.train_with_relative_error else None)
+                                                  avg_traffic=avg_traffic,
+                                                  avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
+        self.source_model.fit(source, (observed_pollution.values - avg).ravel(order="F"))
 
     def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
                          **kwargs) -> np.ndarray:
         source, avg, spatial_indexes, times_indexes = self.get_source(target_positions, observed_pollution, **kwargs)
+        avg_traffic = np.nanmean(source, axis=1, keepdims=False)
+        avg_nodes_traffic = np.nanmean(source[:, self.get_space_indexes(observed_stations), :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
         source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, target_positions,
                                                   observed_pollution, order="F",
-                                                  **kwargs)
+                                                  avg_traffic=avg_traffic,
+                                                  avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
         u = self.source_model.predict(source).reshape((len(times_indexes), -1), order="F") + avg
 
         # final solution
@@ -351,7 +461,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
                  forward_weight2=1, source_weight2=0,
                  forward_weight3=1, source_weight3=0,
                  std_normalize=False, mean_normalize=True,
-                 name="", loss=mse, optim_method=GRAD, cv_in_space=True, basis="pca",
+                 name="", loss=mse, optim_method=GRAD, basis="pca",
                  verbose=False, redo_preprocessing=False,
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
@@ -360,7 +470,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
         super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
                          loss=loss, optim_method=optim_method, verbose=verbose,
                          train_with_relative_error=train_with_relative_error,
-                         niter=niter, sigma0=sigma0, cv_in_space=cv_in_space,
+                         niter=niter, sigma0=sigma0, cv_in_space=False,
                          graph=graph, spacial_locations=spacial_locations,
                          times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
                          redo_preprocessing=redo_preprocessing, source_model=source_model,
@@ -497,19 +607,24 @@ class ProjectionFullSourceModel(BaseSourceModel):
         # source = (source - avg[:, :, np.newaxis] - self.source_mean) / self.source_std
         source = (source - self.source_mean) / self.source_std
         source = self.project_to_subspace(source, observed_stations, observed_pollution, avg)  # project to subspace
-        source = (source[:, spatial_indexes, :] * self.source_std[:, spatial_indexes, :] +
-                  self.source_mean[:, spatial_indexes, :])  # re-center without average in space
+        source = (source * self.source_std + self.source_mean)  # re-center without average in space
+
+        avg_traffic = np.nanmean(source, axis=1, keepdims=False)
+        avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
+        source = source[:, spatial_indexes, :]
         source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, target_positions,
                                                   observed_pollution, order="F",
-                                                  **kwargs)
+                                                  avg_traffic=avg_traffic,
+                                                  avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
         if kwargs.get("training_mode", False):  # fit to correct average
             target_pollution = kwargs.get("target_pollution", observed_pollution).values
             self.source_model.fit(
                 source,
                 (target_pollution.reshape(len(times_indexes), -1) - avg).reshape((-1, 1), order="F"),
-                sample_weight=1 / target_pollution.ravel(order="F") if self.train_with_relative_error else None)
-        u = self.source_model.predict(source).reshape((len(times_indexes), -1),
-                                                      order="F") + avg  # add average to predictions.
+                # sample_weight=1 / target_pollution.ravel(order="F") if self.train_with_relative_error else None
+            )
+        # add average to predictions.
+        u = self.source_model.predict(source).reshape((len(times_indexes), -1), order="F") + avg
 
         # final solution
         return u

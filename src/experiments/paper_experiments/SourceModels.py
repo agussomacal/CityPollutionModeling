@@ -23,33 +23,36 @@ from src.lib.Models.TrueStateEstimationModels.PhysicsModel import PCASourceModel
     ProjectionFullSourceModel, ModelsAggregatorNoCV
 from src.lib.Modules import Optim
 
-if __name__ == "__main__":
-    k_neighbours = 10
-    hidden_layer_sizes = (20, 20,)
-    activation = "logistic"
-    learning_rate_init = 0.1
-    learning_rate = "adaptive"
-    early_stopping = True
-    solver = "Adam"
-    max_iter = 10000
-    runsinfo.append_info(
-        kneighbours=k_neighbours,
-        hiddenlayers=len(hidden_layer_sizes),
-        neurons=hidden_layer_sizes[0] if len(set(hidden_layer_sizes)) == 1 else hidden_layer_sizes,
-        activation=activation,
-        solver=solver
-    )
-    # experiment_name = f"MapExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
-    #                   f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
+extra_regressors = ["temperature", "wind", "hours", "week", "avg_traffic", "avg_nodes_traffic", "avg_pollution"]
+k_neighbours = 10
+hidden_layer_sizes = (20, 20,)
+activation = "logistic"
+learning_rate_init = 0.1
+learning_rate = "adaptive"
+early_stopping = True
+solver = "Adam"
+max_iter = 10000
+runsinfo.append_info(
+    kneighbours=k_neighbours,
+    hiddenlayers=len(hidden_layer_sizes),
+    neurons=hidden_layer_sizes[0] if len(set(hidden_layer_sizes)) == 1 else hidden_layer_sizes,
+    activation=activation,
+    solver=solver
+)
+# experiment_name = f"MapExtraRegressors{if_true_str(shuffle, '_Shuffled')}" \
+#                   f"{if_true_str(simulation, '_Sim')}{if_true_str(filter_graph, '_Gfiltered')}"
 
-    train_with_relative_error = False
-    data_manager = DataManager(
-        path=config.paper_experiments_dir,
-        emissions_path=config.results_dir,
-        name="SourceModelsRelErr" if train_with_relative_error else "SourceModels",
-        country_alpha_code="FR",
-        trackCO2=True
-    )
+train_with_relative_error = False
+data_manager = DataManager(
+    path=config.paper_experiments_dir,
+    emissions_path=config.results_dir,
+    # name="SourceModelsRelErr" if train_with_relative_error else "SourceModels",
+    name="Sauron",
+    country_alpha_code="FR",
+    trackCO2=True
+)
+
+if __name__ == "__main__":
     copy_main_script_version(__file__, data_manager.path)
 
     models = {
@@ -112,7 +115,7 @@ if __name__ == "__main__":
         #                     lnei=1,
         #                     source_model=LassoCV(selection="random", positive=False),
         #                     substract_mean=True,
-        #                     extra_regressors=["temperature", "wind", "hours", "week"],
+        #                     extra_regressors=extra_regressors,
         #                     ),
         # "SourceModel_NN_avg_TWHW":
         #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -130,7 +133,7 @@ if __name__ == "__main__":
         #                                               solver=solver.lower(),
         #                                               max_iter=max_iter),
         #                     substract_mean=True,
-        #                     extra_regressors=["temperature", "wind", "hours", "week"],
+        #                     extra_regressors=extra_regressors,
         #                     ),
         # "SourceModel_RF_avg_TWHW":
         #     NodeSourceModel(
@@ -143,50 +146,50 @@ if __name__ == "__main__":
         #         lnei=1,
         #         source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
         #         substract_mean=True,
-        #         extra_regressors=["temperature", "wind", "hours", "week"],
+        #         extra_regressors=extra_regressors,
         #     ),
-        "PCA_ProjectionFullSourceModel_LM_TWHW": ProjectionFullSourceModel(
-            path4preprocess=data_manager.path, graph=graph,
-            spacial_locations=station_coordinates,
-            times=times_all,
-            traffic_by_edge=traffic_by_edge,
-            redo_preprocessing=False,
-            name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
-            verbose=True, niter=25, sigma0=1,
-            lnei=1, k_max=10,
-            # source_model=LassoCV(selection="cyclic", positive=False, cv=12),
-            # source_model=LassoCV(selection="random", positive=False),
-            # source_model=Pipeline([("Poly", PolynomialFeatures(degree=2)),
-            #                        ("LR", LassoCV(selection="cyclic", positive=False, cv=12))]),
-            source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                                      activation=activation,  # 'relu',
-                                      learning_rate_init=learning_rate_init,
-                                      learning_rate=learning_rate,
-                                      early_stopping=early_stopping,
-                                      solver=solver.lower(),
-                                      max_iter=max_iter),
-            # source_model=RandomForestRegressor(n_estimators=25, max_depth=3)
-            substract_mean=True, cv_in_space=False,
-            extra_regressors=["temperature", "wind", "hours", "week"],
-            # basis="both",
-            basis="geometrical",
-            # kv=Optim(5, None, None), ky=Optim(5, None, None), kr=Optim(5, None, None), kd=Optim(5, None, None),
-            kv=5, ky=5, kr=5, kd=5,
-            # kv=10, ky=3, kr=3, kd=1,
-            # D0=Optim(1e4, 1e-4, 1e4), A0=Optim(1e-4, 1e-4, 1e4),
-            D0=0.0, A0=0.0,
-            D1=0.0, A1=0.0,
-            D2=0.0, A2=0.0,
-            D3=0.0, A3=0.0,
-            # forward_weight0=0.0, source_weight0=Optim(0.999, 0.0, 1.0),
-            # forward_weight1=0.0, source_weight1=Optim(0.999, 0.0, 1.0),
-            # forward_weight2=0.0, source_weight2=Optim(0.999, 0.0, 1.0),
-            # forward_weight3=0.0, source_weight3=Optim(0.999, 0.0, 1.0),
-            forward_weight0=0.0, source_weight0=1,
-            forward_weight1=0.0, source_weight1=1,
-            forward_weight2=0.0, source_weight2=1,
-            forward_weight3=0.0, source_weight3=1,
-        ),
+        # "PCA_ProjectionFullSourceModel_LM_TWHW": ProjectionFullSourceModel(
+        #     path4preprocess=data_manager.path, graph=graph,
+        #     spacial_locations=station_coordinates,
+        #     times=times_all,
+        #     traffic_by_edge=traffic_by_edge,
+        #     redo_preprocessing=False,
+        #     name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
+        #     verbose=True, niter=25, sigma0=1,
+        #     lnei=1, k_max=10,
+        #     # source_model=LassoCV(selection="cyclic", positive=False, cv=12),
+        #     # source_model=LassoCV(selection="random", positive=False),
+        #     # source_model=Pipeline([("Poly", PolynomialFeatures(degree=2)),
+        #     #                        ("LR", LassoCV(selection="cyclic", positive=False, cv=12))]),
+        #     source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+        #                               activation=activation,  # 'relu',
+        #                               learning_rate_init=learning_rate_init,
+        #                               learning_rate=learning_rate,
+        #                               early_stopping=early_stopping,
+        #                               solver=solver.lower(),
+        #                               max_iter=max_iter),
+        #     # source_model=RandomForestRegressor(n_estimators=25, max_depth=3)
+        #     substract_mean=True, cv_in_space=False,
+        #     extra_regressors=extra_regressors,
+        #     # basis="both",
+        #     basis="geometrical",
+        #     # kv=Optim(5, None, None), ky=Optim(5, None, None), kr=Optim(5, None, None), kd=Optim(5, None, None),
+        #     kv=5, ky=5, kr=5, kd=5,
+        #     # kv=10, ky=3, kr=3, kd=1,
+        #     # D0=Optim(1e4, 1e-4, 1e4), A0=Optim(1e-4, 1e-4, 1e4),
+        #     D0=0.0, A0=0.0,
+        #     D1=0.0, A1=0.0,
+        #     D2=0.0, A2=0.0,
+        #     D3=0.0, A3=0.0,
+        #     # forward_weight0=0.0, source_weight0=Optim(0.999, 0.0, 1.0),
+        #     # forward_weight1=0.0, source_weight1=Optim(0.999, 0.0, 1.0),
+        #     # forward_weight2=0.0, source_weight2=Optim(0.999, 0.0, 1.0),
+        #     # forward_weight3=0.0, source_weight3=Optim(0.999, 0.0, 1.0),
+        #     forward_weight0=0.0, source_weight0=1,
+        #     forward_weight1=0.0, source_weight1=1,
+        #     forward_weight2=0.0, source_weight2=1,
+        #     forward_weight3=0.0, source_weight3=1,
+        # ),
         # "PCAAfterSourceModel_LM_TWHW":
         #     ProjectionAfterSourceModel(
         #         name="", loss=mse, optim_method=BAYES,
@@ -202,7 +205,7 @@ if __name__ == "__main__":
         #             lnei=1,
         #             source_model=LassoCV(selection="random", positive=False),
         #             substract_mean=True,
-        #             extra_regressors=["temperature", "wind", "hours", "week"],
+        #             extra_regressors=extra_regressors,
         #         ),
         #         basis="pca",
         #         # k=Optim(10, 1, 10)
@@ -223,7 +226,7 @@ if __name__ == "__main__":
         #             lnei=1,
         #             source_model=LassoCV(selection="random", positive=False),
         #             substract_mean=True,
-        #             extra_regressors=["temperature", "wind", "hours", "week"],
+        #             extra_regressors=extra_regressors,
         #         ),
         #         basis="graph_laplacian",
         #         k=Optim(10, 1, 10)
@@ -244,7 +247,7 @@ if __name__ == "__main__":
         # # #                                               solver=solver.lower(),
         # # #                                               max_iter=max_iter),
         # # #                     substract_mean=True,
-        # # #                     extra_regressors=["temperature", "wind", "hours", "week"],
+        # # #                     extra_regressors=extra_regressors,
         # # #                     ),
         # #
         # # # "PCASourceModel_Poly1Lasso_avg_TW":
@@ -270,7 +273,7 @@ if __name__ == "__main__":
         # #                    lnei=1, k_max=10, k=5,
         # #                    source_model=LassoCV(selection="random", positive=False),
         # #                    substract_mean=True,
-        # #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        # #                    extra_regressors=extra_regressors,
         # #                    ),
         # # "PhysicsModel":
         # #     PhysicsModel(path4preprocess=data_manager.path, graph=graph,
@@ -284,7 +287,7 @@ if __name__ == "__main__":
         # #                  rb_k_max=10,
         # #                  source_model=LassoCV(selection="random", positive=False),
         # #                  substract_mean=True,
-        # #                  extra_regressors=["temperature", "wind", "hours", "week"],
+        # #                  extra_regressors=extra_regressors,
         # #                  loss=mse, optim_method=GRAD,
         # #                  cv_in_space=True,
         # #                  # rb_k=Optim(start=9, lower=1, upper=10),
@@ -333,7 +336,7 @@ if __name__ == "__main__":
         # #                    #     random_state=0
         # #                    # ),
         # #                    substract_mean=True,
-        # #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        # #                    extra_regressors=extra_regressors,
         # #                    ),
         # # "PCASourceModel_Poly1RF_avg_TWHW":
         # #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -362,7 +365,7 @@ if __name__ == "__main__":
         # #                    #     random_state=0
         # #                    # ),
         # #                    substract_mean=True,
-        # #                    extra_regressors=["temperature", "wind", "hours", "week"],
+        # #                    extra_regressors=extra_regressors,
         # #                    ),
         # # "LaplacianSourceModel_Poly1Lasso_avg_TWHW":
         # #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -374,7 +377,7 @@ if __name__ == "__main__":
         # #                          lnei=1, k_max=10, k=5,
         # #                          source_model=LassoCV(selection="random", positive=False),
         # #                          substract_mean=True,
-        # #                          extra_regressors=["temperature", "wind", "hours", "week"],
+        # #                          extra_regressors=extra_regressors,
         # #                          ),
         # "V2LaplacianSourceModel_Poly1Lasso_avg_TWHW":
         #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -386,7 +389,7 @@ if __name__ == "__main__":
         #                          lnei=1, k_max=10, k=None,
         #                          source_model=LassoCV(selection="random", positive=False),
         #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=["temperature", "wind", "hours", "week"],
+        #                          extra_regressors=extra_regressors,
         #                          ),
         # "V2LaplacianSourceModel_NN_avg_TWHW":
         #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -404,7 +407,7 @@ if __name__ == "__main__":
         #                                                    solver=solver.lower(),
         #                                                    max_iter=max_iter),
         #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=["temperature", "wind", "hours", "week"],
+        #                          extra_regressors=extra_regressors,
         #                          ),
         # "V2LaplacianSourceModel_RF_avg_TWHW":
         #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
@@ -416,7 +419,7 @@ if __name__ == "__main__":
         #                          lnei=1, k_max=10, k=None,
         #                          source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
         #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=["temperature", "wind", "hours", "week"],
+        #                          extra_regressors=extra_regressors,
         #                          ),
 
     }
@@ -503,6 +506,7 @@ if __name__ == "__main__":
     #                                          )
     # models2["PCASourceModel_Poly1NN_avg_TWHW"] = models["PCASourceModel_Poly1NN_avg_TWHW"]
     # models2["Kernel"] = models["Kernel"]
+    # models2["Spatial Avg"] = models["Spatial Avg"]
     # models2["BLUE"] = models["BLUE"]
     # models2["BLUE_DU"] = models["BLUE_DU"]
     # models2["BLUE_DI"] = models["BLUE_DI"]
@@ -526,16 +530,21 @@ if __name__ == "__main__":
     #     kernel_function=rational_kernel,
     #     alpha=1.0, beta=Optim(0.01, 0.01, 10),
     #     name="", loss=mse, optim_method=GRAD, niter=50, verbose=True)
-    for source_model_name, source_model in [("linear", LassoCV(selection="random", positive=False)),
-                                            # ("nn", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                                            #                     activation=activation,  # 'relu',
-                                            #                     learning_rate_init=learning_rate_init,
-                                            #                     learning_rate=learning_rate,
-                                            #                     early_stopping=early_stopping,
-                                            #                     solver=solver.lower(),
-                                            #                     max_iter=max_iter)),
-                                            ("RF", RandomForestRegressor(n_estimators=25, max_depth=3))
-                                            ]:
+    # models2 = dict()
+    for source_model_name, source_model in [
+        ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
+                            ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
+                                           ))])),
+        ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
+        ("nn", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+                            activation=activation,  # 'relu',
+                            learning_rate_init=learning_rate_init,
+                            learning_rate=learning_rate,
+                            early_stopping=early_stopping,
+                            solver=solver.lower(),
+                            max_iter=max_iter)),
+        ("RF", RandomForestRegressor(n_estimators=25, max_depth=3))
+    ]:
         models2[f"node_{source_model_name}_TWHW"] = NodeSourceModel(
             train_with_relative_error=train_with_relative_error,
             path4preprocess=data_manager.path, graph=graph,
@@ -548,9 +557,9 @@ if __name__ == "__main__":
             lnei=1,
             source_model=source_model,
             substract_mean=True,
-            extra_regressors=["temperature", "wind", "hours", "week"],
+            extra_regressors=extra_regressors,
         )
-        for basis in ["geometrical", "pca"]:
+        for basis in ["geometrical", "pca", "both"]:
             models2[f"{basis}_{source_model_name}_TWHW"] = ProjectionFullSourceModel(
                 train_with_relative_error=train_with_relative_error,
                 path4preprocess=data_manager.path, graph=graph,
@@ -562,8 +571,8 @@ if __name__ == "__main__":
                 verbose=True, niter=25, sigma0=1,
                 lnei=1, k_max=10,
                 source_model=source_model,
-                substract_mean=True, cv_in_space=False,
-                extra_regressors=["temperature", "wind", "hours", "week"],
+                substract_mean=True,  # cv_in_space=False,
+                extra_regressors=extra_regressors,
                 basis=basis,
                 # kv=Optim(5, None, None), ky=Optim(5, None, None), kr=Optim(5, None, None), kd=Optim(5, None, None),
                 kv=5, ky=5, kr=5, kd=5,
@@ -582,14 +591,14 @@ if __name__ == "__main__":
                 forward_weight2=0.0, source_weight2=1,
                 forward_weight3=0.0, source_weight3=1,
             )
-    models2 = {
-        "EnsembleAvg": ModelsAggregator(
-            models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"]],
-            weighting="average",
-            train_on_llo=True,
-            aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))])
-        )
-    }
+    # models2 = {
+    #     "EnsembleAvg": ModelsAggregator(
+    #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"]],
+    #         weighting="average",
+    #         train_on_llo=True,
+    #         aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))])
+    #     )
+    # }
 
     # models2 = {
     #     # "EnsembleAvgNoCV_average": ModelsAggregatorNoCV(
@@ -614,7 +623,6 @@ if __name__ == "__main__":
     #     # ),
     # }
 
-
     # models2 = {
     #     "EnsembleAvgNoCV_cv": ModelsAggregatorNoCV(
     #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
@@ -625,21 +633,26 @@ if __name__ == "__main__":
     #     )
     # }
 
-    # models2 = {
-    #     "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
-    #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
-    #                 # models["ExponentialFit"], models["Spatial Avg"]
-    #                 ],
-    #         aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=True))]),
-    #         extra_regressors=[]
-    #     )
-    # }
+    # ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
+    #                     ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
+    #                                    ))])),
+    # ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
+    models2 = {
+        "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
+            models=[m for k, m in models2.items() if "geometrical" in k],
+            # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
+            #         # models["ExponentialFit"], models["Spatial Avg"]
+            #         ],
+            aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+            extra_regressors=[]
+        )
+    }
 
     # models2 = {
     #     "EnsembleAvgNoCV_RF": ModelsAggregatorNoCV(
     #         models=[models2["geometrical_RF_TWHW"], models2["pca_RF_TWHW"], models2["pca_linear_TWHW"]],
     #         aggregator=RandomForestRegressor(n_estimators=25, max_depth=3),
-    #         extra_regressors=["temperature", "wind", "hours", "week"]
+    #         extra_regressors=extra_regressors
     #     )
     # }
     # models2 = {
@@ -652,7 +665,7 @@ if __name__ == "__main__":
     #                                 early_stopping=early_stopping,
     #                                 solver=solver.lower(),
     #                                 max_iter=max_iter),
-    #         extra_regressors=["temperature", "wind", "hours", "week"]
+    #         extra_regressors=extra_regressors
     #     )
     # }
 
