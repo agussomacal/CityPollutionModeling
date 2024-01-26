@@ -47,7 +47,8 @@ data_manager = DataManager(
     path=config.paper_experiments_dir,
     emissions_path=config.results_dir,
     # name="SourceModelsRelErr" if train_with_relative_error else "SourceModels",
-    name="Sauron",
+    # name="Sauron",
+    name="Gandalf",
     country_alpha_code="FR",
     trackCO2=True
 )
@@ -506,13 +507,13 @@ if __name__ == "__main__":
     #                                          )
     # models2["PCASourceModel_Poly1NN_avg_TWHW"] = models["PCASourceModel_Poly1NN_avg_TWHW"]
     # models2["Kernel"] = models["Kernel"]
-    # models2["Spatial Avg"] = models["Spatial Avg"]
-    # models2["BLUE"] = models["BLUE"]
+    models2["Spatial Avg"] = models["Spatial Avg"]
+    models2["BLUE"] = models["BLUE"]
     # models2["BLUE_DU"] = models["BLUE_DU"]
     # models2["BLUE_DI"] = models["BLUE_DI"]
     # models2["ExponentialD"] = models["ExponentialD"]
     # models2["Exponential"] = models["Exponential"]
-    # models2["ExponentialFit"] = models["ExponentialFit"]
+    models2["ExponentialFit"] = models["ExponentialFit"]
     # models2["Gaussian"] = models["Gaussian"]
     # models2["ExponentialOld"] = models["ExponentialOld"]
     # models2["V2LaplacianSourceModel_Poly1Lasso_avg_TWHW"] = models["V2LaplacianSourceModel_Poly1Lasso_avg_TWHW"]
@@ -591,6 +592,22 @@ if __name__ == "__main__":
                 forward_weight2=0.0, source_weight2=1,
                 forward_weight3=0.0, source_weight3=1,
             )
+
+    # ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
+    #                     ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
+    #                                    ))])),
+    # ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
+    # models2 = {
+    #     "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
+    #         models=[m for k, m in models2.items() if "geometrical" in k],
+    #         # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
+    #         #         # models["ExponentialFit"], models["Spatial Avg"]
+    #         #         ],
+    #         aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+    #         extra_regressors=[]
+    #     )
+    # }
+
     # models2 = {
     #     "EnsembleAvg": ModelsAggregator(
     #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"]],
@@ -633,21 +650,6 @@ if __name__ == "__main__":
     #     )
     # }
 
-    # ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
-    #                     ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
-    #                                    ))])),
-    # ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
-    models2 = {
-        "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
-            models=[m for k, m in models2.items() if "geometrical" in k],
-            # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
-            #         # models["ExponentialFit"], models["Spatial Avg"]
-            #         ],
-            aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
-            extra_regressors=[]
-        )
-    }
-
     # models2 = {
     #     "EnsembleAvgNoCV_RF": ModelsAggregatorNoCV(
     #         models=[models2["geometrical_RF_TWHW"], models2["pca_RF_TWHW"], models2["pca_linear_TWHW"]],
@@ -680,9 +682,9 @@ if __name__ == "__main__":
 
     lab.execute(
         data_manager,
-        num_cores=15,
+        num_cores=5,
         forget=False,
-        save_on_iteration=None,
+        save_on_iteration=5,
         station=stations2test
     )
 

@@ -74,6 +74,11 @@ if __name__ == "__main__":
         times = get_time_indexes(times_all, observed_pollution.index)
         nodes = get_space_indexes(position2node_index, observed_stations)
 
+        distance_between_nodes = distance_between_nodes(path=path4preprocess, recalculate=redo_preprocessing,
+                                                        graph=graph)
+
+        ######################################################
+        # ========== PLot correlation and distance ========= #
         if False:
             plotting_stations = stations2test
             # plotting_stations = observed_pollution.columns
@@ -82,8 +87,9 @@ if __name__ == "__main__":
             cor_no_avg = dict()
             d = dict()
             for station in tqdm(plotting_stations):
+                node = get_space_indexes(position2node_index, observed_stations[station])
                 pollution = observed_pollution[station]
-                d[station] = cdist(node_positions, [station_coordinates[station].values]).ravel()
+                d[station] = distance_between_nodes[node]
                 order = np.argsort(d[station])
                 d[station] = d[station][order]
 

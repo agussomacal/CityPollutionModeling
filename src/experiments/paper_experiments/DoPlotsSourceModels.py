@@ -198,7 +198,8 @@ df = list(make_data_frames(data_manager, var_names=["relative_error", "station"]
 
 for kernel_wins, stations_order in zip([""], [
     # ["BONAP", "CELES", "HAUS", "OPERA", "PA13", "PA07", "PA18", "BASCH", "ELYS", "PA12", ]
-    ["OPERA", "PA15L", "HAUS", "BASCH", "PA13", "PA07", "BONAP", "CELES", "ELYS", "PA18", "PA12", ]
+    ["OPERA", "HAUS", "BASCH", "PA13", "PA07", "BONAP", "CELES", "ELYS", "PA18", "PA12", ]
+    # ["OPERA", "PA15L", "HAUS", "BASCH", "PA13", "PA07", "BONAP", "CELES", "ELYS", "PA18", "PA12", ]
 ]):
     for metric in ["RMSE", ]:  # "RMSE",, "COE", "MB""cor"
         xlim = (3, 14)
