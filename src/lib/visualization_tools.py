@@ -1,8 +1,12 @@
+import inspect
+from collections import namedtuple
+
 import numpy as np
 from matplotlib import colors, pylab as plt
 from scipy.interpolate import griddata
 import seaborn as sns
 
+from PerplexityLab.miscellaneous import filter_dict
 from src.lib.Modules import Bounds
 
 
@@ -25,7 +29,7 @@ def plot_estimation_map_in_graph(ax, long, lat, estimation, img, cmap='RdGy', s=
     if s > 0:
         sc = ax.scatter(x=long,
                         y=lat,
-                        c=norm(estimation), cmap=cmap,
+                        c=estimation, cmap=cmap,
                         norm=norm,
                         s=s, alpha=alpha)
 
@@ -74,3 +78,52 @@ def plot_correlation_clustermap(corr, cmap="autumn", linewidths=0.5, annot=True,
     g = sns.clustermap(corr, figsize=figsize,
                        linewidths=linewidths, cmap=cmap, annot=annot,
                        mask=mask, annot_kws={"size": annot_size})
+
+
+FillBetweenInfo = namedtuple("FillBetweenInfo",
+                             ["model1", "model2", "model3", "model4", "color_low", "color_middle", "color_high",
+                              "alpha"])
+
+
+def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None, *args,
+                **kwargs):
+    # plot regions
+    if fill_between is not None:
+        if (fill_between.model1 is not None) and (fill_between.model1 in data[hue].values):
+            df1 = data.loc[data[hue] == fill_between.model1].set_index(y, drop=True, inplace=False)
+            df1 = df1 if y_order is None else df1.loc[y_order, :]
+            ax.fill_betweenx(y=df1.index, x1=kwargs.get("xlim", (0, None))[0], x2=df1[x],
+                             color=fill_between.color_low + (fill_between.alpha,))
+
+        if fill_between.model2 is not None and fill_between.model2 in data[hue].values:
+            df2 = data.loc[data[hue] == fill_between.model2].set_index(y, drop=True, inplace=False)
+            df2 = df2 if y_order is None else df2.loc[y_order, :]
+            ax.fill_betweenx(y=df2.index, x1=df2[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
+                             color=fill_between.color_high + (fill_between.alpha,))
+
+        if fill_between.model3 is not None and fill_between.model3 in data[hue].values:
+            df3 = data.loc[data[hue] == fill_between.model3].set_index(y, drop=True, inplace=False)
+            df3 = df3 if y_order is None else df3.loc[y_order, :]
+            ax.fill_betweenx(y=df3.index, x1=df3[x], x2=kwargs.get("xlim", (0, max(data[x])))[1] * 1.1,
+                             color=fill_between.color_middle + (fill_between.alpha,))
+
+        if fill_between.model4 is not None and fill_between.model4 in data[hue].values:
+            df4 = data.loc[data[hue] == fill_between.model4].set_index(y, drop=True, inplace=False)
+            df4 = df4 if y_order is None else df4.loc[y_order, :]
+            ax.fill_betweenx(y=df4.index, x1=kwargs.get("xlim", (0, None))[0], x2=df4[x],
+                             color=fill_between.color_middle + (fill_between.alpha,))
+
+    # plot models
+    ins = inspect.getfullargspec(sns.lineplot)
+    kw = filter_dict(ins.args + ins.kwonlyargs, kwargs)
+    for method, df in data.groupby(hue, sort=False):
+        df.set_index(y, inplace=True, drop=True)
+        df = df if y_order is None else df.loc[y_order, :]
+        sns.lineplot(
+            x=df[x], y=df.index, label=method, ax=ax, alpha=1,
+            color=model_style[method].color if model_style is not None else None,
+            marker=model_style[method].marker if model_style is not None else None,
+            linestyle=model_style[method].linestyle if model_style is not None else None,
+            linewidth=model_style[method].linewidth if model_style is not None else None,
+            **kw
+        )

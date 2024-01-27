@@ -52,22 +52,3 @@ else:
     nrows2load_traffic_data = 1000  # None 1000
     num_cores = 14
     chunksize = None
-
-if simulation:
-    import datetime
-
-    from src.lib.Models.BaseModel import ModelsAggregator
-    from src.lib.Models.TrueStateEstimationModels.AverageModels import GlobalMeanModel
-    from src.lib.Models.TrueStateEstimationModels.TemporalDependentModels import CosinusModel
-    from src.lib.Models.TrueStateEstimationModels.TrafficConvolution import TrafficConvolutionModel, \
-        gaussker
-
-    simulated_model = ModelsAggregator(
-        models=[
-            GlobalMeanModel(global_mean=60),
-            CosinusModel(t0=datetime.datetime(year=2023, month=1, day=1, hour=8), amplitude=40, period=12, phase=0),
-            TrafficConvolutionModel(conv_kernel=gaussker, normalize=True,
-                                    sigma=0.05, green=0.4, yellow=5, red=26, dark_red=64.46007627922917)
-        ],
-        weights=[1, 1, 1, 0]
-    )

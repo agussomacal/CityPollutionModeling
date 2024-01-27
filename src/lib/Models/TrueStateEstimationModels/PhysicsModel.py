@@ -186,11 +186,7 @@ def get_traffic_by_node_conv(times, traffic_by_edge, graph, lnei):
 
 @if_exist_load_else_do(file_format="npy", loader=None, saver=None, description=None, check_hash=False)
 def distance_between_nodes(graph):
-    # graph = nx.Graph(graph).to_undirected()
-    # if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
-    #     raise Exception("Each edge in Graph should have edge attribute 'length'")
-    # if len(nx.get_edge_attributes(graph, "lanes")) != graph.number_of_edges():
-    #     raise Exception("Each edge in Graph should have edge attribute 'lanes'")
+    graph = graph2undirected(graph)
     node_positions = get_graph_node_positions(graph)
     return cdist(node_positions, node_positions)
 
@@ -362,7 +358,7 @@ class BaseSourceModel(BaseModel):
                  verbose=False, redo_preprocessing=False, cv_in_space=False,
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
-                 niter=1000, sigma0=1, **kwargs):
+                 niter=1000, sigma0=1, sources_dist=(), **kwargs):
         # super call
         super().__init__(name=f"{name}_{substract_mean}_{source_model}",
                          loss=loss, optim_method=optim_method, verbose=verbose, niter=niter, cv_in_space=cv_in_space,
@@ -373,6 +369,7 @@ class BaseSourceModel(BaseModel):
         self.extra_regressors = extra_regressors
         self.source_model = source_model
         self.substract_mean = substract_mean
+        self.sources_dist = sources_dist
 
         graph = nx.Graph(graph).to_undirected()
         if len(nx.get_edge_attributes(graph, "length")) != graph.number_of_edges():
@@ -398,21 +395,25 @@ class BaseSourceModel(BaseModel):
         times_indexes = self.get_time_indexes(observed_pollution)
 
         # [#times, #nodes, #traffic colors]
-        # TODO: this is hard coded the 0.05 put it as a parameter.
-        source = get_traffic_by_node_by_dist_weight_conv(
-            path=self.path4preprocess, times=self.times, filename="get_traffic_by_node_by_dist_weight_conv005",
-            traffic_by_edge=kwargs["traffic_by_edge"],
-            graph=kwargs["graph"], recalculate=self.redo_preprocessing,
-            distances_betw_nodes=distance_between_nodes(path=self.path4preprocess, recalculate=self.redo_preprocessing,
-                                                        graph=kwargs["graph"]),
-            weight_func=lambda d, sigma: np.exp(-d ** 2 / sigma ** 2 / 2), wf_params={"sigma": 0.005})
-        # source = get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
-        #                                   traffic_by_edge=kwargs["traffic_by_edge"],
-        #                                   graph=kwargs["graph"], recalculate=self.redo_preprocessing,
-        #                                   lnei=self.lnei)
+        source = get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
+                                          traffic_by_edge=kwargs["traffic_by_edge"],
+                                          graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+                                          lnei=self.lnei)
+        for sigma in self.sources_dist:
+            source = np.concatenate([source, get_traffic_by_node_by_dist_weight_conv(
+                path=self.path4preprocess, times=self.times,
+                filename=f"get_traffic_by_node_by_dist_weight_conv{str(sigma).split('.')[-1]}",
+                traffic_by_edge=kwargs["traffic_by_edge"],
+                graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+                distances_betw_nodes=distance_between_nodes(path=self.path4preprocess,
+                                                            recalculate=self.redo_preprocessing,
+                                                            graph=kwargs["graph"]),
+                weight_func=lambda d, sigma: np.exp(-d ** 2 / sigma ** 2 / 2), wf_params={"sigma": sigma})],
+                                    axis=-1)
         source = source[times_indexes, :, :]
         source[np.isnan(source)] = 0
 
+        print("SOURCE SHAPE:", np.shape(source))
         # average in space
         avg = np.mean(observed_pollution.values, axis=1, keepdims=True) if self.substract_mean else 0
         return source, avg, spatial_indexes, times_indexes
@@ -424,7 +425,8 @@ class NodeSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, observed_stations,
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1],
+                                                  observed_stations,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
                                                   avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
@@ -436,7 +438,7 @@ class NodeSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, self.get_space_indexes(observed_stations), :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, target_positions,
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1], target_positions,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
                                                   avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
@@ -462,7 +464,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
                  forward_weight3=1, source_weight3=0,
                  std_normalize=False, mean_normalize=True,
                  name="", loss=mse, optim_method=GRAD, basis="pca",
-                 verbose=False, redo_preprocessing=False,
+                 verbose=False, redo_preprocessing=False, sources_dist=(),
                  source_model=LassoCV(selection="random", positive=False),
                  substract_mean=True, lnei=1,
                  niter=1000, sigma0=1, **kwargs):
@@ -470,7 +472,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
         super().__init__(name=f"{name}_{substract_mean}_{source_model}", path4preprocess=path4preprocess,
                          loss=loss, optim_method=optim_method, verbose=verbose,
                          train_with_relative_error=train_with_relative_error,
-                         niter=niter, sigma0=sigma0, cv_in_space=False,
+                         niter=niter, sigma0=sigma0, cv_in_space=False, sources_dist=sources_dist,
                          graph=graph, spacial_locations=spacial_locations,
                          times=times, traffic_by_edge=traffic_by_edge, extra_regressors=extra_regressors,
                          redo_preprocessing=redo_preprocessing, source_model=source_model,
@@ -495,8 +497,9 @@ class ProjectionFullSourceModel(BaseSourceModel):
         self.mean_normalize = mean_normalize
         self.std_normalize = std_normalize  # it works slightly works adding the std
         self.basis = basis
-        self.KdROM = [None] * 4
-        self.MsROM = [None] * 4
+        self.num_colors = (len(self.sources_dist) + 1) * 4
+        self.KdROM = [None] * self.num_colors
+        self.MsROM = [None] * self.num_colors
 
     @staticmethod
     def orthonormalize_base(rb):
@@ -510,13 +513,25 @@ class ProjectionFullSourceModel(BaseSourceModel):
 
     def get_Vn_space(self):
         k = [self.params["kv"], self.params["ky"], self.params["kr"], self.params["kd"]]
-        for i in range(4):
-            pcabasis = self.pca[i].components_[:k[i], :].T
-            gbasis = self.laplacian_basis[:k[i], :].T
-            if self.basis == "pca":
-                yield pcabasis
-            elif self.basis == "geometrical":
-                yield gbasis
+        for i in range(self.num_colors):
+            pcabasis = self.pca[i].components_[:k[i % 4], :].T
+            gbasis = self.laplacian_basis[:k[i % 4], :].T
+            if "pca" in self.basis:
+                if self.basis == "pca_log":
+                    basis = np.sign(pcabasis) * np.log(np.abs(pcabasis))
+                    basis[np.isnan(basis)] = 0
+                    basis = basis / np.sum(basis ** 2, axis=0, keepdims=True)
+                    yield basis
+                else:
+                    yield pcabasis
+            elif "geometrical" in self.basis:
+                if self.basis == "geometrical_log":
+                    basis = np.sign(gbasis) * np.log(np.abs(gbasis))
+                    basis[np.isnan(basis)] = 0
+                    basis = basis / np.sum(basis ** 2, axis=0, keepdims=True)
+                    yield basis
+                else:
+                    yield gbasis
             elif self.basis == "both":
                 new_basis = np.concatenate([pcabasis, gbasis], axis=1)
                 yield self.orthonormalize_base(new_basis)
@@ -537,15 +552,15 @@ class ProjectionFullSourceModel(BaseSourceModel):
             s[:, :, i] = source_k @ B.T
 
             # Forward problem
-            Kd_param, Ms_param = self.params[f"D{i}"], self.params[f"A{i}"]
-            At = Kd_param * self.KdROM[i][:k[i], :k[i]] + Ms_param * self.MsROM[i][:k[i], :k[i]]
+            Kd_param, Ms_param = self.params[f"D{i % 4}"], self.params[f"A{i % 4}"]
+            At = Kd_param * self.KdROM[i][:k[i % 4], :k[i % 4]] + Ms_param * self.MsROM[i][:k[i % 4], :k[i % 4]]
 
             # Inverse problem
             Bz = B[known_stations_idx, :].T @ (observed_pollution.values - avg).T  # learn the correction
             Az = B[known_stations_idx, :].T @ B[known_stations_idx, :]
 
             # solving the joint equation
-            alpha = self.params[f"forward_weight{i}"]
+            alpha = self.params[f"forward_weight{i % 4}"]
             try:
                 c = np.linalg.solve((alpha * At + (1 - alpha) * Az), alpha * source_k.T + (1 - alpha) * Bz)
             except:
@@ -553,7 +568,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
                 c = 0 * source_k.T
 
             # final solution weighted
-            delta = self.params[f"source_weight{i}"]
+            delta = self.params[f"source_weight{i % 4}"]
             s[:, :, i] = (1 - delta) * np.einsum("dk,kt->td", B[:, :], c) + delta * s[:, :, i]
         return s
 
@@ -612,7 +627,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, 4, target_positions,
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1], target_positions,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
                                                   avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
@@ -1206,7 +1221,7 @@ class ModelsAggregator(BaseModel):
 
 
 class ModelsAggregatorNoCV(BaseModel):
-    def __init__(self, models: List[BaseModel], aggregator, name=None, extra_regressors=[]):
+    def __init__(self, models: List[BaseModel], aggregator, name=None, extra_regressors=[], norm21=False):
         super().__init__()
         self.losses = list()
         self.name = name
@@ -1216,6 +1231,7 @@ class ModelsAggregatorNoCV(BaseModel):
         if isinstance(aggregator, str):
             extra_regressors = []
         self.extra_regressors = extra_regressors
+        self.norm21 = norm21
 
     def __str__(self):
         models_names = ','.join([''.join(filter(lambda c: c.isupper(), str(model))) for model in
@@ -1279,3 +1295,5 @@ class ModelsAggregatorNoCV(BaseModel):
             print("Aggregator weights: ", self.aggregator.ravel())
         else:
             self.aggregator.fit(individual_predictions, ground_truth)
+            if self.norm21 and np.all(self.aggregator.coefs_ >= 0):
+                self.aggregator.coefs_ /= np.sum(self.aggregator.coefs_)

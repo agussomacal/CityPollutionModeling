@@ -1,10 +1,11 @@
 import numpy as np
 import seaborn as sns
+from scipy.spatial.distance import cdist
 
 from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
 from PerplexityLab.miscellaneous import NamedPartial
-from PerplexityLab.visualization import generic_plot
+from PerplexityLab.visualization import generic_plot, LegendOutsidePlot
 from src import config
 from src.experiments.paper_experiments.PreProcessPaper import traffic_by_edge, graph, times_all, station_coordinates, \
     pollution_past, traffic_past, pollution_future
@@ -35,17 +36,24 @@ def rational(d, sigma):
     return 1.0 / (d + sigma)
 
 
+def threshold(d, sigma):
+    w = np.zeros(len(d))
+    w[d <= sigma] = 1
+    return w
+
+
 weight_functions = {
     exponential.__name__: exponential,
     gaussian.__name__: gaussian,
-    rational.__name__: rational
+    rational.__name__: rational,
+    threshold.__name__: threshold,
 }
 
 experiment_name = "PollutionTraffic_statistics"
 if __name__ == "__main__":
     with data_manager.track_emissions("Emissions for pollution traffic statistics."):
         path4preprocess = data_manager.path
-        redo_preprocessing = False
+        redo_preprocessing = True
         observed_stations = station_coordinates
         observed_pollution = pollution_past.loc[:, station_coordinates.columns]  # same columns order as locations
         observed_pollution_future = pollution_future.loc[:,
@@ -54,7 +62,7 @@ if __name__ == "__main__":
         traffic_by_node = get_traffic_by_node_conv(
             path=path4preprocess, times=times_all,
             traffic_by_edge=traffic_by_edge,
-            graph=graph, recalculate=redo_preprocessing, lnei=1)
+            graph=graph, recalculate=False, lnei=1)
         # [#times, #nodes, #traffic colors]
 
         node_positions = get_graph_node_positions(graph)
@@ -64,7 +72,7 @@ if __name__ == "__main__":
         times = get_time_indexes(times_all, observed_pollution.index)
         nodes = get_space_indexes(position2node_index, observed_stations)
 
-        distances_betw_nodes = distance_between_nodes(path=path4preprocess, recalculate=redo_preprocessing,
+        distances_betw_nodes = distance_between_nodes(path=path4preprocess, recalculate=False,
                                                       graph=graph)
 
     plotting_stations = stations2test
@@ -90,7 +98,7 @@ if __name__ == "__main__":
 
     def convolution(station, weight_func, sigma):
         node = get_space_indexes(position2node_index, observed_stations[[station]])
-        w = weight_functions[weight_func](distances_betw_nodes[node], sigma).ravel()
+        w = weight_functions[weight_func](distances_betw_nodes[node].ravel(), sigma).ravel()
         w = w / np.nansum(w)
         traffic_by_node_new = np.einsum("tnc,n->tc", traffic_by_node[times], w)
         res = dict()
@@ -119,20 +127,41 @@ if __name__ == "__main__":
         sigma=sigma
     )
 
+    # Linear approximation of distance: distance between Arc du Triumph and Vincennes 9,84km or
+    # 0.1266096365565058 lat long
+    ratio = 9840 / cdist([[48.87551413370949, 2.2944611276838867]], [[48.835641353886075, 2.414628350744604]])[0][0]
+
     def plot(**kwargs):
         sns.lineplot(**kwargs, marker="o")
-        kwargs["ax"].axvline(0.005, linestyle="--", color="r")
+        kwargs["ax"].axvline(0.005*ratio, linestyle="--", color="r")
         kwargs["ax"].axhline(0, linestyle="--", color="gray")
+
+
 
     for c in TRAFFIC_VALUES:
         for avg in ["", "_noavg"]:
             generic_plot(
                 data_manager,
-                x="sigma",
+                x="distance",
+                distance=lambda sigma: sigma * ratio,
                 y=f"cor{avg}_{c}",
-                axes_by="weight_func",
+                plot_by="weight_func",
                 label="station",
                 log="x",
                 plot_func=plot,
-                xticks=sigma
+                # xticks=sigma,
+                dpi=300,
+                axes_xy_proportions=(10, 8),
+                axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+                labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+                legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
+                font_family="amssymb",
+                uselatex=True,
+                xlabel=r"Distance (m)",
+                ylabel=r"Correlation",
+                xticks=sigma[::2],
+                legend_outside_plot=LegendOutsidePlot(
+                    loc='center right',
+                    extra_y_top=0.01, extra_y_bottom=0.1,
+                    extra_x_left=0.125, extra_x_right=0.2),
             )

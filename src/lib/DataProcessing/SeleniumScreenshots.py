@@ -113,8 +113,7 @@ if __name__ == "__main__":
 
     # # take background to substract image afterwards
     do_screenshot(driver, folder=selenium_test_dir, lat=center_of_paris.latitude, long=center_of_paris.longitude,
-                  zoom=zoom,
-                  traffic=False)
+                  zoom=zoom, traffic=False)
     while True:
         if time.gmtime().tm_min % screenshot_period == 0:
             print(f"Taking screenshots: {time.gmtime()}")

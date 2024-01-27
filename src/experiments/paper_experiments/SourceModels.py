@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LassoCV
 from sklearn.neural_network import MLPRegressor
@@ -16,14 +14,17 @@ from src.experiments.paper_experiments.params4runs import runsinfo
 from src.lib.Models.BaseModel import GRAD, mse, BAYES, NONE_OPTIM_METHOD
 from src.lib.Models.SensorDependentModels.BLUEFamily import BLUEModel
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel
-from src.lib.Models.TrueStateEstimationModels.KernelModels import ExponentialKernelModel, GaussianKernelModel, \
-    DistanceModel, rational_kernel
-from src.lib.Models.TrueStateEstimationModels.PhysicsModel import PCASourceModel, LaplacianSourceModel, PhysicsModel, \
-    ModelsAggregator, NodeSourceModel, SoftDiffusion, ProjectionAfterSourceModel, \
-    ProjectionFullSourceModel, ModelsAggregatorNoCV
+from src.lib.Models.TrueStateEstimationModels.KernelModels import ExponentialKernelModel, GaussianKernelModel
+from src.lib.Models.TrueStateEstimationModels.PhysicsModel import NodeSourceModel, ProjectionFullSourceModel, \
+    ModelsAggregatorNoCV
 from src.lib.Modules import Optim
 
-extra_regressors = ["temperature", "wind", "hours", "week", "avg_traffic", "avg_nodes_traffic", "avg_pollution"]
+# sources_dist = [0.005]
+sources_dist = []
+source_dist4name = ("_" if len(sources_dist) > 0 else "") + "_".join(list(map(str, sources_dist))).replace("0.", "")
+# "temperature", "wind", "hours", "week", , "avg_traffic", "avg_nodes_traffic", "avg_pollution", "avg_traffic", "avg_nodes_traffic",
+extra_regressors = ["temperature", "wind", ]
+# extra_regressors = []
 k_neighbours = 10
 hidden_layer_sizes = (20, 20,)
 activation = "logistic"
@@ -48,7 +49,10 @@ data_manager = DataManager(
     emissions_path=config.results_dir,
     # name="SourceModelsRelErr" if train_with_relative_error else "SourceModels",
     # name="Sauron",
-    name="Gandalf",
+    # name="Kenobi",
+    # name="Araucaria",# shuffle True all stations
+    # name="Lenga",  # shuffle False all stations
+    name="Mara",  # shuffle False all stations no convolution for node traffic
     country_alpha_code="FR",
     trackCO2=True
 )
@@ -94,448 +98,28 @@ if __name__ == "__main__":
             BLUEModel(name="BLUEI",
                       sensor_distrust={c: Optim(start=0.0, lower=0.0, upper=1.0) for c in pollution_past.columns},
                       loss=mse, optim_method=BAYES, niter=100, verbose=True),
-        # "SourceModel_Poly1Lasso_avg":
-        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                     spacial_locations=station_coordinates, times=times_all,
-        #                     traffic_by_edge=traffic_by_edge,
-        #                     redo_preprocessing=False,
-        #                     name="", loss=mse, optim_method=GRAD,
-        #                     verbose=True, niter=10, sigma0=1,
-        #                     lnei=1,
-        #                     source_model=LassoCV(selection="random", positive=False),
-        #                     substract_mean=True,
-        #                     # extra_regressors=["temperature", "wind"],
-        #                     ),
-        # "SourceModel_Poly1Lasso_avg_TWHW":
-        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                     spacial_locations=station_coordinates, times=times_all,
-        #                     traffic_by_edge=traffic_by_edge,
-        #                     redo_preprocessing=False,
-        #                     name="", loss=mse, optim_method=GRAD,
-        #                     verbose=True, niter=10, sigma0=1,
-        #                     lnei=1,
-        #                     source_model=LassoCV(selection="random", positive=False),
-        #                     substract_mean=True,
-        #                     extra_regressors=extra_regressors,
-        #                     ),
-        # "SourceModel_NN_avg_TWHW":
-        #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                     spacial_locations=station_coordinates, times=times_all,
-        #                     traffic_by_edge=traffic_by_edge,
-        #                     redo_preprocessing=False,
-        #                     name="", loss=mse, optim_method=GRAD,
-        #                     verbose=True, niter=10, sigma0=1,
-        #                     lnei=1,
-        #                     source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-        #                                               activation=activation,  # 'relu',
-        #                                               learning_rate_init=learning_rate_init,
-        #                                               learning_rate=learning_rate,
-        #                                               early_stopping=early_stopping,
-        #                                               solver=solver.lower(),
-        #                                               max_iter=max_iter),
-        #                     substract_mean=True,
-        #                     extra_regressors=extra_regressors,
-        #                     ),
-        # "SourceModel_RF_avg_TWHW":
-        #     NodeSourceModel(
-        #         path4preprocess=data_manager.path, graph=graph,
-        #         spacial_locations=station_coordinates, times=times_all,
-        #         traffic_by_edge=traffic_by_edge,
-        #         redo_preprocessing=False,
-        #         name="", loss=mse, optim_method=GRAD,
-        #         verbose=True, niter=10, sigma0=1,
-        #         lnei=1,
-        #         source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
-        #         substract_mean=True,
-        #         extra_regressors=extra_regressors,
-        #     ),
-        # "PCA_ProjectionFullSourceModel_LM_TWHW": ProjectionFullSourceModel(
-        #     path4preprocess=data_manager.path, graph=graph,
-        #     spacial_locations=station_coordinates,
-        #     times=times_all,
-        #     traffic_by_edge=traffic_by_edge,
-        #     redo_preprocessing=False,
-        #     name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
-        #     verbose=True, niter=25, sigma0=1,
-        #     lnei=1, k_max=10,
-        #     # source_model=LassoCV(selection="cyclic", positive=False, cv=12),
-        #     # source_model=LassoCV(selection="random", positive=False),
-        #     # source_model=Pipeline([("Poly", PolynomialFeatures(degree=2)),
-        #     #                        ("LR", LassoCV(selection="cyclic", positive=False, cv=12))]),
-        #     source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-        #                               activation=activation,  # 'relu',
-        #                               learning_rate_init=learning_rate_init,
-        #                               learning_rate=learning_rate,
-        #                               early_stopping=early_stopping,
-        #                               solver=solver.lower(),
-        #                               max_iter=max_iter),
-        #     # source_model=RandomForestRegressor(n_estimators=25, max_depth=3)
-        #     substract_mean=True, cv_in_space=False,
-        #     extra_regressors=extra_regressors,
-        #     # basis="both",
-        #     basis="geometrical",
-        #     # kv=Optim(5, None, None), ky=Optim(5, None, None), kr=Optim(5, None, None), kd=Optim(5, None, None),
-        #     kv=5, ky=5, kr=5, kd=5,
-        #     # kv=10, ky=3, kr=3, kd=1,
-        #     # D0=Optim(1e4, 1e-4, 1e4), A0=Optim(1e-4, 1e-4, 1e4),
-        #     D0=0.0, A0=0.0,
-        #     D1=0.0, A1=0.0,
-        #     D2=0.0, A2=0.0,
-        #     D3=0.0, A3=0.0,
-        #     # forward_weight0=0.0, source_weight0=Optim(0.999, 0.0, 1.0),
-        #     # forward_weight1=0.0, source_weight1=Optim(0.999, 0.0, 1.0),
-        #     # forward_weight2=0.0, source_weight2=Optim(0.999, 0.0, 1.0),
-        #     # forward_weight3=0.0, source_weight3=Optim(0.999, 0.0, 1.0),
-        #     forward_weight0=0.0, source_weight0=1,
-        #     forward_weight1=0.0, source_weight1=1,
-        #     forward_weight2=0.0, source_weight2=1,
-        #     forward_weight3=0.0, source_weight3=1,
-        # ),
-        # "PCAAfterSourceModel_LM_TWHW":
-        #     ProjectionAfterSourceModel(
-        #         name="", loss=mse, optim_method=BAYES,
-        #         verbose=True, niter=11, sigma0=1,
-        #         source_model=NodeSourceModel(
-        #             path4preprocess=data_manager.path, graph=graph,
-        #             spacial_locations=station_coordinates,
-        #             times=times_all,
-        #             traffic_by_edge=traffic_by_edge,
-        #             redo_preprocessing=False,
-        #             name="", loss=mse, optim_method=GRAD,
-        #             verbose=True, niter=10, sigma0=1,
-        #             lnei=1,
-        #             source_model=LassoCV(selection="random", positive=False),
-        #             substract_mean=True,
-        #             extra_regressors=extra_regressors,
-        #         ),
-        #         basis="pca",
-        #         # k=Optim(10, 1, 10)
-        #         k=10
-        #     ),
-        # "LapAfterSourceModel_LM_TWHW":
-        #     ProjectionAfterSourceModel(
-        #         name="", loss=mse, optim_method=BAYES,
-        #         verbose=True, niter=11, sigma0=1,
-        #         source_model=NodeSourceModel(
-        #             path4preprocess=data_manager.path, graph=graph,
-        #             spacial_locations=station_coordinates,
-        #             times=times_all,
-        #             traffic_by_edge=traffic_by_edge,
-        #             redo_preprocessing=False,
-        #             name="", loss=mse, optim_method=GRAD,
-        #             verbose=True, niter=10, sigma0=1,
-        #             lnei=1,
-        #             source_model=LassoCV(selection="random", positive=False),
-        #             substract_mean=True,
-        #             extra_regressors=extra_regressors,
-        #         ),
-        #         basis="graph_laplacian",
-        #         k=Optim(10, 1, 10)
-        #     ),
-        # # # "SourceModel_Poly1NN_avg_TWHW":
-        # # #     NodeSourceModel(path4preprocess=data_manager.path, graph=graph,
-        # # #                     spacial_locations=station_coordinates, times=times_all,
-        # # #                     traffic_by_edge=traffic_by_edge,
-        # # #                     redo_preprocessing=False,
-        # # #                     name="", loss=mse, optim_method=GRAD,
-        # # #                     verbose=True, niter=10, sigma0=1,
-        # # #                     lnei=1,
-        # # #                     source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-        # # #                                               activation=activation,  # 'relu',
-        # # #                                               learning_rate_init=learning_rate_init,
-        # # #                                               learning_rate=learning_rate,
-        # # #                                               early_stopping=early_stopping,
-        # # #                                               solver=solver.lower(),
-        # # #                                               max_iter=max_iter),
-        # # #                     substract_mean=True,
-        # # #                     extra_regressors=extra_regressors,
-        # # #                     ),
-        # #
-        # # # "PCASourceModel_Poly1Lasso_avg_TW":
-        # # #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-        # # #                    spacial_locations=station_coordinates, times=times_all,
-        # # #                    traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # # #                    redo_preprocessing=False,
-        # # #                    name="", loss=mse, optim_method=GRAD,
-        # # #                    verbose=True, niter=10, sigma0=1,
-        # # #                    lnei=1, k_max=10,  # k=5,
-        # # #                    source_model=LassoCV(selection="random", positive=False),
-        # # #                    substract_mean=True,
-        # # #                    extra_regressors=["temperature", "wind"],
-        # # #                    ),
-        # #
-        # # "PCASourceModel_Poly1Lasso_avg_TWHW":
-        # #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-        # #                    spacial_locations=station_coordinates, times=times_all,
-        # #                    traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # #                    redo_preprocessing=False,
-        # #                    name="", loss=mse, optim_method=GRAD,
-        # #                    verbose=True, niter=10, sigma0=1,
-        # #                    lnei=1, k_max=10, k=5,
-        # #                    source_model=LassoCV(selection="random", positive=False),
-        # #                    substract_mean=True,
-        # #                    extra_regressors=extra_regressors,
-        # #                    ),
-        # # "PhysicsModel":
-        # #     PhysicsModel(path4preprocess=data_manager.path, graph=graph,
-        # #                  spacial_locations=station_coordinates, times=times_all,
-        # #                  traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # #                  redo_preprocessing=False,
-        # #                  name="",
-        # #                  verbose=True,
-        # #                  niter=50, sigma0=1,
-        # #                  lnei=1, k_max=10, k=5,
-        # #                  rb_k_max=10,
-        # #                  source_model=LassoCV(selection="random", positive=False),
-        # #                  substract_mean=True,
-        # #                  extra_regressors=extra_regressors,
-        # #                  loss=mse, optim_method=GRAD,
-        # #                  cv_in_space=True,
-        # #                  # rb_k=Optim(start=9, lower=1, upper=10),
-        # #                  rb_k=9,
-        # #                  # basis="graph_laplacian",
-        # #                  basis="pca_source",
-        # #                  absorption=0.1,
-        # #                  diffusion=0.1,
-        # #                  # absorption=Optim(start=0.1, lower=1e-4, upper=1e3),
-        # #                  # diffusion=Optim(start=7137, lower=1e-4, upper=1e5),
-        # #                  # alpha=Optim(start=0.0, lower=0.0, upper=1.0),
-        # #                  # delta=Optim(start=0.013, lower=0.0, upper=1.0),
-        # #                  alpha=0,
-        # #                  delta=0.013,
-        # #                  ),
-        # # "PCASourceModel_Poly1NN_avg_TWHW":
-        # #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-        # #                    spacial_locations=station_coordinates, times=times_all,
-        # #                    traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # #                    redo_preprocessing=False,
-        # #                    name="", loss=mse, optim_method=GRAD,
-        # #                    verbose=True, niter=10, sigma0=1,
-        # #                    lnei=1, k_max=10, k=5,
-        # #                    source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-        # #                                              activation=activation,  # 'relu',
-        # #                                              learning_rate_init=learning_rate_init,
-        # #                                              learning_rate=learning_rate,
-        # #                                              early_stopping=early_stopping,
-        # #                                              solver=solver.lower(),
-        # #                                              max_iter=max_iter),
-        # #                    # source_model=BayesSearchCV(
-        # #                    #     RandomForestRegressor(n_estimators=25),
-        # #                    #     {
-        # #                    #         "max_depth": Integer(1, 5),
-        # #                    #         "min_samples_split": Integer(2, 10),
-        # #                    #         "min_samples_leaf": Integer(1, 10),
-        # #                    #         # "min_weight_fraction_leaf" = 0.0,
-        # #                    #         "max_features": Integer(1, 10),
-        # #                    #         # "max_leaf_nodes" = None,
-        # #                    #         # "min_impurity_decrease" = 0.0,
-        # #                    #         # ccp_alpha = 0.0,
-        # #                    #         # max_samples = None,
-        # #                    #     },
-        # #                    #     cv=5,
-        # #                    #     n_iter=32,
-        # #                    #     random_state=0
-        # #                    # ),
-        # #                    substract_mean=True,
-        # #                    extra_regressors=extra_regressors,
-        # #                    ),
-        # # "PCASourceModel_Poly1RF_avg_TWHW":
-        # #     PCASourceModel(path4preprocess=data_manager.path, graph=graph,
-        # #                    spacial_locations=station_coordinates, times=times_all,
-        # #                    traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # #                    redo_preprocessing=False,
-        # #                    name="", loss=mse, optim_method=GRAD,
-        # #                    verbose=True, niter=10, sigma0=1,
-        # #                    lnei=1, k_max=10, k=5,
-        # #                    source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
-        # #                    # source_model=BayesSearchCV(
-        # #                    #     RandomForestRegressor(n_estimators=25),
-        # #                    #     {
-        # #                    #         "max_depth": Integer(1, 5),
-        # #                    #         "min_samples_split": Integer(2, 10),
-        # #                    #         "min_samples_leaf": Integer(1, 10),
-        # #                    #         # "min_weight_fraction_leaf" = 0.0,
-        # #                    #         "max_features": Integer(1, 10),
-        # #                    #         # "max_leaf_nodes" = None,
-        # #                    #         # "min_impurity_decrease" = 0.0,
-        # #                    #         # ccp_alpha = 0.0,
-        # #                    #         # max_samples = None,
-        # #                    #     },
-        # #                    #     cv=5,
-        # #                    #     n_iter=32,
-        # #                    #     random_state=0
-        # #                    # ),
-        # #                    substract_mean=True,
-        # #                    extra_regressors=extra_regressors,
-        # #                    ),
-        # # "LaplacianSourceModel_Poly1Lasso_avg_TWHW":
-        # #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
-        # #                          spacial_locations=station_coordinates, times=times_all,
-        # #                          traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        # #                          redo_preprocessing=False,
-        # #                          name="", loss=mse, optim_method=GRAD,
-        # #                          verbose=True, niter=10, sigma0=1,
-        # #                          lnei=1, k_max=10, k=5,
-        # #                          source_model=LassoCV(selection="random", positive=False),
-        # #                          substract_mean=True,
-        # #                          extra_regressors=extra_regressors,
-        # #                          ),
-        # "V2LaplacianSourceModel_Poly1Lasso_avg_TWHW":
-        #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                          spacial_locations=station_coordinates, times=times_all,
-        #                          traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        #                          redo_preprocessing=False,
-        #                          name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
-        #                          verbose=True, niter=10, sigma0=1,
-        #                          lnei=1, k_max=10, k=None,
-        #                          source_model=LassoCV(selection="random", positive=False),
-        #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=extra_regressors,
-        #                          ),
-        # "V2LaplacianSourceModel_NN_avg_TWHW":
-        #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                          spacial_locations=station_coordinates, times=times_all,
-        #                          traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        #                          redo_preprocessing=False,
-        #                          name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
-        #                          verbose=True, niter=10, sigma0=1,
-        #                          lnei=1, k_max=10, k=None,
-        #                          source_model=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-        #                                                    activation=activation,  # 'relu',
-        #                                                    learning_rate_init=learning_rate_init,
-        #                                                    learning_rate=learning_rate,
-        #                                                    early_stopping=early_stopping,
-        #                                                    solver=solver.lower(),
-        #                                                    max_iter=max_iter),
-        #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=extra_regressors,
-        #                          ),
-        # "V2LaplacianSourceModel_RF_avg_TWHW":
-        #     LaplacianSourceModel(path4preprocess=data_manager.path, graph=graph,
-        #                          spacial_locations=station_coordinates, times=times_all,
-        #                          traffic_by_edge=traffic_by_edge, mean_normalize=True, std_normalize=False,
-        #                          redo_preprocessing=False,
-        #                          name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
-        #                          verbose=True, niter=10, sigma0=1,
-        #                          lnei=1, k_max=10, k=None,
-        #                          source_model=RandomForestRegressor(n_estimators=25, max_depth=3),
-        #                          substract_mean=True, cv_in_space=False,
-        #                          extra_regressors=extra_regressors,
-        #                          ),
-
     }
 
     models2 = dict()
 
-    # models2["Ensemble"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PhysicsModel"],
-    #     models["Spatial Avg"]],
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-    #
-    # models2["Ensemble2"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     # models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PhysicsModel"],
-    #     models["Spatial Avg"]],
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-
-    # models2["EnsembleAvg"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     # models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["PhysicsModel"],
-    #     # models["Kernel"],
-    #     models["Spatial Avg"]],
-    #     fitting_strategy="average",
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-
-    # models2["EnsembleKernelBLUE"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     # models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["PhysicsModel"],
-    #     models["Kernel"],
-    #     models["Spatial Avg"]],
-    #     fitting_strategy="BLUE_weighting",
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-    # models2["EnsembleBLUE"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     # models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["PhysicsModel"],
-    #     # models["Kernel"],
-    #     models["Spatial Avg"]],
-    #     fitting_strategy="BLUE_weighting",
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-    #
-    # models2["EnsembleKernelMSE"] = ModelsAggregator(models=[
-    #     models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["LaplacianSourceModel_Poly1Lasso_avg_TWHW"],
-    #     models["PCASourceModel_Poly1RF_avg_TWHW"],
-    #     models["PCASourceModel_Poly1NN_avg_TWHW"],
-    #     # models["SourceModel_Poly1Lasso_avg_TWHW"],
-    #     # models["PhysicsModel"],
-    #     models["Kernel"],
-    #     models["Spatial Avg"]],
-    #     fitting_strategy="mse_weighting",
-    #     aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))]))
-    # models2["SoftDiffusion"] = SoftDiffusion(path4preprocess=data_manager.path, graph=graph,
-    #                                          spacial_locations=station_coordinates, times=times_all,
-    #                                          traffic_by_edge=traffic_by_edge,
-    #                                          redo_preprocessing=False, cv_in_space=False,
-    #                                          name="", loss=mse, optim_method=GRAD,
-    #                                          verbose=True, niter=50, sigma0=1,
-    #                                          source_model=models["PCASourceModel_Poly1Lasso_avg_TWHW"],
-    #                                          substract_mean=True,
-    #                                          alpha=Optim(1.0, None, None),
-    #                                          beta=Optim(0.0, None, None),
-    #                                          delta=Optim(0.0, None, None),
-    #                                          )
-    # models2["PCASourceModel_Poly1NN_avg_TWHW"] = models["PCASourceModel_Poly1NN_avg_TWHW"]
-    # models2["Kernel"] = models["Kernel"]
     models2["Spatial Avg"] = models["Spatial Avg"]
     models2["BLUE"] = models["BLUE"]
-    # models2["BLUE_DU"] = models["BLUE_DU"]
-    # models2["BLUE_DI"] = models["BLUE_DI"]
-    # models2["ExponentialD"] = models["ExponentialD"]
-    # models2["Exponential"] = models["Exponential"]
     models2["ExponentialFit"] = models["ExponentialFit"]
-    # models2["Gaussian"] = models["Gaussian"]
-    # models2["ExponentialOld"] = models["ExponentialOld"]
-    # models2["V2LaplacianSourceModel_Poly1Lasso_avg_TWHW"] = models["V2LaplacianSourceModel_Poly1Lasso_avg_TWHW"]
-    # models2["V2LaplacianSourceModel_NN_avg_TWHW"] = models["V2LaplacianSourceModel_NN_avg_TWHW"]
-    # models2["V2LaplacianSourceModel_RF_avg_TWHW"] = models["V2LaplacianSourceModel_RF_avg_TWHW"]
-
-    # models2["SourceModel_Poly1Lasso_avg_TWHW"] = models["SourceModel_Poly1Lasso_avg_TWHW"]
-    # models2["SourceModel_NN_avg_TWHW"] = models["SourceModel_NN_avg_TWHW"]
-    # models2["SourceModel_RF_avg_TWHW"] = models["SourceModel_RF_avg_TWHW"]
-
-    # models2["PCAAfterSourceModel_LM_TWHW"] = models["PCAAfterSourceModel_LM_TWHW"]
-    # models2["LapAfterSourceModel_LM_TWHW"] = models["LapAfterSourceModel_LM_TWHW"]
-
-    # models2["DistanceRational"] = DistanceModel(
-    #     kernel_function=rational_kernel,
-    #     alpha=1.0, beta=Optim(0.01, 0.01, 10),
-    #     name="", loss=mse, optim_method=GRAD, niter=50, verbose=True)
-    # models2 = dict()
     for source_model_name, source_model in [
         ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
                             ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
                                            ))])),
+        ("poly3", Pipeline([("PF", PolynomialFeatures(degree=3)),
+                            ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
+                                           ))])),
+        ("poly2NN", Pipeline([("PF", PolynomialFeatures(degree=3)),
+                              ("NN", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+                                                  activation=activation,  # 'relu',
+                                                  learning_rate_init=learning_rate_init,
+                                                  learning_rate=learning_rate,
+                                                  early_stopping=early_stopping,
+                                                  solver=solver.lower(),
+                                                  max_iter=max_iter))])),
         ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
         ("nn", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
                             activation=activation,  # 'relu',
@@ -546,7 +130,8 @@ if __name__ == "__main__":
                             max_iter=max_iter)),
         ("RF", RandomForestRegressor(n_estimators=25, max_depth=3))
     ]:
-        models2[f"node_{source_model_name}_TWHW"] = NodeSourceModel(
+        models2[
+            f"node_{source_model_name}_{''.join([e[0].upper() for e in extra_regressors])}{source_dist4name}"] = NodeSourceModel(
             train_with_relative_error=train_with_relative_error,
             path4preprocess=data_manager.path, graph=graph,
             spacial_locations=station_coordinates,
@@ -557,11 +142,12 @@ if __name__ == "__main__":
             verbose=True, niter=1, sigma0=1,
             lnei=1,
             source_model=source_model,
-            substract_mean=True,
+            substract_mean=True, sources_dist=sources_dist,
             extra_regressors=extra_regressors,
         )
-        for basis in ["geometrical", "pca", "both"]:
-            models2[f"{basis}_{source_model_name}_TWHW"] = ProjectionFullSourceModel(
+        for basis in ["geometrical", "pca", "geometrical_log", "pca_log"]:  # , "both"
+            models2[
+                f"{basis}_{source_model_name}_{''.join([e[0].upper() for e in extra_regressors])}{source_dist4name}"] = ProjectionFullSourceModel(
                 train_with_relative_error=train_with_relative_error,
                 path4preprocess=data_manager.path, graph=graph,
                 spacial_locations=station_coordinates,
@@ -571,7 +157,7 @@ if __name__ == "__main__":
                 name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
                 verbose=True, niter=25, sigma0=1,
                 lnei=1, k_max=10,
-                source_model=source_model,
+                source_model=source_model, sources_dist=sources_dist,
                 substract_mean=True,  # cv_in_space=False,
                 extra_regressors=extra_regressors,
                 basis=basis,
@@ -593,116 +179,66 @@ if __name__ == "__main__":
                 forward_weight3=0.0, source_weight3=1,
             )
 
-    # ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
-    #                     ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
-    #                                    ))])),
-    # ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
-    # models2 = {
-    #     "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
-    #         models=[m for k, m in models2.items() if "geometrical" in k],
-    #         # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
-    #         #         # models["ExponentialFit"], models["Spatial Avg"]
-    #         #         ],
-    #         aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
-    #         extra_regressors=[]
-    #     )
-    # }
-
-    # models2 = {
-    #     "EnsembleAvg": ModelsAggregator(
-    #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"]],
-    #         weighting="average",
-    #         train_on_llo=True,
-    #         aggregator=Pipeline([("lasso", LassoCV(selection="random", positive=False))])
-    #     )
-    # }
-
-    # models2 = {
-    #     # "EnsembleAvgNoCV_average": ModelsAggregatorNoCV(
-    #     #     models=list(models2.values()),
-    #     #     aggregator="average",
-    #     #     extra_regressors=[]
-    #     # ),
-    #     # "EnsembleAvgNoCV_std": ModelsAggregatorNoCV(
-    #     #     models=list(models2.values()),
-    #     #     aggregator="std",
-    #     #     extra_regressors=[]
-    #     # ),
-    #     # "EnsembleAvgNoCV_cv": ModelsAggregatorNoCV(
-    #     #     models=list(models2.values()),
-    #     #     aggregator="cv",
-    #     #     extra_regressors=[]
-    #     # ),
-    #     # "EnsembleAvgNoCV_weighted_average": ModelsAggregatorNoCV(
-    #     #     models=list(models2.values()),
-    #     #     aggregator="weighted_average",
-    #     #     extra_regressors=[]
-    #     # ),
-    # }
-
-    # models2 = {
-    #     "EnsembleAvgNoCV_cv": ModelsAggregatorNoCV(
-    #         models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
-    #                 # models["ExponentialFit"], models["Spatial Avg"]
-    #                 ],
-    #         aggregator="cv",
-    #         extra_regressors=[]
-    #     )
-    # }
-
-    # models2 = {
-    #     "EnsembleAvgNoCV_RF": ModelsAggregatorNoCV(
-    #         models=[models2["geometrical_RF_TWHW"], models2["pca_RF_TWHW"], models2["pca_linear_TWHW"]],
-    #         aggregator=RandomForestRegressor(n_estimators=25, max_depth=3),
-    #         extra_regressors=extra_regressors
-    #     )
-    # }
-    # models2 = {
-    #     "EnsembleAvgNoCV_nn": ModelsAggregatorNoCV(
-    #         models=[models2["geometrical_RF_TWHW"], models2["pca_RF_TWHW"], models2["pca_linear_TWHW"]],
-    #         aggregator=MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-    #                                 activation=activation,  # 'relu',
-    #                                 learning_rate_init=learning_rate_init,
-    #                                 learning_rate=learning_rate,
-    #                                 early_stopping=early_stopping,
-    #                                 solver=solver.lower(),
-    #                                 max_iter=max_iter),
-    #         extra_regressors=extra_regressors
-    #     )
-    # }
-
-    # models2["BLUE"] = models["BLUE"]
-    # models2["Spatial Avg"] = models["Spatial Avg"]
-    lab = LabPipeline()
-    lab.define_new_block_of_functions(
-        "individual_models",
-        *list(map(train_test_model, models2.items())),
-        recalculate=True
-    )
-
-    lab.execute(
-        data_manager,
-        num_cores=5,
-        forget=False,
-        save_on_iteration=5,
-        station=stations2test
-    )
-
+    # lab = LabPipeline()
     # lab.define_new_block_of_functions(
     #     "individual_models",
-    #     # train_test_model(("SL Spatial Avg", (Pipeline([("LR", LassoCV(selection="random"))]), ["Spatial Avg"]))),
-    #     train_test_model(("SL Physics", (Pipeline([("LR", LassoCV(selection="random"))]), ["Spatial Avg", "Physics"]))),
-    #     train_test_model(
-    #         ("SL Physics-avg", (Pipeline([("LR", LassoCV(selection="random"))]), ["Spatial Avg", "Physics-avg"]))),
-    #     recalculate=True
+    #     *list(map(train_test_model, models2.items())),
+    #     recalculate=False
     # )
+    #
     # lab.execute(
     #     data_manager,
     #     num_cores=15,
     #     forget=False,
-    #     save_on_iteration=None,
-    #     # station=["BONAP"],  # stations2test
+    #     save_on_iteration=1,
     #     station=stations2test
     # )
 
-    import DoPlotsSourceModels
+    models2 = {
+        "EnsembleAvgNoCV_Lasso": ModelsAggregatorNoCV(
+            # models=list(models2.values()),
+            # models=[m for k, m in models2.items() if "geometrical" in k],
+            # models=[
+            #     models2["geometrical_nn_"],
+            #     models2["geometrical_poly2NN_"],
+            #     models2["geometrical_poly3_"],
+            #     models2["geometrical_poly2_"],
+            #     models2["geometrical_nn_"]
+            # ],
+            # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
+            #         # models["ExponentialFit"], models["Spatial Avg"]
+            #         ],
+            aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+            extra_regressors=[]
+        ),
+        "EnsembleAvgNoCV_avg": ModelsAggregatorNoCV(
+            # models=[m for k, m in models2.items() if "geometrical" in k],
+            models=[
+                models2["geometrical_nn_"],
+                models2["geometrical_poly2NN_"],
+                models2["geometrical_poly3_"],
+                models2["geometrical_poly2_"],
+                models2["geometrical_nn_"]
+            ],
+            # models=[models2["geometrical_RF_TWHW"], models2["node_linear_TWHW"], models2["pca_linear_TWHW"],
+            #         # models["ExponentialFit"], models["Spatial Avg"]
+            #         ],
+            aggregator="average",
+            extra_regressors=[]
+        )
+    }
+
+    lab = LabPipeline()
+    lab.define_new_block_of_functions(
+        "individual_models",
+        *list(map(train_test_model, models2.items())),
+        recalculate=False
+    )
+
+    lab.execute(
+        data_manager,
+        num_cores=15,
+        forget=False,
+        save_on_iteration=15,
+        station=stations2test
+    )

@@ -178,9 +178,9 @@ with ((data_manager.track_emissions("PreprocessesTrafficPollution"))):
         screenshot_period=screenshot_period,
         traffic_past=traffic_past, pollution_past=pollution_past, traffic_future=traffic_future,
         pollution_future=pollution_future, station_coordinates=station_coordinates)
-    pollution_past = pollution_past[stations2test]
-    pollution_future = pollution_future[stations2test]
-    station_coordinates = station_coordinates[stations2test]
+    # pollution_past = pollution_past[stations2test]
+    # pollution_future = pollution_future[stations2test]
+    # station_coordinates = station_coordinates[stations2test]
 
     runsinfo.append_info(
         numstations=int(len(station_coordinates.columns)),
@@ -251,7 +251,7 @@ def train_test(model, station):
     test_error = ((estimation.ravel() - data_unknown.values.ravel()) ** 2).ravel()
 
     print(
-        f"Finish training model {model}: "
+        f"STATION {station}: finish training model {model}: "
         f"\n\t - train loss: {np.mean(train_error)}"
         f"\n\t - test loss: {np.mean(test_error)}"
         "\n__________\n"
@@ -297,7 +297,7 @@ def train_test_model(model_tuple: Tuple[str, Union[BaseModel, Tuple]]):
     return decorated_func
 
 
-@if_exist_load_else_do(file_format="csv", loader=pd.read_csv, saver=pd.DataFrame.to_csv)
+# @if_exist_load_else_do(file_format="csv", loader=pd.read_csv, saver=pd.DataFrame.to_csv)
 def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes):
     data_known, data_unknown = split_by_station(unknown_station=station, observed_stations=station_coordinates,
                                                 observed_pollution=pollution_future.loc[[time], :],
@@ -316,48 +316,20 @@ def estimate_pollution_map_in_graph(time, station, trained_model, nodes_indexes)
 
 @perplex_plot(legend=False)
 @one_line_iterator
-def plot_pollution_map_in_graph(fig, ax, station, individual_models, diffusion_method=None, time=None,
-                                nodes_indexes=None, log=False, recalculate=False,
-                                cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5, bar=False,
-                                estimation_limit_vals=(0, 1), levels=0, n_ticks=5):
-    trained_model, _ = load_model(individual_models, station)
-    img = load_image(
-        f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
-
-    estimation = estimate_pollution_map_in_graph(path=data_manager.path, recalculate=recalculate,
-                                                 filename=f"PollutionEstimation_{station}_{time}_{individual_models}",
-                                                 time=time, station=station, trained_model=trained_model,
-                                                 nodes_indexes=nodes_indexes)
-
-    # smoothing
-    pollution = np.ravel(diffusion_method(estimation["pollution"].values.reshape((-1, 1))))
-    pollution = np.log(pollution) if log else pollution
-
-    plot_estimation_map_in_graph(ax,
-                                 long=estimation["long"].values,
-                                 lat=estimation["lat"].values,
-                                 estimation=pollution,
-                                 img=img, cmap=cmap, s=s, alpha=alpha,
-                                 bar=bar, estimation_limit_vals=estimation_limit_vals,
-                                 levels=levels, n_ticks=n_ticks)
-
-
-@perplex_plot(legend=False)
-@one_line_iterator
 def plot_pollution_map_in_graph(fig, ax, station, individual_models, time=None,
-                                nodes_indexes=None, log=False, norm=None,
+                                nodes_indexes=None, norm=None,
                                 cmap='RdGy', zoom=13, center_of_city=center_of_paris, s=20, alpha=0.5, bar=False,
                                 estimation_limit_vals=(0, 1), levels=0, n_ticks=5, method="cubic"):
     trained_model, _ = load_model(individual_models, station)
     img = load_image(
         f"{traffic_screenshots_folder(screenshot_period)}/{get_filename_from_date(zoom, *center_of_city, time.utctimetuple())}.png")
 
-    estimation = estimate_pollution_map_in_graph(path=data_manager.path,
-                                                 filename=f"PollutionEstimation_{station}_{time}_{individual_models}",
-                                                 time=time, station=station, trained_model=trained_model,
-                                                 nodes_indexes=nodes_indexes)
+    estimation = estimate_pollution_map_in_graph(
+        # path=data_manager.path,
+        # filename=f"PollutionEstimation_{station}_{time}_{individual_models}",
+        time=time, station=station, trained_model=trained_model,
+        nodes_indexes=nodes_indexes)
     pollution = np.ravel(estimation["pollution"].values.reshape((-1, 1)))
-    pollution = np.log(pollution) if log else pollution
 
     plot_estimation_map_in_graph(ax,
                                  long=estimation["long"].values,
@@ -374,12 +346,13 @@ def plot_estimation_histogram(fig, ax, station, individual_models, time=None, no
     station = station.pop()
     for model in individual_models:
         trained_model, _ = load_model(model, station)
-        estimation = estimate_pollution_map_in_graph(path=data_manager.path,
-                                                     filename=f"PollutionEstimation_{station}_{time}_{model}",
-                                                     time=time, station=station, trained_model=trained_model,
-                                                     nodes_indexes=nodes_indexes)
-        pollution = np.ravel(estimation["pollution"].values.reshape((-1, 1)))
-        ax.hist(pollution, bins="sqrt", label=model,
+        estimation = estimate_pollution_map_in_graph(
+            # path=data_manager.path,
+            # filename=f"PollutionEstimation_{station}_{time}_{model}",
+            time=time, station=station, trained_model=trained_model,
+            nodes_indexes=nodes_indexes)
+        pollution = np.ravel(estimation["pollution"].values)
+        ax.hist(pollution, bins=int(np.sqrt(len(pollution))), label=model,
                 color=model_style[model].color if model_style is not None else None,
                 alpha=alpha)
 
