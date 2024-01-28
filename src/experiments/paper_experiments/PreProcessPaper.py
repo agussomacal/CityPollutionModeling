@@ -281,7 +281,7 @@ def train_test_model(model_tuple: Tuple[str, Union[BaseModel, Tuple]]):
     model_name, model = model_tuple
 
     def decorated_func(station):
-        print(station, model)
+        print(station, model_name, model)
         res = train_test(model, station)
 
         path2model = Path(f"{path2models}/{station}")

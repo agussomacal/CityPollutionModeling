@@ -85,8 +85,8 @@ FillBetweenInfo = namedtuple("FillBetweenInfo",
                               "alpha"])
 
 
-def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None, *args,
-                **kwargs):
+def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None,
+                map_names=None, *args, **kwargs):
     # plot regions
     if fill_between is not None:
         if (fill_between.model1 is not None) and (fill_between.model1 in data[hue].values):
@@ -116,14 +116,27 @@ def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_betwee
     # plot models
     ins = inspect.getfullargspec(sns.lineplot)
     kw = filter_dict(ins.args + ins.kwonlyargs, kwargs)
-    for method, df in data.groupby(hue, sort=False):
+    # data.sort_values(by=map_names.keys(), ascending=False, inplace=True)
+    for method in map_names.keys():
+        df = data.loc[data[hue] == method]
+        # for method, df in data.groupby(hue, sort=False):
         df.set_index(y, inplace=True, drop=True)
         df = df if y_order is None else df.loc[y_order, :]
-        sns.lineplot(
-            x=df[x], y=df.index, label=method, ax=ax, alpha=1,
-            color=model_style[method].color if model_style is not None else None,
-            marker=model_style[method].marker if model_style is not None else None,
-            linestyle=model_style[method].linestyle if model_style is not None else None,
-            linewidth=model_style[method].linewidth if model_style is not None else None,
-            **kw
-        )
+        if model_style[method].linestyle is not None or model_style[method].linewidth is not None:
+            sns.lineplot(
+                x=df[x], y=df.index, label=method if map_names is None else map_names[method],
+                ax=ax, alpha=1,
+                color=model_style[method].color if model_style is not None else None,
+                marker=model_style[method].marker if model_style is not None else None,
+                linestyle=model_style[method].linestyle if model_style is not None else None,
+                linewidth=model_style[method].linewidth if model_style is not None else None,
+                **kw
+            )
+        else:
+            sns.scatterplot(
+                x=df[x], y=df.index, label=method, ax=ax, alpha=1,
+                color=model_style[method].color if model_style is not None else None,
+                marker=model_style[method].marker if model_style is not None else None,
+                size=model_style[method].size if model_style is not None else None,
+                # **kw
+            )

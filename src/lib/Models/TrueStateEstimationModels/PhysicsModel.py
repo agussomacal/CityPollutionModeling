@@ -394,22 +394,28 @@ class BaseSourceModel(BaseModel):
         spatial_indexes = self.get_space_indexes(positions)
         times_indexes = self.get_time_indexes(observed_pollution)
 
+        source = []
         # [#times, #nodes, #traffic colors]
-        source = get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
-                                          traffic_by_edge=kwargs["traffic_by_edge"],
-                                          graph=kwargs["graph"], recalculate=self.redo_preprocessing,
-                                          lnei=self.lnei)
         for sigma in self.sources_dist:
-            source = np.concatenate([source, get_traffic_by_node_by_dist_weight_conv(
-                path=self.path4preprocess, times=self.times,
-                filename=f"get_traffic_by_node_by_dist_weight_conv{str(sigma).split('.')[-1]}",
-                traffic_by_edge=kwargs["traffic_by_edge"],
-                graph=kwargs["graph"], recalculate=self.redo_preprocessing,
-                distances_betw_nodes=distance_between_nodes(path=self.path4preprocess,
-                                                            recalculate=self.redo_preprocessing,
-                                                            graph=kwargs["graph"]),
-                weight_func=lambda d, sigma: np.exp(-d ** 2 / sigma ** 2 / 2), wf_params={"sigma": sigma})],
-                                    axis=-1)
+            if sigma == 0:
+                source.append(get_traffic_by_node_conv(path=self.path4preprocess, times=self.times,
+                                                       traffic_by_edge=kwargs["traffic_by_edge"],
+                                                       graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+                                                       lnei=self.lnei))
+            else:
+                source.append(get_traffic_by_node_by_dist_weight_conv(
+                    path=self.path4preprocess, times=self.times,
+                    filename=f"get_traffic_by_node_by_dist_weight_conv{str(sigma).split('.')[-1]}",
+                    traffic_by_edge=kwargs["traffic_by_edge"],
+                    graph=kwargs["graph"], recalculate=self.redo_preprocessing,
+                    distances_betw_nodes=distance_between_nodes(path=self.path4preprocess,
+                                                                recalculate=self.redo_preprocessing,
+                                                                graph=kwargs["graph"]),
+                    weight_func=lambda d, sigma: np.exp(-d ** 2 / sigma ** 2 / 2), wf_params={"sigma": sigma}))
+        else:
+            if len(source) == 0:
+                raise Exception("Source empty.")
+        source = np.concatenate(source, axis=-1)
         source = source[times_indexes, :, :]
         source[np.isnan(source)] = 0
 
@@ -497,7 +503,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
         self.mean_normalize = mean_normalize
         self.std_normalize = std_normalize  # it works slightly works adding the std
         self.basis = basis
-        self.num_colors = (len(self.sources_dist) + 1) * 4
+        self.num_colors = len(self.sources_dist) * 4
         self.KdROM = [None] * self.num_colors
         self.MsROM = [None] * self.num_colors
 

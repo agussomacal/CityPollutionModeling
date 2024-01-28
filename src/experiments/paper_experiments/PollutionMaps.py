@@ -16,22 +16,43 @@ from src.experiments.paper_experiments.PreProcessPaper import plot_pollution_map
     pollution_future, plot_estimation_histogram
 
 model_style = OrderedDict([
-    ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
-    ("geometrical_poly2NN_", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
-    ("geometrical_poly3_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
-    ("geometrical_poly2_", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
-    ("geometrical_poly3_TWHW", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
-    # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
-    ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
-    # ("geometrical_poly2_TWHW", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
-    # ("geometrical_poly2NN_TWHW", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
+    # ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly2NN_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly2NN_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly3_TW_005", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+    ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+    # ("pca_linear_TW", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+
+    # ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly3_TW", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly3_TWAAA", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+    ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+    # ("EnsembleAvgNoCV_Poly2", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+    ("Ensemble", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+    # ("Ensemble2", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+
+    # ("geometrical_poly2_TWAAA", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
+    # ("geometrical_poly2NN_TWAAA", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
 ])
+# model_style = OrderedDict([
+#     ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+#     ("geometrical_poly2NN_", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+#     ("geometrical_poly3_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+#     ("geometrical_poly2_", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+#     ("geometrical_poly3_TWHW", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+#     # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
+#     ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
+#     # ("geometrical_poly2_TWHW", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
+#     # ("geometrical_poly2NN_TWHW", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
+# ])
 
 # levels=10,
 # levels=np.array([40, 45, 46, 47, 48, 50, 52, 55, 60]),
 # levels=np.array([0, 11.3, 16.4, 20.8, 25.6, 29.7, 34.6, 40.2, 47.3, 60]),
 # levels=np.array([10, 20, 22.5, 25, 27.5, 30, 35, 40, 45, 50, 60]),
-for ix in [25, 30, 40]:
+# for ix in [25, 30, 40]:
+for ix in range(21, 45):
     plot_pollution_map_in_graph(
         data_manager=data_manager,
         # folder=path2latex_figures,
@@ -63,7 +84,8 @@ for ix in [25, 30, 40]:
         # limit_vals=np.quantile(np.ravel(pollution_future.values.mean(axis=1)), q=limit_vals),
         plot_nodes=True,
         s=10,
-        levels=levels,
+        # levels=levels,
+        levels=0,
         num_points=1000,
         bar=True,
         method="linear"

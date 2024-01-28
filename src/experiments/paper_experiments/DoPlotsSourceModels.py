@@ -15,7 +15,7 @@ from src.lib.Models.TrueStateEstimationModels.PhysicsModel import get_diffusion_
     get_geometric_basis
 from src.lib.visualization_tools import FillBetweenInfo, plot_errors, plot_estimation_map_in_graph
 
-PlotStyle = namedtuple("PlotStyle", "color marker linestyle linewidth", defaults=["black", "o", "--", None])
+PlotStyle = namedtuple("PlotStyle", "color marker linestyle linewidth size", defaults=["black", "o", "--", None, None])
 cblue, corange, cgreen, cred, cpurple, cbrown, cpink, cgray, cyellow, ccyan = sns.color_palette("tab10")
 cblack = (0, 0, 0)
 cwhite = (1, 1, 1)
@@ -50,7 +50,7 @@ model_names = dict(zip(model_names, model_names))
 modelstyle_basics = OrderedDict([
     ("Spatial Avg", PlotStyle(color=cred, marker=None, linestyle=":")),
     ("BLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
-    ("ExponentialFit", PlotStyle(color=cyellow, marker="o", linestyle="-", linewidth=2)),
+    ("ExponentialFit", PlotStyle(color=cyellow, marker="<", linestyle=":", linewidth=2)),
 ])
 
 # model_style = OrderedDict([
@@ -298,6 +298,49 @@ groups = [
     #     ("geometrical_log_poly3_TW", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
     #     ("pca_log_poly3_TW", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
     # ]),
+    # ---------- TW regressors ---------- #
+    # ("LinearModels_TW_10", [
+    #     ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_linear_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_linear_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_linear_TW_10", PlotStyle(color=cred, marker=".", linestyle="-", linewidth=2)),
+    #     ("pca_log_linear_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
+    # ("QuadraticModels_TW_10", [
+    #     ("node_poly2_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly2_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly2_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_poly2_TW_10", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
+    #     ("pca_log_poly2_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
+    # ("RFModels_TW_10", [
+    #     ("node_RF_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_RF_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_RF_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_RF_TW_10", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
+    #     ("pca_log_RF_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
+    # ("NNModels_TW_10", [
+    #     ("node_nn_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_nn_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_nn_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_nn_TW_10", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
+    #     ("pca_log_nn_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
+    # ("Poly2NNModels_TW", [
+    #     ("node_poly2NN_TW_10", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly2NN_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly2NN_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_poly2NN_TW_10", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
+    #     ("pca_log_poly2NN_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
+    # ("Poly3_TW_10", [
+    #     ("node_poly3_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly3_TW_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly3_TW_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_poly3_TW_10", PlotStyle(color=cred, marker="o", linestyle="-", linewidth=2)),
+    #     ("pca_log_poly3_TW_10", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    # ]),
     # ---------- TW 0.005 regressors ---------- #
     # ("LinearModels_TW_005", [
     #     ("node_linear_TW_005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
@@ -335,22 +378,86 @@ groups = [
     #     ("pca_poly3_TW_005", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
     #     ("both_poly3_TW_005", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2)),
     # ]),
+    # ---------- 0.005 only regressors ---------- #
+    # ("LinearModels_only005_10", [
+    #     ("node_linear_only005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_linear_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_linear_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_linear_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
+    #     ("pca_log_linear_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
+    # ("QuadraticModels_only005_10", [
+    #     ("node_poly2_only005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly2_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly2_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_poly2_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
+    #     ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
+    # ("RFModels_only005_10", [
+    #     ("node_RF_only005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_RF_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_RF_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_RF_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
+    #     ("pca_log_RF_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
+    # ("NNModels_only005_10", [
+    #     ("node_nn_only005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_nn_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_nn_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_nn_only005_10", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2)),
+    #     ("pca_log_nn_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
+    # ("Poly2NNModels_only005", [
+    #     ("node_poly2NN_only005_10", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly2NN_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly2NN_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_log_poly2NN_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
+    #     ("pca_log_poly2NN_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
+    # ("Poly3_only005_10", [
+    #     ("node_poly3_only005", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly3_only005_10", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+    #     ("pca_poly3_only005_10", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #     ("geometrical_poly3_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
+    #     ("pca_log_poly3_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
+    # ]),
     # ---------- Chosen for paper ---------- #
     ("Chosen", [
-        ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
-        ("geometrical_poly2NN_", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
-        ("pca_poly2_TW", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+        ("node_linear_TW", PlotStyle(color=cgreen, marker="*", linestyle="-", linewidth=2, size=50)),
+        ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2, size=50)),
+        ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker=".", linestyle="-.", linewidth=1, size=50)),
+
+        # ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+        # # ("geometrical_poly2NN_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+        # ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2)),
+        # # ("geometrical_poly3_TW_005", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+        # ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker="*", linestyle="--", linewidth=2)),
+        # # ("pca_linear_TW", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
 
         # ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
         # ("geometrical_poly3_TW", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
         # ("geometrical_poly3_TWAAA", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
-        # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
-        # ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=2)),
+        # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+        # ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+        # ("EnsembleAvgNoCV_Poly2", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+        ("Ensemble", PlotStyle(color=cblack, marker="", linestyle="--", linewidth=2, size=None)),
+        # ("Ensemble2", PlotStyle(color=cgray, marker="*", linestyle="-.", linewidth=2)),
+
         # ("geometrical_poly2_TWAAA", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
         # ("geometrical_poly2NN_TWAAA", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
     ]),
 ]
 
+map_names = OrderedDict(
+    [
+        ("Spatial Avg", "Spatial average"),
+        ("BLUE", "BLUE"),
+        ("ExponentialFit", "Kriging"),
+        ("node_linear_TW", "Source"),
+        ("pca_log_poly2_only005_10", "Physical-PCA"),
+        ("geometrical_poly2NN_", "Physical-Laplacian"),
+        ("Ensemble", "Ensemble")
+    ])
 stations_order = ["BONAP", "CELES", "HAUS", "OPERA", "PA13", "PA07", "PA18", "BASCH", "ELYS", "PA12", ]
 
 if __name__ == "__main__":
@@ -382,7 +489,7 @@ if __name__ == "__main__":
             data_manager=data_manager,
             # folder=path2latex_figures,
             y="station", x="RMSE", label="models",
-            plot_func=NamedPartial(plot_errors, model_style=model_style,
+            plot_func=NamedPartial(plot_errors, model_style=model_style, map_names=map_names,
                                    hue_order=models_order, orient="y", sort=True,
                                    y_order=stations_order,
                                    fill_between=FillBetweenInfo(model1=OptimModel, model2=BaselineModel,
@@ -410,7 +517,7 @@ if __name__ == "__main__":
             individual_models=models2plot,
             station=stations_order,
             dpi=300,
-            axes_xy_proportions=(8, 10),
+            axes_xy_proportions=(8, 12),
             axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
             labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
             legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
@@ -421,9 +528,12 @@ if __name__ == "__main__":
             xlim=xlim,
             # create_preimage_data=True,
             # only_create_preimage_data=False
-            legend_outside_plot=LegendOutsidePlot(loc="lower center",
-                                                  extra_y_top=0.01, extra_y_bottom=0.45,
-                                                  extra_x_left=0.125, extra_x_right=0.075),
+            legend_outside_plot=LegendOutsidePlot(loc="center right",
+                                                  extra_y_top=0.01, extra_y_bottom=0.065,
+                                                  extra_x_left=0.125, extra_x_right=0.275),
+            # legend_outside_plot=LegendOutsidePlot(loc="lower center",
+            #                                       extra_y_top=0.01, extra_y_bottom=0.275,
+            #                                       extra_x_left=0.125, extra_x_right=0.075),
         )
 
     wuvbd
@@ -626,69 +736,68 @@ if __name__ == "__main__":
                                                   extra_x_left=0.125, extra_x_right=0.075),
         )
 
-# stations_coordinates = get_stations_lat_long()
-# for metric in ["RMSE", ]:
-#     for d in ["mean", "median", "min"]:
-#         generic_plot(
-#             # format=".pdf",
-#             name=f"{metric}_Distance{d}_Kernel",
-#             data_manager=data_manager,
-#             # folder=path2latex_figures,
-#             x=f"{d}_distance", y=metric, label="models",
-#             plot_func=sns.lineplot,
-#             distance=lambda station: np.sqrt(
-#                 np.sum((stations_coordinates[[station]].values - stations_coordinates.loc[:,
-#                                                                  ~stations_coordinates.columns.isin([station])]) ** 2,
-#                        axis=0)),
-#             min_distance=lambda distance: np.min(distance),
-#             mean_distance=lambda distance: np.mean(distance),
-#             median_distance=lambda distance: np.median(distance),
-#             sort_by=["individual_models"],
-#             RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
-#             models=lambda individual_models: model_names[individual_models],
-#             individual_models=["Kernel"],
-#             dpi=300,
-#             axes_xy_proportions=(8, 10),
-#             axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
-#             labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
-#             legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
-#             font_family="amssymb",
-#             uselatex=True,
-#             xlabel=f"{d} distance",
-#             ylabel=r"Stations",
-#             # create_preimage_data=True,
-#             # only_create_preimage_data=False
-#             legend_outside_plot=LegendOutsidePlot(loc="lower center",
-#                                                   extra_y_top=0.01, extra_y_bottom=0.3,
-#                                                   extra_x_left=0.125, extra_x_right=0.075),
-#         )
+    # stations_coordinates = get_stations_lat_long()
+    # for metric in ["RMSE", ]:
+    #     for d in ["mean", "median", "min"]:
+    #         generic_plot(
+    #             # format=".pdf",
+    #             name=f"{metric}_Distance{d}_Kernel",
+    #             data_manager=data_manager,
+    #             # folder=path2latex_figures,
+    #             x=f"{d}_distance", y=metric, label="models",
+    #             plot_func=sns.lineplot,
+    #             distance=lambda station: np.sqrt(
+    #                 np.sum((stations_coordinates[[station]].values - stations_coordinates.loc[:,
+    #                                                                  ~stations_coordinates.columns.isin([station])]) ** 2,
+    #                        axis=0)),
+    #             min_distance=lambda distance: np.min(distance),
+    #             mean_distance=lambda distance: np.mean(distance),
+    #             median_distance=lambda distance: np.median(distance),
+    #             sort_by=["individual_models"],
+    #             RMSE=lambda error: np.NAN if error is None else np.sqrt(error.mean()),
+    #             models=lambda individual_models: model_names[individual_models],
+    #             individual_models=["Kernel"],
+    #             dpi=300,
+    #             axes_xy_proportions=(8, 10),
+    #             axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
+    #             labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
+    #             legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
+    #             font_family="amssymb",
+    #             uselatex=True,
+    #             xlabel=f"{d} distance",
+    #             ylabel=r"Stations",
+    #             # create_preimage_data=True,
+    #             # only_create_preimage_data=False
+    #             legend_outside_plot=LegendOutsidePlot(loc="lower center",
+    #                                                   extra_y_top=0.01, extra_y_bottom=0.3,
+    #                                                   extra_x_left=0.125, extra_x_right=0.075),
+    #         )
 
+    # plot laplacian eigenfuncs
+    k_max = 10
+    Kd = get_diffusion_matrix(path=data_manager.path, filename=f"diffusion_matrix", graph=graph,
+                              recalculate=False, verbose=False)
+    Ms = get_absorption_matrix(path=data_manager.path, filename=f"absorption_matrix", graph=graph,
+                               recalculate=False, verbose=False)
+    vk, vm = get_geometric_basis(path=data_manager.path,
+                                 filename=f"LaplacianModel_basis_k{k_max}",
+                                 Kd=Kd, Ms=Ms,
+                                 k=k_max,
+                                 recalculate=False, verbose=False)
 
-# plot laplacian eigenfuncs
-k_max = 10
-Kd = get_diffusion_matrix(path=data_manager.path, filename=f"diffusion_matrix", graph=graph,
-                          recalculate=False, verbose=False)
-Ms = get_absorption_matrix(path=data_manager.path, filename=f"absorption_matrix", graph=graph,
-                           recalculate=False, verbose=False)
-vk, vm = get_geometric_basis(path=data_manager.path,
-                             filename=f"LaplacianModel_basis_k{k_max}",
-                             Kd=Kd, Ms=Ms,
-                             k=k_max,
-                             recalculate=False, verbose=False)
-
-levels = np.array([16.4, 20.8, 29.7, 34.6, 47.3, 60])
-img = load_background(screenshot_period)
-node_positions = get_graph_node_positions(graph)
-for i, e in enumerate(vk.T):
-    with save_fig(paths=data_manager.path, filename=f"LaplacianEigen_{i}"):
-        fig, ax = plt.subplots()
-        plot_estimation_map_in_graph(ax, long=node_positions[:, 0], lat=node_positions[:, 1],
-                                     estimation=np.log10(np.abs(e)),
-                                     img=img,
-                                     cmap=sns.color_palette("coolwarm", as_cmap=True, n_colors=10),
-                                     s=5, alpha=0.5, bar=True,
-                                     estimation_limit_vals=(0, 1), levels=0, long_bounds=None, lat_bounds=None,
-                                     n_ticks=5, method='linear', norm=None)
-    # with save_fig(paths=data_manager.path, filename=f"HistLaplacianEigen_{i}"):
-    #     fig, ax = plt.subplots()
-    #     plt.hist(np.log10(np.abs(e)), bins=int(np.sqrt(len(node_positions))))
+    levels = np.array([16.4, 20.8, 29.7, 34.6, 47.3, 60])
+    img = load_background(screenshot_period)
+    node_positions = get_graph_node_positions(graph)
+    for i, e in enumerate(vk.T):
+        with save_fig(paths=data_manager.path, filename=f"LaplacianEigen_{i}"):
+            fig, ax = plt.subplots()
+            plot_estimation_map_in_graph(ax, long=node_positions[:, 0], lat=node_positions[:, 1],
+                                         estimation=np.log10(np.abs(e)),
+                                         img=img,
+                                         cmap=sns.color_palette("coolwarm", as_cmap=True, n_colors=10),
+                                         s=5, alpha=0.5, bar=True,
+                                         estimation_limit_vals=(0, 1), levels=0, long_bounds=None, lat_bounds=None,
+                                         n_ticks=5, method='linear', norm=None)
+        # with save_fig(paths=data_manager.path, filename=f"HistLaplacianEigen_{i}"):
+        #     fig, ax = plt.subplots()
+        #     plt.hist(np.log10(np.abs(e)), bins=int(np.sqrt(len(node_positions))))
