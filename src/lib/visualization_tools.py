@@ -85,7 +85,7 @@ FillBetweenInfo = namedtuple("FillBetweenInfo",
                               "alpha"])
 
 
-def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None,
+def plot_errors_vertical(data, x, y, hue, ax, y_order=None, model_style=None, fill_between: FillBetweenInfo = None,
                 map_names=None, *args, **kwargs):
     # plot regions
     if fill_between is not None:
@@ -117,14 +117,15 @@ def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_betwee
     ins = inspect.getfullargspec(sns.lineplot)
     kw = filter_dict(ins.args + ins.kwonlyargs, kwargs)
     # data.sort_values(by=map_names.keys(), ascending=False, inplace=True)
-    for method in map_names.keys():
+    for method in (map_names.keys() if map_names is not None else np.unique(data[hue])):
         df = data.loc[data[hue] == method]
         # for method, df in data.groupby(hue, sort=False):
         df.set_index(y, inplace=True, drop=True)
         df = df if y_order is None else df.loc[y_order, :]
         if model_style[method].linestyle is not None or model_style[method].linewidth is not None:
             sns.lineplot(
-                x=df[x], y=df.index, label=method if map_names is None else map_names[method],
+                x=df[x], y=df.index,
+                label=method if map_names is None else map_names[method],
                 ax=ax, alpha=1,
                 color=model_style[method].color if model_style is not None else None,
                 marker=model_style[method].marker if model_style is not None else None,
@@ -140,3 +141,62 @@ def plot_errors(data, x, y, hue, ax, y_order=None, model_style=None, fill_betwee
                 size=model_style[method].size if model_style is not None else None,
                 # **kw
             )
+
+
+def plot_errors(data, x, y, hue, ax, stations_order=None, model_style=None, fill_between: FillBetweenInfo = None,
+                map_names=None, *args, **kwargs):
+    # plot regions
+    if fill_between is not None:
+        if (fill_between.model1 is not None) and (fill_between.model1 in data[hue].values):
+            df1 = data.loc[data[hue] == fill_between.model1].set_index(x, drop=True, inplace=False)
+            df1 = df1 if stations_order is None else df1.loc[stations_order, :]
+            ax.fill_between(x=df1.index, y1=kwargs.get("xlim", (0, None))[0], y2=df1[y],
+                            color=fill_between.color_low + (fill_between.alpha,))
+
+        if fill_between.model2 is not None and fill_between.model2 in data[hue].values:
+            df2 = data.loc[data[hue] == fill_between.model2].set_index(x, drop=True, inplace=False)
+            df2 = df2 if stations_order is None else df2.loc[stations_order, :]
+            ax.fill_between(x=df2.index, y1=df2[y], y2=kwargs.get("xlim", (0, max(data[y])))[1] * 1.1,
+                            color=fill_between.color_high + (fill_between.alpha,))
+
+        if fill_between.model3 is not None and fill_between.model3 in data[hue].values:
+            df3 = data.loc[data[hue] == fill_between.model3].set_index(x, drop=True, inplace=False)
+            df3 = df3 if stations_order is None else df3.loc[stations_order, :]
+            ax.fill_between(x=df3.index, y1=df3[y], y2=kwargs.get("xlim", (0, max(data[y])))[1] * 1.1,
+                            color=fill_between.color_middle + (fill_between.alpha,))
+
+        if fill_between.model4 is not None and fill_between.model4 in data[hue].values:
+            df4 = data.loc[data[hue] == fill_between.model4].set_index(x, drop=True, inplace=False)
+            df4 = df4 if stations_order is None else df4.loc[stations_order, :]
+            ax.fill_between(x=df4.index, y1=kwargs.get("xlim", (0, None))[0], y2=df4[y],
+                            color=fill_between.color_middle + (fill_between.alpha,))
+
+    # plot models
+    ins = inspect.getfullargspec(sns.lineplot)
+    kw = filter_dict(ins.args + ins.kwonlyargs, kwargs)
+    # data.sort_values(by=map_names.keys(), ascending=False, inplace=True)
+    for method in (map_names.keys() if map_names is not None else np.unique(data[hue])):
+        df = data.loc[data[hue] == method]
+        # for method, df in data.groupby(hue, sort=False):
+        df.set_index(x, inplace=True, drop=True)
+        df = df if stations_order is None else df.loc[stations_order, :]
+
+        ax.scatter(
+            x=df.index, y=df[y],
+            c=model_style[method].color if model_style is not None else None,
+            marker=model_style[method].marker if model_style is not None else None,
+            s=model_style[method].size if model_style is not None else None,
+            # **kw
+        )
+
+        sns.lineplot(
+            x=df.index, y=df[y],
+            label=method if map_names is None else map_names[method],
+            ax=ax, alpha=1,
+            color=model_style[method].color if model_style is not None else None,
+            # marker=model_style[method].marker if model_style is not None else None,
+            linestyle=model_style[method].linestyle if model_style is not None else None,
+            linewidth=model_style[method].linewidth if model_style is not None else None,
+            # size=model_style[method].size if model_style is not None else None,
+            **kw
+        )

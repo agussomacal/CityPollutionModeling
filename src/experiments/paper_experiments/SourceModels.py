@@ -1,5 +1,5 @@
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LassoCV
+from sklearn.linear_model import LassoCV, LinearRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
@@ -16,11 +16,12 @@ from src.lib.Models.SensorDependentModels.BLUEFamily import BLUEModel
 from src.lib.Models.TrueStateEstimationModels.AverageModels import SnapshotMeanModel
 from src.lib.Models.TrueStateEstimationModels.KernelModels import ExponentialKernelModel, GaussianKernelModel
 from src.lib.Models.TrueStateEstimationModels.PhysicsModel import NodeSourceModel, ProjectionFullSourceModel, \
-    ModelsAggregatorNoCV, ModelsAggregator
+    ModelsAggregatorNoCV, ModelsAggregator, ModelsAggregatorTwoModels, ModelsAggregatorNoCVTwoModels
 from src.lib.Modules import Optim
 
 k = 5
 sources_dist = [0.005]
+sources_dist = [0]
 if sources_dist == [0.005]:
     source_dist4name = "only005"
 elif sources_dist == [0]:
@@ -108,8 +109,8 @@ if __name__ == "__main__":
                       loss=mse, optim_method=BAYES, niter=100, verbose=True),
     }
 
-    # models2 = dict()
-    #
+    models2 = dict()
+
     # models2["Spatial Avg"] = models["Spatial Avg"]
     # models2["BLUE"] = models["BLUE"]
     # models2["ExponentialFit"] = models["ExponentialFit"]
@@ -343,12 +344,38 @@ if __name__ == "__main__":
         #     weighting="average",
         #     train_on_llo=True),
 
-        "Ensemble2": ModelsAggregator(
-            models=[node_linear_TW, geometrical_poly3NN_, ],  # pca_log_poly2_only005_10 pca_linear_TW
-            aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+        # "Ensemble2": ModelsAggregator(
+        #     models=[node_linear_TW, geometrical_poly3NN_, ],  # pca_log_poly2_only005_10 pca_linear_TW
+        #     aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+        #     name=None,
+        #     weighting="average",
+        #     train_on_llo=True
+        # )
+
+        # "EnsambleKrigging": ModelsAggregatorTwoModels(
+        #     models=[node_linear_TW, geometrical_poly3NN_, pca_linear_TW, pca_log_poly2_only005_10],
+        #     aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+        #     name=None,
+        #     weighting="average",
+        #     train_on_llo=True,
+        #     model2=models["ExponentialFit"],
+        #     sigma=0.01
+        # )
+        # "EnsembleKriging_NoCV": ModelsAggregatorNoCVTwoModels(
+        #     models=[node_linear_TW, geometrical_poly3NN_],
+        #     aggregator=Pipeline([("lasso", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+        #     name=None,
+        #     model2=models["ExponentialFit"],
+        #     sigma=0.01
+        # ),
+        "EnsembleKriging_NoCV_avg": ModelsAggregatorNoCVTwoModels(
+            models=[node_linear_TW, geometrical_poly3NN_],
+            aggregator="average",
             name=None,
-            weighting="average",
-            train_on_llo=True)
+            model2=models["ExponentialFit"],
+            sigma=0.01
+        )
+
     }
 
     lab = LabPipeline()
@@ -365,3 +392,71 @@ if __name__ == "__main__":
         save_on_iteration=15,
         station=stations2test
     )
+    # extra_regressors_list = [
+    #     # ["avg_pollution", "sorted_pollution"],
+    #     ["avg_pollution", "sorted_traffic", "avg_traffic", "avg_nodes_traffic"],
+    #     # ["avg_pollution", "sorted_pollution"],
+    #     # ["avg_pollution", "avg_nodes_traffic"],
+    #     # ["avg_pollution"],
+    #     # ["avg_pollution", "temperature", "wind"],
+    # ]
+    # for extra_regressors in extra_regressors_list:
+    #     extra_regressors = extra_regressors + ["no_source"]
+    #     for source_model_name, source_model in [
+    #         ("poly2", Pipeline([("PF", PolynomialFeatures(degree=2)),
+    #                             ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1,
+    #                                            max_iter=250))])),
+    #         # ("poly3", Pipeline([("PF", PolynomialFeatures(degree=3)),
+    #         #                     ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1
+    #         #                                    ))])),
+    #         # ("poly2NN", Pipeline([("PF", PolynomialFeatures(degree=2)),
+    #         #                       ("NN", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+    #         #                                           activation=activation,  # 'relu',
+    #         #                                           learning_rate_init=learning_rate_init,
+    #         #                                           learning_rate=learning_rate,
+    #         #                                           early_stopping=early_stopping,
+    #         #                                           solver=solver.lower(),
+    #         #                                           max_iter=max_iter))])),
+    #         # ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1)),
+    #         ("linear", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1,
+    #                            max_iter=250)),
+    #         ("nn", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+    #                             activation=activation,  # 'relu',
+    #                             learning_rate_init=learning_rate_init,
+    #                             learning_rate=learning_rate,
+    #                             early_stopping=early_stopping,
+    #                             solver=solver.lower(),
+    #                             max_iter=max_iter)),
+    #         ("RF", RandomForestRegressor(n_estimators=25, max_depth=3))
+    #     ]:
+    #         model_name = f"node_{source_model_name}_{''.join(list(map(lambda e: e[0].upper(), '_'.join(extra_regressors).split('_'))))}{source_dist4name}"
+    #         print("MODEL NAME:", model_name)
+    #         models2[model_name] = NodeSourceModel(
+    #             train_with_relative_error=train_with_relative_error,
+    #             path4preprocess=data_manager.path, graph=graph,
+    #             spacial_locations=station_coordinates,
+    #             times=times_all,
+    #             traffic_by_edge=traffic_by_edge,
+    #             redo_preprocessing=False,
+    #             name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
+    #             verbose=True, niter=1, sigma0=1,
+    #             lnei=1,
+    #             source_model=source_model,
+    #             substract_mean=False, sources_dist=sources_dist,
+    #             extra_regressors=extra_regressors,
+    #         )
+    #
+    # lab = LabPipeline()
+    # lab.define_new_block_of_functions(
+    #     "individual_models",
+    #     *list(map(train_test_model, models2.items())),
+    #     recalculate=True
+    # )
+    #
+    # lab.execute(
+    #     data_manager,
+    #     num_cores=15,
+    #     forget=False,
+    #     save_on_iteration=1,
+    #     station=stations2test
+    # )

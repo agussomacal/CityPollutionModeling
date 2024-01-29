@@ -48,9 +48,9 @@ Krigging = "Kernel"  # "Krigging"
 model_names = list(set(data_manager["individual_models"]))
 model_names = dict(zip(model_names, model_names))
 modelstyle_basics = OrderedDict([
-    ("Spatial Avg", PlotStyle(color=cred, marker="", linestyle=":", size=0)),
-    ("BLUE", PlotStyle(color=cblue, marker="", linestyle=":", size=0)),
-    ("ExponentialFit", PlotStyle(color=cyellow, marker="o", linestyle=":", linewidth=2, size=50)),
+    ("Spatial Avg", PlotStyle(color=cred, marker=None, linestyle=":")),
+    ("BLUE", PlotStyle(color=cblue, marker=None, linestyle=":")),
+    # ("ExponentialFit", PlotStyle(color=cyellow, marker="<", linestyle=":", linewidth=2)),
 ])
 
 # model_style = OrderedDict([
@@ -421,49 +421,54 @@ groups = [
     #     ("geometrical_poly3_only005_10", PlotStyle(color=cred, marker="*", linestyle="--", linewidth=2)),
     #     ("pca_log_poly3_only005_10", PlotStyle(color=corange, marker="o", linestyle="--", linewidth=2)),
     # ]),
-    # ---------- Chosen for paper ---------- #
-    ("Chosen", [
-        ("node_linear_TW", PlotStyle(color=cgreen, marker="o", linestyle="-", linewidth=2, size=50)),
-        ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2, size=50)),
-        ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker="o", linestyle="-.", linewidth=1, size=50)),
-        ("EnsembleKriging_NoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="--", linewidth=3, size=50)),
-
-        # ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
-        # # ("geometrical_poly2NN_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
-        # ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2)),
-        # # ("geometrical_poly3_TW_005", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
-        # ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker="*", linestyle="--", linewidth=2)),
-        # # ("pca_linear_TW", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
-
-        # ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
-        # ("geometrical_poly3_TW", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
-        # ("geometrical_poly3_TWAAA", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
-        # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
-        # ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
-        # ("EnsembleAvgNoCV_Poly2", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
-        # ("Ensemble", PlotStyle(color=cblack, marker="", linestyle="--", linewidth=2, size=None)),
-        # ("Ensemble2", PlotStyle(color=cgray, marker="*", linestyle="-.", linewidth=2)),
-        # ("EnsembleKriging_NoCV", PlotStyle(color=cblack, marker="", linestyle="-", linewidth=3, size=None)),
-        # ("geometrical_poly2_TWAAA", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
-        # ("geometrical_poly2NN_TWAAA", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
+    # ---------- regressor average models ---------- #
+    ("SPSN", [
+        ("node_linear_SPNS", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+        ("node_poly2_SPNS", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+        ("node_RF_SPNS", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+        ("node_nn_SPNS", PlotStyle(color=cpurple, marker=".", linestyle="--", linewidth=2)),
+        ("node_poly2NN_SPNS", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+        ("node_poly3_SPNS", PlotStyle(color=cblack, marker=".", linestyle="--", linewidth=2)),
     ]),
+    # ---------- Chosen for paper ---------- #
+    # ("Chosen", [
+    #     ("node_linear_TW", PlotStyle(color=cgreen, marker="*", linestyle="-", linewidth=2, size=50)),
+    #     ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2, size=50)),
+    #     ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker=".", linestyle="-.", linewidth=1, size=50)),
+    #
+    #     # ("node_linear_TW", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     # # ("geometrical_poly2NN_", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+    #     # ("geometrical_poly2NN_", PlotStyle(color=cred, marker="o", linestyle="--", linewidth=2)),
+    #     # # ("geometrical_poly3_TW_005", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+    #     # ("pca_log_poly2_only005_10", PlotStyle(color=corange, marker="*", linestyle="--", linewidth=2)),
+    #     # # ("pca_linear_TW", PlotStyle(color=cblue, marker=".", linestyle="--", linewidth=2)),
+    #
+    #     # ("geometrical_nn_", PlotStyle(color=cgreen, marker=".", linestyle="--", linewidth=2)),
+    #     # ("geometrical_poly3_TW", PlotStyle(color=cred, marker=".", linestyle="--", linewidth=2)),
+    #     # ("geometrical_poly3_TWAAA", PlotStyle(color=corange, marker=".", linestyle="--", linewidth=2)),
+    #     # ("EnsembleAvgNoCV_Lasso", PlotStyle(color=cblack, marker=".", linestyle="-", linewidth=2)),
+    #     # ("EnsembleAvgNoCV_avg", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+    #     # ("EnsembleAvgNoCV_Poly2", PlotStyle(color=cblack, marker="o", linestyle="-.", linewidth=2)),
+    #     ("Ensemble", PlotStyle(color=cblack, marker="", linestyle="--", linewidth=2, size=None)),
+    #     # ("Ensemble2", PlotStyle(color=cgray, marker="*", linestyle="-.", linewidth=2)),
+    #
+    #     # ("geometrical_poly2_TWAAA", PlotStyle(color=cpink, marker=".", linestyle="--", linewidth=2)),
+    #     # ("geometrical_poly2NN_TWAAA", PlotStyle(color=cbrown, marker=".", linestyle="--", linewidth=2)),
+    # ]),
 ]
 
 map_names = None
-map_names = OrderedDict(
-    [
-        ("Spatial Avg", "Spatial average"),
-        ("BLUE", "BLUE"),
-        ("ExponentialFit", "Kriging"),
-        ("node_linear_TW", "Source"),
-        ("pca_log_poly2_only005_10", "Physical-PCA"),
-        ("geometrical_poly2NN_", "Physical-Laplacian"),
-        # ("Ensemble", "Ensemble"),
-        # ("EnsembleKriging_NoCV", "Ensemble"),
-        ("EnsembleKriging_NoCV_avg", "Ensemble"),
-    ])
-stations_order = ["BONAP", "CELES", "HAUS", "OPERA", "PA13", "PA07", "PA18", "BASCH", "PA12", "ELYS",  ]
-# stations_order = ["PA13", "PA07", "PA18", "BASCH", "PA12", "ELYS",  "BONAP", "CELES", "HAUS", "OPERA",]
+# map_names = OrderedDict(
+#     [
+#         ("Spatial Avg", "Spatial average"),
+#         ("BLUE", "BLUE"),
+#         ("ExponentialFit", "Kriging"),
+#         ("node_linear_TW", "Source"),
+#         ("pca_log_poly2_only005_10", "Physical-PCA"),
+#         ("geometrical_poly2NN_", "Physical-Laplacian"),
+#         ("Ensemble", "Ensemble")
+#     ])
+stations_order = ["BONAP", "CELES", "HAUS", "OPERA", "PA13", "PA07", "PA18", "BASCH", "ELYS", "PA12", ]
 
 if __name__ == "__main__":
     for name, group_style in groups:
@@ -487,24 +492,23 @@ if __name__ == "__main__":
 
         # ["OPERA", "HAUS", "BASCH", "PA13", "PA07", "BONAP", "CELES", "ELYS", "PA18", "PA12", ]
         # ["OPERA", "PA15L", "HAUS", "BASCH", "PA13", "PA07", "BONAP", "ELYS", "CELES", "PA12", "PA18", ]
-        ylim = (3, 14)
+        xlim = (3, 14)
         generic_plot(
             # format=".pdf",
             name=f"RMSE_{name}",
             data_manager=data_manager,
             # folder=path2latex_figures,
-            x="station", y="RMSE", label="models",
+            y="station", x="RMSE", label="models",
             plot_func=NamedPartial(plot_errors, model_style=model_style, map_names=map_names,
-                                   hue_order=models_order,  # orient="x",
-                                   sort=True,
-                                   stations_order=stations_order,
+                                   hue_order=models_order, orient="y", sort=True,
+                                   y_order=stations_order,
                                    fill_between=FillBetweenInfo(model1=OptimModel, model2=BaselineModel,
                                                                 model3=Krigging, model4=None,
                                                                 color_low=model_style[OptimModel].color,
                                                                 color_middle=cyellow,
                                                                 color_high=model_style[BaselineModel].color,
                                                                 alpha=0.15),
-                                   ylim=ylim
+                                   xlim=xlim
                                    ),
             sort_by=["individual_models"],
             # Station=lambda station: station,
@@ -523,7 +527,7 @@ if __name__ == "__main__":
             individual_models=models2plot,
             station=stations_order,
             dpi=300,
-            axes_xy_proportions=(12, 8),
+            axes_xy_proportions=(8, 12),
             axis_font_dict={'color': 'black', 'weight': 'normal', 'size': 16},
             labels_font_dict={'color': 'black', 'weight': 'normal', 'size': 18},
             legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
@@ -531,12 +535,12 @@ if __name__ == "__main__":
             uselatex=True,
             xlabel=fr"RMSE",
             ylabel=r"Stations",
-            ylim=ylim,
+            xlim=xlim,
             # create_preimage_data=True,
             # only_create_preimage_data=False
             legend_outside_plot=LegendOutsidePlot(loc="center right",
                                                   extra_y_top=0.01, extra_y_bottom=0.065,
-                                                  extra_x_left=0.1, extra_x_right=0.2),
+                                                  extra_x_left=0.125, extra_x_right=0.275),
             # legend_outside_plot=LegendOutsidePlot(loc="lower center",
             #                                       extra_y_top=0.01, extra_y_bottom=0.275,
             #                                       extra_x_left=0.125, extra_x_right=0.075),

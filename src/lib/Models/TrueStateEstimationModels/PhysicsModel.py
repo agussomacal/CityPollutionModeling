@@ -308,30 +308,46 @@ def extra_regressors(times: pd.DatetimeIndex, positions, extra_regressors, **kwa
     return X
 
 
-def add_extra_regressors_and_reshape(extra_regressors_names, predictions, number_of_instances, positions,
+def add_extra_regressors_and_reshape(extra_regressors_names, predictions, positions,
                                      observed_pollution, order="F", **kwargs):
-    predictions = predictions.reshape((-1, number_of_instances), order=order)
-    if len(extra_regressors_names) > 1:
-        extra_data = extra_regressors(observed_pollution.index, positions, extra_regressors_names, **kwargs)
-        predictions = np.concatenate([predictions, extra_data], axis=1)
-
+    number_of_instances = np.shape(predictions)[-1]
+    if "sorted_traffic" in extra_regressors_names:
+        sorted_traffic = predictions.copy()
+        for i in range(number_of_instances):
+            sorted_traffic[:, :, i] = np.sort(predictions[:, :, i], axis=1)
+        predictions = np.concatenate(
+            [predictions] +
+            [np.transpose([sorted_traffic[:, :, i]] * np.shape(predictions)[1], (1, 0, 2)) for i in
+             range(number_of_instances)], axis=-1)
     if "avg_traffic" in kwargs and "avg_traffic" in extra_regressors_names:
         predictions = np.concatenate([
             predictions,
-            np.transpose([kwargs["avg_traffic"]] * np.shape(positions)[1], (1, 0, 2)).reshape((-1, 4), order="F")],
-            axis=-1)
+            np.transpose([kwargs["avg_traffic"]] * np.shape(predictions)[1], (1, 0, 2))
+        ], axis=-1)
     if "avg_nodes_traffic" in kwargs and "avg_nodes_traffic" in extra_regressors_names:
         predictions = np.concatenate([
             predictions,
-            np.transpose([kwargs["avg_nodes_traffic"]] * np.shape(positions)[1], (1, 0, 2)).reshape((-1, 4),
-                                                                                                    order="F")],
-            axis=-1)
+            np.transpose([kwargs["avg_nodes_traffic"]] * np.shape(predictions)[1], (1, 0, 2))
+        ], axis=-1)
     if "avg_pollution" in kwargs and "avg_pollution" in extra_regressors_names:
         predictions = np.concatenate([
             predictions,
-            np.transpose([kwargs["avg"].ravel()] * np.shape(positions)[1], (1, 0)).reshape((-1, 1), order="F")],
-            axis=-1)
+            np.transpose([kwargs["avg"].ravel()] * np.shape(predictions)[1], (1, 0))[:, :, np.newaxis]
+        ], axis=-1)
+    if "sorted_pollution" in extra_regressors_names:
+        sorted_pollution = np.sort(observed_pollution.values, axis=1)
+        predictions = np.concatenate([
+            predictions,
+            np.transpose([sorted_pollution] * np.shape(predictions)[1], (1, 0, 2))
+        ], axis=-1)
 
+    predictions = predictions.reshape((-1, np.shape(predictions)[-1]), order=order)
+    if len(set(extra_regressors_names).intersection(["water", "green", "week", "hours", "temperature", "wind"])) > 0:
+        extra_data = extra_regressors(observed_pollution.index, positions, extra_regressors_names, **kwargs)
+        predictions = np.concatenate([predictions, extra_data], axis=1)
+
+    if "no_source" in extra_regressors_names:
+        predictions = predictions[:, number_of_instances:]
     return predictions
 
 
@@ -431,7 +447,7 @@ class NodeSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1],
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source,
                                                   observed_stations,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
@@ -444,7 +460,7 @@ class NodeSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, self.get_space_indexes(observed_stations), :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1], target_positions,
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source, target_positions,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
                                                   avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
@@ -633,7 +649,7 @@ class ProjectionFullSourceModel(BaseSourceModel):
         avg_traffic = np.nanmean(source, axis=1, keepdims=False)
         avg_nodes_traffic = np.nanmean(source[:, spatial_indexes, :], axis=1, keepdims=False)
         source = source[:, spatial_indexes, :]
-        source = add_extra_regressors_and_reshape(self.extra_regressors, source, np.shape(source)[-1], target_positions,
+        source = add_extra_regressors_and_reshape(self.extra_regressors, source, target_positions,
                                                   observed_pollution, order="F",
                                                   avg_traffic=avg_traffic,
                                                   avg_nodes_traffic=avg_nodes_traffic, avg=avg, **kwargs)
@@ -1226,6 +1242,32 @@ class ModelsAggregator(BaseModel):
             self.calibrated = True
 
 
+class ModelsAggregatorTwoModels(ModelsAggregator):
+    def __init__(self, models: List[BaseModel], aggregator: Pipeline, model2: BaseModel, sigma, name=None,
+                 weighting="average",
+                 train_on_llo=True):
+        super().__init__(models, aggregator, name=name, weighting=weighting, train_on_llo=train_on_llo)
+        self.model2 = model2
+        self.sigma = sigma
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        models_prediction = super(ModelsAggregatorTwoModels, self).state_estimation(observed_stations,
+                                                                                    observed_pollution, traffic,
+                                                                                    target_positions, **kwargs)
+        models2_prediction = self.model2.state_estimation(observed_stations,
+                                                          observed_pollution, traffic,
+                                                          target_positions, **kwargs)
+        distance = cdist(target_positions.values.T, observed_stations.values.T)
+        min_dist = np.min(distance, axis=1)
+        w = np.exp(-self.sigma * min_dist)
+        return w * models2_prediction + (1 - w) * models_prediction
+
+    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+        super(ModelsAggregatorTwoModels, self).calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+        self.model2.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+
+
 class ModelsAggregatorNoCV(BaseModel):
     def __init__(self, models: List[BaseModel], aggregator, name=None, extra_regressors=[], norm21=False):
         super().__init__()
@@ -1259,7 +1301,7 @@ class ModelsAggregatorNoCV(BaseModel):
             target_positions=target_positions, **kwargs)
         shape = np.shape(individual_predictions)
         individual_predictions = add_extra_regressors_and_reshape(
-            self.extra_regressors, individual_predictions, shape[-1], target_positions, observed_pollution, order="F",
+            self.extra_regressors, individual_predictions, target_positions, observed_pollution, order="F",
             **kwargs)
         if isinstance(self.aggregator, np.ndarray):
             u = individual_predictions @ self.aggregator
@@ -1276,7 +1318,7 @@ class ModelsAggregatorNoCV(BaseModel):
             target_positions=observed_stations, **kwargs)
         shape = np.shape(individual_predictions)
         individual_predictions = add_extra_regressors_and_reshape(
-            self.extra_regressors, individual_predictions, shape[-1], observed_stations, observed_pollution, order="F",
+            self.extra_regressors, individual_predictions, observed_stations, observed_pollution, order="F",
             **kwargs)
 
         ground_truth = observed_pollution.values.reshape((-1, 1), order="F")
@@ -1303,3 +1345,27 @@ class ModelsAggregatorNoCV(BaseModel):
             self.aggregator.fit(individual_predictions, ground_truth)
             if self.norm21 and np.all(self.aggregator.coefs_ >= 0):
                 self.aggregator.coefs_ /= np.sum(self.aggregator.coefs_)
+
+
+class ModelsAggregatorNoCVTwoModels(ModelsAggregatorNoCV):
+    def __init__(self, models: List[BaseModel], aggregator: Pipeline, model2: BaseModel, sigma, name=None):
+        super().__init__(models, aggregator, name=name)
+        self.model2 = model2
+        self.sigma = sigma
+
+    def state_estimation(self, observed_stations, observed_pollution, traffic, target_positions: pd.DataFrame,
+                         **kwargs) -> np.ndarray:
+        models_prediction = super(ModelsAggregatorNoCVTwoModels, self).state_estimation(observed_stations,
+                                                                                        observed_pollution, traffic,
+                                                                                        target_positions, **kwargs)
+        models2_prediction = self.model2.state_estimation(observed_stations,
+                                                          observed_pollution, traffic,
+                                                          target_positions, **kwargs)
+        distance = cdist(target_positions.values.T, observed_stations.values.T)
+        min_dist = np.min(distance, axis=1)
+        w = np.exp(-min_dist / self.sigma)
+        return w * models2_prediction + (1 - w) * models_prediction
+
+    def calibrate(self, observed_stations, observed_pollution: pd.DataFrame, traffic, **kwargs):
+        self.model2.calibrate(observed_stations, observed_pollution, traffic, **kwargs)
+        super(ModelsAggregatorNoCVTwoModels, self).calibrate(observed_stations, observed_pollution, traffic, **kwargs)
