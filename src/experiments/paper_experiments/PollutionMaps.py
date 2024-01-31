@@ -54,7 +54,7 @@ for ix in [25]:#, 30, 40
         # norm=colors.CenteredNorm(),
         # norm=colors.BoundaryNorm(boundaries=levels, ncolors=len(levels), clip=True),
         alpha=0.75,
-        dpi=300,
+        dpi=50,
         estimation_limit_vals=(45, 55),
         # estimation_limit_vals=(np.min(levels), np.max(levels)),
         plot_nodes=True,

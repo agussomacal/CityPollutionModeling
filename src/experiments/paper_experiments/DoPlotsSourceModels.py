@@ -529,8 +529,8 @@ if __name__ == "__main__":
             legend_font_dict={'weight': 'normal', "size": 18, 'stretch': 'normal'},
             font_family="amssymb",
             uselatex=True,
-            xlabel=fr"RMSE",
-            ylabel=r"Stations",
+            ylabel=fr"RMSE",
+            xlabel=r"Stations",
             ylim=ylim,
             # create_preimage_data=True,
             # only_create_preimage_data=False

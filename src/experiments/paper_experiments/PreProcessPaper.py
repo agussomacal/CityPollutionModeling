@@ -412,10 +412,11 @@ if __name__ == "__main__":
     runsinfo.append_info(
         MinDistNodeStation=int(np.max(np.sqrt(np.sum((station_coordinates - vertex_stations) ** 2, axis=0))) * ratio),
     )
-    with save_fig([data_manager.path, path2latex_figures], "AvailableStations_InPeriod.pdf", dpi=300):
+    with save_fig([data_manager.path, path2latex_figures], "AvailableStations_InPeriod.pdf", dpi=100):
         plt.imshow(load_background(screenshot_period), alpha=1.0)
         plot_stations(vertex_stations, latitudes, longitudes, color="red", marker="o", size=7)
         plot_stations(station_coordinates, latitudes, longitudes, color="blue", marker="x", size=7, label=False)
+        plt.axis("off")
 
     # ---------- Graph and cropping ---------- #
     original_graph = osm_graph(path=city_dir, filename="ParisGraph", south=lat_bounds.lower, north=lat_bounds.upper,
@@ -428,7 +429,7 @@ if __name__ == "__main__":
     # )
     # plot deleted edges in red
     ec = ['y' if e in graph.edges else 'r' for e in original_graph.edges(keys=True, data=False)]
-    with save_fig([data_manager.path, path2latex_figures], "GoogleMapsAndOpenStreetMap.pdf", dpi=300):
+    with save_fig([data_manager.path, path2latex_figures], "GoogleMapsAndOpenStreetMap.png", dpi=75):
         figsize_x = 10
         fig, ax = plt.subplots(1, 1, figsize=(figsize_x, 10))
         dimensions = np.max(node_positions, axis=0) - np.min(node_positions, axis=0)
