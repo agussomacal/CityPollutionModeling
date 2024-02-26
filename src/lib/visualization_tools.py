@@ -175,7 +175,9 @@ def plot_errors(data, x, y, hue, ax, stations_order=None, model_style=None, fill
     ins = inspect.getfullargspec(sns.lineplot)
     kw = filter_dict(ins.args + ins.kwonlyargs, kwargs)
     # data.sort_values(by=map_names.keys(), ascending=False, inplace=True)
-    for method in (map_names.keys() if map_names is not None else np.unique(data[hue])):
+    iterate_on = (map_names.keys() if map_names is not None else np.unique(data[hue]))
+    iterate_on = [n for n in iterate_on if n in np.unique(data[hue])]
+    for method in iterate_on:
         df = data.loc[data[hue] == method]
         # for method, df in data.groupby(hue, sort=False):
         df.set_index(x, inplace=True, drop=True)

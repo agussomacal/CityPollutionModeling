@@ -435,7 +435,6 @@ class BaseSourceModel(BaseModel):
         source = source[times_indexes, :, :]
         source[np.isnan(source)] = 0
 
-        print("SOURCE SHAPE:", np.shape(source))
         # average in space
         avg = np.mean(observed_pollution.values, axis=1, keepdims=True) if self.substract_mean else 0
         return source, avg, spatial_indexes, times_indexes

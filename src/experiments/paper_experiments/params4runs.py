@@ -16,15 +16,15 @@ screenshot_period = 15
 # shuffle times
 shuffle = False
 simulation = False
-max_num_stations = 100
 filter_graph = True  # filter by nodes with neighboaring edges having traffic and keep the biggest commponent.
 seed = 42
-# all_stations = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS',
-#                  'PA15L']
+all_stations = ['OPERA', 'BP_EST', 'AUT', 'BASCH', 'BONAP', 'CELES', 'ELYS', 'PA07', 'PA12', 'PA13', 'PA18', 'HAUS',
+                'PA15L']
 # stations that are inside Paris so traffic information is all around
 # stations2test = ['OPERA', 'HAUS', 'BONAP', 'CELES',  'ELYS', 'PA07', 'PA13', 'PA18']
-stations2test = ['PA13', 'OPERA', 'BONAP', 'ELYS', 'PA07', 'PA18', 'BASCH', 'PA12', 'CELES', 'HAUS']
+# stations2test = ['PA13', 'OPERA', 'BONAP', 'ELYS', 'PA07', 'PA18', 'BASCH', 'PA12', 'CELES', 'HAUS']
 # stations2test = ['PA13', 'OPERA', 'BONAP', 'ELYS', 'PA07', 'PA18', 'BASCH', 'PA12', 'CELES', 'HAUS', 'PA15L']
+stations2test = all_stations
 
 runsinfo.append_info(
     filtergraph=filter_graph,
