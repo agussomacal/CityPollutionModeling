@@ -2,6 +2,7 @@ from collections import OrderedDict, namedtuple
 
 import numpy as np
 import seaborn as sns
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LassoCV
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
@@ -12,6 +13,7 @@ from PerplexityLab.DataManager import DataManager
 from PerplexityLab.LabPipeline import LabPipeline
 from PerplexityLab.miscellaneous import NamedPartial
 from PerplexityLab.miscellaneous import copy_main_script_version
+from PerplexityLab.mlutils.scikit_keras import SkKerasRegressor
 from PerplexityLab.visualization import generic_plot, LegendOutsidePlot
 from src.experiments.paper_experiments.PreProcessPaper import train_test_model, stations2test, station_coordinates, \
     graph, times_all, traffic_by_edge, plot_pollution_map_in_graph, pollution_future
@@ -102,20 +104,32 @@ geometrical_poly3NN_ = ProjectionFullSourceModel(
     name="", loss=mse, optim_method=NONE_OPTIM_METHOD,
     verbose=True, niter=25, sigma0=1,
     lnei=1, k_max=10,
-    source_model=Pipeline([
-        ("PF", PolynomialFeatures(degree=3)),
-        ("NN", MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
-                            activation=activation,  # 'relu',
-                            learning_rate_init=learning_rate_init,
-                            learning_rate=learning_rate,
-                            early_stopping=early_stopping,
-                            solver=solver.lower(),
-                            max_iter=max_iter,
-                            ),
-         )]),
+    source_model=
+    Pipeline([("PF", PolynomialFeatures(degree=1)),
+              ("RF", RandomForestRegressor(n_estimators=50, max_depth=3))]),
+    # Pipeline([("PF", PolynomialFeatures(degree=3)),
+    #           ("LR", LassoCV(selection="cyclic", positive=False, cv=len(stations2test) - 1))]),
+    # Pipeline([
+    #     ("PF", PolynomialFeatures(degree=3)),
+    #     ("NN",
+    #      # SkKerasRegressor(hidden_layer_sizes=hidden_layer_sizes,
+    #      #                        epochs=max_iter, activation=activation, validation_size=0.1,
+    #      #                        restarts=1,
+    #      #                        batch_size=0.1, criterion="mse", optimizer=solver,
+    #      #                        lr=None, lr_lower_limit=1e-12,
+    #      #                        lr_upper_limit=1, n_epochs_without_improvement=100,
+    #      #                        train_noise=1e-5)
+    #      MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+    #                   activation=activation,  # 'relu',
+    #                   learning_rate_init=learning_rate_init,
+    #                   learning_rate=learning_rate,
+    #                   early_stopping=early_stopping,
+    #                   solver=solver.lower(),
+    #                   max_iter=max_iter)
+    #      )]),
     sources_dist=[0],
     substract_mean=True,
-    extra_regressors=[],
+    # extra_regressors=["temperature", "wind"],
     basis="geometrical",
     kv=5, ky=5, kr=5, kd=5,
     D0=0.0, A0=0.0,
@@ -160,12 +174,12 @@ kriging = ExponentialKernelModel(
     name="", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=100, verbose=True)
 
 models = {
-    "Spatial average": SnapshotMeanModel(summary_statistic="mean"),
-    "BLUE": BLUEModel(name="BLUE", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=True),
-    "Kriging": kriging,
-    "Source": node_linear_TW,
-    "Physical-Laplacian": geometrical_poly3NN_,
-    "Physical-PCA": pca_log_poly2_only005_10,
+    # "Spatial average": SnapshotMeanModel(summary_statistic="mean"),
+    # "BLUE": BLUEModel(name="BLUE", loss=mse, optim_method=NONE_OPTIM_METHOD, niter=1000, verbose=True),
+    # "Kriging": kriging,
+    # "Source": node_linear_TW,
+    # "Physical-Laplacian": geometrical_poly3NN_,
+    # "Physical-PCA": pca_log_poly2_only005_10,
     "Ensemble": ModelsAggregatorNoCVTwoModels(
         models=[node_linear_TW, geometrical_poly3NN_, pca_log_poly2_only005_10],
         aggregator="average",
@@ -179,7 +193,7 @@ lab = LabPipeline()
 lab.define_new_block_of_functions(
     "individual_models",
     *list(map(train_test_model, models.items())),
-    recalculate=False
+    recalculate=True
 )
 
 lab.execute(
@@ -187,8 +201,8 @@ lab.execute(
     num_cores=15,
     forget=False,
     save_on_iteration=1,
-    # station=stations2test
-    station=pollution_future.columns.tolist()
+    station=stations2test
+    # station=pollution_future.columns.tolist()
 )
 
 ########################################################################################################################
