@@ -1,6 +1,6 @@
 This repository has the python implementation of the paper:
 
-**State estimation of urban air pollution with statistical, physical, and super-learning graph models**: [arXiv-preprint](https://arxiv.org/abs/2402.02812) |
+**State estimation of urban air pollution with statistical, physical, and super-learning graph models**: [arXiv-preprint](https://arxiv.org/abs/2402.02812) | [Poster summary](https://github.com/agussomacal/CityPollutionModeling/blob/main/poster/PollutionPoster.pdf)
 <br><sub>
 We consider the problem of real-time reconstruction of urban air pollution 
 maps. The task is challenging due to the heterogeneous sources of available 
